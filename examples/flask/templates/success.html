@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block heading %}Verified{% endblock %}
+
+{% block content %}
+  <div class="success">
+    <p>Phone number <strong>+{{ phone }}</strong> has been verified.</p>
+    <p><a href="{{ url_for('index') }}">Verify another number</a></p>
+  </div>
+{% endblock %}

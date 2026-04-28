@@ -1,0 +1,24 @@
+source "https://rubygems.org"
+
+ruby ">= 3.2.0"
+
+# Rails framework -- using a slim setup, no ActiveRecord/ActionMailer needed
+# for this demo. If you scaffold with `rails new myotp-demo --minimal`, this
+# matches what you get plus dotenv-rails for env loading.
+gem "rails", "~> 7.1"
+
+# Web server
+gem "puma", "~> 6.0"
+
+# Templating + helpers
+gem "sprockets-rails"
+
+# Loads .env into ENV in development. Production should use real env vars.
+gem "dotenv-rails", "~> 3.0", groups: [:development, :test]
+
+# Boot performance
+gem "bootsnap", "~> 1.18", require: false
+
+group :development do
+  gem "web-console"
+end

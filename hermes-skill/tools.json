@@ -1,0 +1,219 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "generate_otp",
+      "description": "Send a one-time password (OTP) to a phone number via SMS, WhatsApp, or Telegram. MyOTP.App generates the code, formats the message, picks the best carrier route, and delivers it. Returns a `message_id` (UUID) that must be retained for later calls to `verify_otp`, `check_otp_status`, or `extend_otp`. Each call deducts credits from the account balance; the per-message cost varies by destination country and channel and is returned in the `cost` field. Use this whenever an app needs to verify someone's phone: signup, login 2FA, password reset, transaction confirmation, etc.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "phone_number": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{6,14}$",
+            "minLength": 7,
+            "maxLength": 15,
+            "description": "Destination phone number in international format with NO leading + or 0. Must be 7-15 digits and start with a non-zero digit. Example: '14155551234' for a US number, '447911123456' for a UK number."
+          },
+          "channel": {
+            "type": "string",
+            "enum": ["sms", "whatsapp", "telegram"],
+            "default": "sms",
+            "description": "Delivery channel. 'sms' (default) works in 190+ countries. 'whatsapp' is best for India, Brazil, Indonesia, Mexico, Nigeria, Turkey. 'telegram' suits privacy-focused users. Same API for all three."
+          },
+          "otp_length": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 8,
+            "default": 6,
+            "description": "Number of digits in the auto-generated OTP. Range 3-8 (4-8 for telegram). Default 6. Requires CUSTOM_OTP_LENGTH entitlement (Business plan or above)."
+          },
+          "otp_code": {
+            "type": "string",
+            "pattern": "^[0-9]{3,8}$",
+            "description": "Optional. Provide your own pre-generated numeric OTP code (3-8 digits, 4-8 for telegram) instead of letting MyOTP generate one. Useful when you already have a code from another system."
+          },
+          "otp_validity": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 14400,
+            "default": 300,
+            "description": "How long the OTP stays valid, in seconds. Range 30-14400 (30-3600 for telegram). Default 300 (5 minutes). Requires CUSTOM_OTP_EXPIRY entitlement (Business plan or above)."
+          },
+          "brand": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9.]+$",
+            "minLength": 3,
+            "maxLength": 16,
+            "description": "Sender brand name shown to the recipient (3-16 alphanumeric characters plus dots). Defaults to the brand registered against the API key, or 'MyOTP.App' if none."
+          },
+          "return_otp": {
+            "type": "string",
+            "enum": ["true", "false"],
+            "default": "false",
+            "description": "Set to 'true' to include the generated OTP code in the API response. Useful for testing or custom delivery. Never enable in production user flows."
+          },
+          "force_send": {
+            "type": "string",
+            "enum": ["true", "false"],
+            "default": "false",
+            "description": "Set to 'true' to send a new OTP even if one is already active for this phone number. By default the API returns 409 in that case. Use sparingly: repeated sends to the same number can hit carrier-level spam filters."
+          },
+          "template_order": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99,
+            "description": "Pick a specific message template by its order number (1-99). Requires ACCESS_TO_TEMPLATES entitlement. Not supported on telegram."
+          }
+        },
+        "required": ["phone_number"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "verify_otp",
+      "description": "Verify a code submitted by an end user against the OTP MyOTP delivered. Returns `{status: 'success'}` if the code matches and the OTP has not expired; at that point the OTP is consumed and cannot be reused. Returns `{status: 'failed', reason: 'invalid' | 'expired' | 'not found'}` otherwise. You MUST pass either `phone_number` or `message_id` to identify which OTP you're verifying against. Call this after collecting the code from the user (login form, signup screen, etc.).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "otp": {
+            "type": "string",
+            "pattern": "^[0-9]{3,8}$",
+            "description": "The OTP code the end user typed in (3-8 numeric digits)."
+          },
+          "phone_number": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{6,14}$",
+            "description": "Phone number the OTP was originally sent to, in international format without + or leading 0. Provide either this OR `message_id`. `message_id` is more precise."
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The UUID returned by `generate_otp`. Provide either this OR `phone_number`. Prefer this when you have it: it disambiguates if the same number got multiple OTPs."
+          }
+        },
+        "required": ["otp"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_otp_status",
+      "description": "Check whether a previously sent OTP is still active and (with DLR_ACCESS entitlement on Enterprise plan) get its delivery status. Returns `is_active` (bool) and `expires_at` (ISO timestamp) on every plan. On Enterprise plans, also returns `DLR` (one of 'delivered', 'sent', 'read', 'failed', 'pending'). Useful when an end user reports they did not receive the code: confirm whether MyOTP delivered it before deciding to resend. Does NOT verify a code; use `verify_otp` for that.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The UUID returned by `generate_otp`. Identifies which OTP you want a status report on."
+          }
+        },
+        "required": ["message_id"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "extend_otp",
+      "description": "Extend the expiry time of an active OTP without sending a new one. Useful when the end user is taking longer than expected to enter the code (switched apps, carrier delivery delay). Adds `duration` seconds (60-14400) to the current `expires_at`. Requires the EXTEND_OTP entitlement (Business or Enterprise plan). Some destination countries do not allow extensions: the API returns 403 in that case. Cheaper and less spammy than calling `generate_otp` again.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The UUID returned by `generate_otp`. Identifies the OTP you want to extend."
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 14400,
+            "description": "Additional seconds to add to the OTP's expiry. Range 60-14400 (1 minute to 4 hours)."
+          }
+        },
+        "required": ["message_id", "duration"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_account_info",
+      "description": "Return account details for the API key currently in use. Always returns at least the account `email`. Use this as a sanity check when wiring up MyOTP for the first time: if this call succeeds, your API key and IP whitelist are configured correctly.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_usage_report",
+      "description": "Fetch a paginated list of OTP transactions for a date range. Each transaction includes message_id, timestamp, phone_number, channel, country, cost, status, and the originating client IP. Date range cannot exceed 31 days. Defaults: last 7 days, page 1, 10 per page. Requires the API_REPORTING entitlement (Business or Enterprise plan). Use this to audit recent activity, build internal dashboards, reconcile billing, or debug delivery issues across many recipients.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "description": "Start date in YYYY-MM-DD format (UTC). Defaults to 7 days before today. Range start_date..end_date cannot exceed 31 days."
+          },
+          "end_date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "description": "End date in YYYY-MM-DD format (UTC). Defaults to today. Range start_date..end_date cannot exceed 31 days."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Page number for paginated results, starting at 1."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10,
+            "description": "Results per page, 1-100."
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "register_account",
+      "description": "BETA. Register a new MyOTP.App account programmatically. Intended use: an AI agent helping a user set up phone verification for the first time can call this to bootstrap the account, then a follow-up verification step yields an API key. Status: the agent-registration endpoint (POST /v1/agent/register) is not yet live. Until it ships, this tool will return 404. When that happens, direct the user to https://myotp.app/sign-up/ to create an account manually and generate an API key in the dashboard. They get 15 free trial credits on signup, no credit card required. This is the only tool that does not require an existing API key.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address for the new MyOTP.App account. Will receive a verification code."
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{6,14}$",
+            "description": "Phone number for the account holder (international format, no + or leading 0). May be used for phone verification during onboarding."
+          },
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "The company or product name registering for an account."
+          }
+        },
+        "required": ["email", "phone", "company_name"]
+      }
+    }
+  }
+]

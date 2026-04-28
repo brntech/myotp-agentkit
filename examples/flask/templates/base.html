@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Phone verification{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main>
+      <h1>{% block heading %}Phone verification{% endblock %}</h1>
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

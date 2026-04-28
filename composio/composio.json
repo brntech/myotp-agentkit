@@ -1,0 +1,216 @@
+{
+  "$schema": "https://docs.composio.dev/schemas/toolkit.v1.json",
+  "slug": "myotp",
+  "name": "MyOTP.App",
+  "description": "Multi-channel OTP delivery (SMS, WhatsApp, Telegram) for phone verification and 2FA. Cleaner alternative to Twilio Verify with transparent per-message pricing and direct carrier connections via Broadnet.",
+  "categories": ["authentication", "communication", "security"],
+  "logo": "https://myotp.app/wp-content/uploads/2024/02/cropped-favicon.png",
+  "homepage": "https://myotp.app",
+  "documentation": "https://api.myotp.app/swagger-ui/",
+
+  "auth": {
+    "scheme": "api_key",
+    "header_name": "X-API-Key",
+    "key_location": "header",
+    "obtain_url": "https://myotp.app/sign-up/",
+    "obtain_instructions": "Sign up at myotp.app/sign-up (15 free trial credits, no card required), then generate an API key in the dashboard. Add your server IP (or `*` for testing) to the IP whitelist for that key."
+  },
+
+  "base_url": "https://api.myotp.app",
+
+  "tools": [
+    {
+      "name": "generate_otp",
+      "method": "POST",
+      "path": "/generate_otp",
+      "description": "Send a one-time password to a phone number via SMS, WhatsApp, or Telegram. Returns a message_id for later verification.",
+      "parameters": [
+        {
+          "name": "phone_number",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Destination phone number, digits only, no leading + or 0. Example: 14155551234 for a US number.",
+          "pattern": "^[1-9][0-9]{6,14}$"
+        },
+        {
+          "name": "channel",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "default": "sms",
+          "enum": ["sms", "whatsapp", "telegram"],
+          "description": "Delivery channel."
+        },
+        {
+          "name": "otp_length",
+          "in": "body",
+          "type": "integer",
+          "required": false,
+          "default": 6,
+          "minimum": 3,
+          "maximum": 8,
+          "description": "Number of digits in the OTP. Telegram requires 4-8."
+        },
+        {
+          "name": "otp_validity",
+          "in": "body",
+          "type": "integer",
+          "required": false,
+          "default": 300,
+          "description": "OTP expiry in seconds. Range 30-14400 (30-3600 for Telegram)."
+        },
+        {
+          "name": "brand",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "Sender brand name. Letters, numbers, dots only; 3-16 chars."
+        },
+        {
+          "name": "force_send",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "default": "false",
+          "enum": ["true", "false"],
+          "description": "Set to true to issue a new OTP even if one is already active for this phone number."
+        },
+        {
+          "name": "return_otp",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "default": "false",
+          "enum": ["true", "false"],
+          "description": "Set to true to include the OTP code in the response (testing or custom delivery)."
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "properties": {
+          "message_id": { "type": "string" },
+          "status": { "type": "string" },
+          "message": { "type": "string" },
+          "date_sent": { "type": "string" },
+          "expires_at": { "type": "string" },
+          "cost": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "verify_otp",
+      "method": "POST",
+      "path": "/verify_otp",
+      "description": "Verify a one-time password the user typed in. Provide either phone_number or message_id.",
+      "parameters": [
+        {
+          "name": "otp",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "The code the user typed. 3-8 digits."
+        },
+        {
+          "name": "phone_number",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "Phone the OTP was sent to. Either this OR message_id is required."
+        },
+        {
+          "name": "message_id",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "The message_id returned by generate_otp. Either this OR phone_number is required. Preferred when you may have multiple concurrent OTPs."
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["success", "failed"] },
+          "reason": { "type": "string", "description": "On failure: invalid, expired, or 'not found'." },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "check_otp_status",
+      "method": "POST",
+      "path": "/check_otp_status",
+      "description": "Check the delivery status of a previously sent OTP. Returns DLR (Delivery Report) field on plans with DLR_ACCESS entitlement.",
+      "parameters": [
+        {
+          "name": "message_id",
+          "in": "body",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "properties": {
+          "DLR": { "type": "string", "enum": ["delivered", "sent", "read", "failed", "pending"] },
+          "is_active": { "type": "boolean" },
+          "expires_at": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "extend_otp",
+      "method": "POST",
+      "path": "/extend_otp",
+      "description": "Extend the expiry time of an active OTP. Requires the EXTEND_OTP entitlement on your plan.",
+      "parameters": [
+        { "name": "message_id", "in": "body", "type": "string", "required": true },
+        { "name": "duration", "in": "body", "type": "integer", "required": true, "minimum": 60, "maximum": 14400 }
+      ]
+    },
+    {
+      "name": "get_account_info",
+      "method": "GET",
+      "path": "/me",
+      "description": "Get the authenticated account's basic profile.",
+      "parameters": []
+    },
+    {
+      "name": "get_usage_report",
+      "method": "POST",
+      "path": "/report",
+      "description": "Get a date-ranged transaction history. Requires API_REPORTING entitlement.",
+      "parameters": [
+        {
+          "name": "start_date",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "YYYY-MM-DD. Defaults to 7 days ago."
+        },
+        {
+          "name": "end_date",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "YYYY-MM-DD. Defaults to today."
+        }
+      ]
+    }
+  ],
+
+  "metadata": {
+    "publisher": "BroadNet Technologies",
+    "supports": ["api_key"],
+    "free_tier": {
+      "credits": 15,
+      "card_required": false
+    },
+    "paid_tiers": [
+      { "name": "Starter", "monthly_price_usd": 20 },
+      { "name": "Business", "monthly_price_usd": 25 },
+      { "name": "Enterprise", "monthly_price_usd": null, "note": "custom" }
+    ],
+    "regions": "190+ countries via Broadnet direct carrier connections",
+    "compliance": ["ISO_27001", "ISO_9001", "GDPR_compliant"]
+  }
+}

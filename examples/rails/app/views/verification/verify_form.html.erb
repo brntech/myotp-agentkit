@@ -1,0 +1,13 @@
+<% content_for :heading, "Enter code" %>
+
+<p>We sent a code via <strong><%= @channel %></strong> to <strong>+<%= @phone %></strong>. Enter it below.</p>
+
+<%= form_with url: verify_otp_path, method: :post, local: true do |f| %>
+  <label>
+    <span>Verification code</span>
+    <%= f.text_field :otp, type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: 8, required: true %>
+  </label>
+
+  <% if @error.present? %><p class="error"><%= @error %></p><% end %>
+  <%= f.submit "Verify" %>
+<% end %>

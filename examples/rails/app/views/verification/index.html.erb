@@ -1,0 +1,18 @@
+<p>Enter your phone number in international format (no leading +). MyOTP will send a 6-digit code.</p>
+
+<%= form_with url: send_otp_path, method: :post, local: true do |f| %>
+  <label>
+    <span>Phone number</span>
+    <%= f.text_field :phone, type: "tel", inputmode: "numeric", placeholder: "14155551234", required: true %>
+  </label>
+
+  <fieldset>
+    <legend>Channel</legend>
+    <label class="inline"><%= f.radio_button :channel, "sms", checked: true %> SMS</label>
+    <label class="inline"><%= f.radio_button :channel, "whatsapp" %> WhatsApp</label>
+    <label class="inline"><%= f.radio_button :channel, "telegram" %> Telegram</label>
+  </fieldset>
+
+  <% if @error.present? %><p class="error"><%= @error %></p><% end %>
+  <%= f.submit "Send code" %>
+<% end %>

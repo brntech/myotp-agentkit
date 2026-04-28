@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phone verification</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Phone verification</h1>
+      <p>Enter your phone number in international format (no leading +). MyOTP will send a 6-digit code.</p>
+
+      <form id="phone-form">
+        <label>
+          <span>Phone number</span>
+          <input name="phone" type="tel" inputmode="numeric" placeholder="14155551234" required />
+        </label>
+
+        <fieldset>
+          <legend>Channel</legend>
+          <label class="inline"><input type="radio" name="channel" value="sms" checked /> SMS</label>
+          <label class="inline"><input type="radio" name="channel" value="whatsapp" /> WhatsApp</label>
+          <label class="inline"><input type="radio" name="channel" value="telegram" /> Telegram</label>
+        </fieldset>
+
+        <p id="error" class="error" hidden></p>
+        <button type="submit">Send code</button>
+      </form>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

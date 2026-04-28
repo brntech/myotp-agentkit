@@ -1,0 +1,62 @@
+{
+  "name": "@myotp/better-auth",
+  "version": "0.1.0",
+  "description": "MyOTP.App phone-number adapter for Better Auth — drop-in SMS, WhatsApp, and Telegram OTP delivery for the better-auth phoneNumber() plugin.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "better-auth",
+    "myotp",
+    "otp",
+    "sms",
+    "whatsapp",
+    "telegram",
+    "phone-verification",
+    "2fa",
+    "twilio-alternative"
+  ],
+  "author": "BroadNet Technologies <info@myotp.app>",
+  "license": "MIT",
+  "homepage": "https://myotp.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brntech/myotp-agentkit.git",
+    "directory": "better-auth"
+  },
+  "bugs": {
+    "url": "https://github.com/brntech/myotp-agentkit/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "better-auth": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-auth": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}

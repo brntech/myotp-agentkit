@@ -7,7 +7,7 @@ import { runStatus } from './commands/status.js';
 import { runConfig } from './commands/config.js';
 import { colors, logErrorHuman, logHuman } from './lib/output.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.2';
 
 const program = new Command();
 
@@ -28,10 +28,8 @@ const globalOptions = (cmd: Command): Command =>
 globalOptions(
   program
     .command('init')
-    .description('Create a MyOTP account and save the API key locally')
-    .option('--email <email>', 'work email')
-    .option('--phone <phone>', 'mobile phone in international format')
-    .option('--company <name>', 'company or project name')
+    .description('Save your MyOTP API key locally (sign up first at https://myotp.app/sign-up/)')
+    .option('--key <api-key>', 'API key from your MyOTP dashboard')
     .option('--force', 'overwrite an existing config without prompting', false)
     .action(async (opts) => {
       await runInit(opts);

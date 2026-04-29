@@ -5,18 +5,17 @@ import path from "node:path";
 import { MyOtpApiError } from "../../src/lib/api.js";
 import { captureIo, ExitError, stdout } from "../helpers/io.js";
 
-// We only test the --json path of init because that path bypasses interactive
-// prompts entirely (--email/--phone/--company come in as flags). The
-// interactive prompt flow (TTY-based) is intentionally out of scope.
+// Init now just validates a pasted/passed API key against /me. No prompting in
+// JSON mode. Interactive paste flow (TTY-based) is intentionally out of scope.
 
-const registerMock = vi.fn();
+const meMock = vi.fn();
 
 vi.mock("../../src/lib/api.js", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     MyOtpClient: function MockMyOtpClient() {
-      return { register: registerMock };
+      return { me: meMock };
     },
   };
 });
@@ -29,7 +28,7 @@ beforeEach(async () => {
   homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(tmpHome);
   delete process.env.MYOTP_API_KEY;
   delete process.env.MYOTP_BASE_URL;
-  registerMock.mockReset();
+  meMock.mockReset();
 });
 
 afterEach(async () => {
@@ -37,50 +36,29 @@ afterEach(async () => {
   await fs.rm(tmpHome, { recursive: true, force: true });
 });
 
-describe("init command — onboarding endpoint not shipped (404)", () => {
-  it("emits a JSON 'fallback' result when the register endpoint returns 404", async () => {
-    registerMock.mockRejectedValueOnce(
-      new MyOtpApiError("Not Found", { status: 404, body: null, endpoint: "/v1/agent/register" })
-    );
+describe("init command — JSON mode with --key", () => {
+  it("validates the key against /me and saves it on success", async () => {
+    meMock.mockResolvedValueOnce({ email: "user@example.com" });
     const { runInit } = await import("../../src/commands/init.js");
+    const { readConfig } = await import("../../src/lib/config.js");
     const io = captureIo();
     try {
-      await runInit({
-        email: "user@example.com",
-        phone: "+14155551234",
-        company: "Acme",
-        json: true,
-      });
+      await runInit({ key: "k_valid_key_12345", json: true });
       const parsed = JSON.parse(stdout(io).trim());
       expect(parsed.ok).toBe(true);
-      expect(parsed.data.status).toBe("fallback");
-      expect(parsed.data.signup_url).toContain("myotp.app");
-      expect(parsed.data.set_key_command).toContain("--set-key");
+      expect(parsed.data.status).toBe("active");
+      expect(parsed.data.email).toBe("user@example.com");
+      expect(parsed.data.api_key_set).toBe(true);
+
+      const cfg = await readConfig();
+      expect(cfg.apiKey).toBe("k_valid_key_12345");
+      expect(cfg.email).toBe("user@example.com");
     } finally {
       io.restore();
     }
   });
 
-  it("does NOT throw on 404 — just surfaces the fallback", async () => {
-    registerMock.mockRejectedValueOnce(
-      new MyOtpApiError("Not Found", { status: 404, body: null, endpoint: "/v1/agent/register" })
-    );
-    const { runInit } = await import("../../src/commands/init.js");
-    const io = captureIo();
-    try {
-      await expect(
-        runInit({ email: "u@example.com", phone: "+14155551234", company: "Acme", json: true })
-      ).resolves.toBeUndefined();
-      // No process.exit fired.
-      expect(io.exits.length).toBe(0);
-    } finally {
-      io.restore();
-    }
-  });
-});
-
-describe("init command — JSON mode validation", () => {
-  it("requires --email, --phone, --company in JSON mode", async () => {
+  it("requires --key in JSON mode", async () => {
     const { runInit } = await import("../../src/commands/init.js");
     const io = captureIo();
     try {
@@ -90,33 +68,69 @@ describe("init command — JSON mode validation", () => {
       io.restore();
     }
   });
-});
 
-describe("init command — register returns api_key", () => {
-  it("writes the returned API key to the config and reports active status", async () => {
-    registerMock.mockResolvedValueOnce({
-      account_id: "acct_42",
-      status: "active",
-      api_key: "k_brand_new_key",
-    });
+  it("surfaces a clear error when the key is rejected (401)", async () => {
+    meMock.mockRejectedValueOnce(
+      new MyOtpApiError("Unauthorized", { status: 401, body: null, endpoint: "/me" })
+    );
     const { runInit } = await import("../../src/commands/init.js");
-    const { readConfig } = await import("../../src/lib/config.js");
     const io = captureIo();
     try {
-      await runInit({
-        email: "u@example.com",
-        phone: "+14155551234",
-        company: "Acme",
-        json: true,
-      });
+      await expect(runInit({ key: "k_bogus", json: true })).rejects.toBeInstanceOf(ExitError);
+      expect(io.exits[0]).toBe(1);
+    } finally {
+      io.restore();
+    }
+  });
+
+  it("surfaces a different error when IP is not whitelisted (403)", async () => {
+    meMock.mockRejectedValueOnce(
+      new MyOtpApiError("Forbidden", { status: 403, body: null, endpoint: "/me" })
+    );
+    const { runInit } = await import("../../src/commands/init.js");
+    const io = captureIo();
+    try {
+      await expect(runInit({ key: "k_valid_but_ip_blocked", json: true })).rejects.toBeInstanceOf(ExitError);
+      expect(io.exits[0]).toBe(1);
+    } finally {
+      io.restore();
+    }
+  });
+});
+
+describe("init command — existing config", () => {
+  it("refuses to overwrite without --force in JSON mode", async () => {
+    // Seed a config first
+    const { writeConfig } = await import("../../src/lib/config.js");
+    await writeConfig({ apiKey: "k_existing", email: "old@example.com" });
+
+    const { runInit } = await import("../../src/commands/init.js");
+    const io = captureIo();
+    try {
+      await expect(
+        runInit({ key: "k_new", json: true })
+      ).rejects.toBeInstanceOf(ExitError);
+      expect(io.exits[0]).toBe(1);
+    } finally {
+      io.restore();
+    }
+  });
+
+  it("overwrites with --force in JSON mode", async () => {
+    const { writeConfig, readConfig } = await import("../../src/lib/config.js");
+    await writeConfig({ apiKey: "k_existing", email: "old@example.com" });
+
+    meMock.mockResolvedValueOnce({ email: "new@example.com" });
+    const { runInit } = await import("../../src/commands/init.js");
+    const io = captureIo();
+    try {
+      await runInit({ key: "k_new_key", force: true, json: true });
       const parsed = JSON.parse(stdout(io).trim());
-      expect(parsed.data.status).toBe("active");
-      expect(parsed.data.account_id).toBe("acct_42");
+      expect(parsed.ok).toBe(true);
 
       const cfg = await readConfig();
-      expect(cfg.apiKey).toBe("k_brand_new_key");
-      expect(cfg.email).toBe("u@example.com");
-      expect(cfg.accountId).toBe("acct_42");
+      expect(cfg.apiKey).toBe("k_new_key");
+      expect(cfg.email).toBe("new@example.com");
     } finally {
       io.restore();
     }

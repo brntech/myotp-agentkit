@@ -39,7 +39,8 @@ Requires Node 20 or newer.
 ## Quick start
 
 ```bash
-# 1. Create an account (or import an existing API key)
+# 1. Sign up at https://myotp.app/sign-up/ (~60 seconds, 15 free trial credits)
+#    Then save your API key locally:
 npx myotp init
 
 # 2. Send a test OTP
@@ -56,13 +57,21 @@ npx myotp status
 
 ### `myotp init`
 
-Interactive account setup. Calls the MyOTP onboarding API, walks you through email and phone verification, and saves your API key to `~/.myotp/config.json`.
+Saves an API key locally and validates it against `/me`.
 
-If you already have an API key from the dashboard, skip the registration flow:
+Signup is human-driven and takes ~60 seconds at [myotp.app/sign-up](https://myotp.app/sign-up/). After signup, run `myotp init` and paste the API key from your dashboard. The CLI will:
+
+1. Confirm the key is valid (calls `/me`)
+2. Save it to `~/.myotp/config.json` (chmod 600)
+3. Show your account email so you know it stuck
+
+Non-interactive (CI / scripted setup):
 
 ```bash
-npx myotp config --set-key sk_live_xxxxxxxxxxxxxxxx
+npx myotp init --key sk_live_xxxxxxxxxxxxxxxx --json
 ```
+
+Already have a key in your environment? Skip `init` entirely — every subcommand reads `MYOTP_API_KEY` directly. `init` exists for convenience, not as a requirement.
 
 ### `myotp test <phone> [--channel <sms|whatsapp|telegram>]`
 

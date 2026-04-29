@@ -4,19 +4,19 @@ import { MyOtpApiError, MyOtpClient } from '../lib/api.js';
 import {
   configExists,
   configPath,
-  ONBOARDING_BASE_URL,
+  DEFAULT_BASE_URL,
   readConfig,
   resolveBaseUrl,
   writeConfig,
 } from '../lib/config.js';
 import { fail } from '../lib/errors.js';
-import { normalizePhone } from '../lib/phone.js';
 import { colors, emitJsonSuccess, logHuman } from '../lib/output.js';
 
+const SIGNUP_URL = 'https://myotp.app/sign-up/';
+const DASHBOARD_URL = 'https://myotp.app/login/';
+
 const optionsSchema = z.object({
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  company: z.string().optional(),
+  key: z.string().optional(),
   baseUrl: z.string().optional(),
   force: z.boolean().default(false),
   json: z.boolean().default(false),
@@ -24,17 +24,12 @@ const optionsSchema = z.object({
 });
 
 export interface InitOptionsInput {
-  email?: string;
-  phone?: string;
-  company?: string;
+  key?: string;
   baseUrl?: string;
   force?: boolean;
   json?: boolean;
   verbose?: boolean;
 }
-
-const SIGNUP_FALLBACK_MESSAGE =
-  'Programmatic onboarding is in development. Visit https://myotp.app/sign-up to create an account, then run `npx myotp config --set-key <KEY>`.';
 
 export async function runInit(rawOpts: InitOptionsInput): Promise<void> {
   const parsed = optionsSchema.safeParse(rawOpts);
@@ -47,7 +42,6 @@ export async function runInit(rawOpts: InitOptionsInput): Promise<void> {
   }
   const opts = parsed.data;
 
-  // Existing config check.
   if (await configExists()) {
     if (!opts.force) {
       if (opts.json) {
@@ -79,247 +73,99 @@ export async function runInit(rawOpts: InitOptionsInput): Promise<void> {
     }
   }
 
-  // Gather required fields.
-  let email = opts.email;
-  let rawPhone = opts.phone;
-  let company = opts.company;
+  const cfg = await readConfig();
+  const baseUrl = resolveBaseUrl(opts.baseUrl, { ...cfg, baseUrl: cfg.baseUrl ?? DEFAULT_BASE_URL });
 
-  if (opts.json) {
-    if (!email || !rawPhone || !company) {
+  let apiKey = opts.key?.trim();
+
+  if (!apiKey) {
+    if (opts.json) {
       fail({
         command: 'init',
         json: true,
-        err: new Error(
-          'In --json mode, --email, --phone, and --company must all be provided as flags.'
-        ),
+        err: new Error('In --json mode, --key <API_KEY> must be provided. Sign up at ' + SIGNUP_URL + ' first.'),
       });
     }
-  } else {
-    if (!email || !rawPhone || !company) {
-      logHuman('');
-      logHuman(colors.bold('MyOTP onboarding'));
-      logHuman(colors.dim('Tell us a few things to create your account.'));
-      logHuman('');
-    }
-    if (!email) {
-      const res = await prompts(
-        {
-          type: 'text',
-          name: 'value',
-          message: 'Work email',
-          validate: (v: string) =>
-            /.+@.+\..+/.test(v.trim()) ? true : 'Please enter a valid email address.',
+    logHuman('');
+    logHuman(colors.bold('MyOTP setup'));
+    logHuman('');
+    logHuman('Signup is human-driven and takes about 60 seconds:');
+    logHuman('  1. Open ' + colors.cyan(SIGNUP_URL));
+    logHuman('  2. Verify your email and phone');
+    logHuman('  3. Get an API key from ' + colors.cyan(DASHBOARD_URL));
+    logHuman(colors.dim('     (15 free trial credits, no card required)'));
+    logHuman('');
+
+    const res = await prompts(
+      {
+        type: 'password',
+        name: 'value',
+        message: 'Paste your API key',
+        validate: (v: string) => (v.trim().length > 0 ? true : 'API key is required.'),
+      },
+      {
+        onCancel: () => {
+          logHuman(colors.dim('Aborted.'));
+          process.exit(130);
         },
-        {
-          onCancel: () => {
-            logHuman(colors.dim('Aborted.'));
-            process.exit(130);
-          },
-        }
-      );
-      email = String(res.value).trim();
-    }
-    if (!rawPhone) {
-      const res = await prompts(
-        {
-          type: 'text',
-          name: 'value',
-          message: 'Mobile phone (international format, e.g. +14155551234)',
-          validate: (v: string) => {
-            try {
-              normalizePhone(v);
-              return true;
-            } catch (err) {
-              return (err as Error).message;
-            }
-          },
-        },
-        {
-          onCancel: () => {
-            logHuman(colors.dim('Aborted.'));
-            process.exit(130);
-          },
-        }
-      );
-      rawPhone = String(res.value).trim();
-    }
-    if (!company) {
-      const res = await prompts(
-        {
-          type: 'text',
-          name: 'value',
-          message: 'Company or project name',
-          validate: (v: string) => (v.trim().length > 0 ? true : 'Required.'),
-        },
-        {
-          onCancel: () => {
-            logHuman(colors.dim('Aborted.'));
-            process.exit(130);
-          },
-        }
-      );
-      company = String(res.value).trim();
-    }
+      }
+    );
+    apiKey = String(res.value).trim();
   }
 
-  let phone: string;
-  try {
-    phone = normalizePhone(rawPhone!);
-  } catch (err) {
-    fail({ command: 'init', json: opts.json, err });
+  if (!apiKey) {
+    fail({ command: 'init', json: opts.json, err: new Error('No API key provided.') });
   }
 
-  const cfg = await readConfig();
-  const baseUrl = resolveBaseUrl(opts.baseUrl, { ...cfg, baseUrl: cfg.baseUrl ?? ONBOARDING_BASE_URL });
-  const client = new MyOtpClient({ baseUrl });
+  const client = new MyOtpClient({ baseUrl, apiKey });
 
   if (!opts.json) {
     logHuman('');
-    logHuman(colors.dim(`Registering account at ${baseUrl}/v1/agent/register ...`));
+    logHuman(colors.dim('Validating key against ' + baseUrl + '/me ...'));
   }
 
-  let registerRes: Awaited<ReturnType<MyOtpClient['register']>> | null = null;
+  let email: string | undefined;
   try {
-    registerRes = await client.register({
-      email: email!,
-      phone,
-      company_name: company!,
-      source: 'cli',
-    });
+    const me = await client.me();
+    email = me?.email;
   } catch (err) {
-    if (err instanceof MyOtpApiError && err.status === 404) {
-      // Onboarding API not shipped yet -- fall back to manual sign-up.
-      if (opts.json) {
-        emitJsonSuccess('init', {
-          status: 'fallback',
-          message: SIGNUP_FALLBACK_MESSAGE,
-          signup_url: 'https://myotp.app/sign-up',
-          set_key_command: 'npx myotp config --set-key <KEY>',
-        });
-        return;
-      }
-      logHuman('');
-      logHuman(colors.yellow(SIGNUP_FALLBACK_MESSAGE));
-      logHuman('');
-      return;
+    if (err instanceof MyOtpApiError && err.status === 401) {
+      fail({
+        command: 'init',
+        json: opts.json,
+        err: new Error('API key was rejected (401). Double-check the key in your dashboard at ' + DASHBOARD_URL),
+      });
+    }
+    if (err instanceof MyOtpApiError && err.status === 403) {
+      fail({
+        command: 'init',
+        json: opts.json,
+        err: new Error('API key valid but request was blocked (403). Most likely your IP is not whitelisted on the key. Add this machine\'s IP (or "*" for development) in the dashboard.'),
+      });
     }
     fail({ command: 'init', json: opts.json, err });
   }
 
-  // Some onboarding API designs return the API key right away (after email/phone
-  // verification flows are complete on their side). Others return only an
-  // account_id and a follow-up step. Handle both.
-  if (registerRes && registerRes.api_key) {
-    await writeConfig({
-      apiKey: registerRes.api_key,
-      email: email,
-      accountId: registerRes.account_id,
-      baseUrl: baseUrl === 'https://api.myotp.app' ? undefined : baseUrl,
-    });
-    if (opts.json) {
-      emitJsonSuccess('init', {
-        status: 'active',
-        account_id: registerRes.account_id,
-        config_path: configPath(),
-        api_key_set: true,
-      });
-      return;
-    }
-    logHuman('');
-    logHuman(`${colors.green('OK')}  ${colors.bold('Account ready.')} API key saved to ${configPath()}.`);
-    logHuman('');
-    logHuman(colors.dim('Try it now:'));
-    logHuman(`  npx myotp test +${phone}`);
-    logHuman('');
-    return;
-  }
+  await writeConfig({
+    apiKey,
+    email,
+    baseUrl: baseUrl === DEFAULT_BASE_URL ? undefined : baseUrl,
+  });
 
-  // Account created but not yet active: prompt for OTP codes.
   if (opts.json) {
     emitJsonSuccess('init', {
-      status: 'pending_verification',
-      account_id: registerRes?.account_id,
-      next: registerRes?.next ?? 'Check your email and SMS for verification codes.',
+      status: 'active',
+      email,
+      config_path: configPath(),
+      api_key_set: true,
     });
     return;
   }
 
   logHuman('');
-  logHuman(`${colors.green('OK')}  Account created. Verification codes have been sent to your email and phone.`);
-  logHuman(colors.dim('Enter the codes below to activate your account.'));
+  logHuman(`${colors.green('OK')}  Saved to ${configPath()}${email ? ` (${email})` : ''}.`);
   logHuman('');
-
-  const emailCodeRes = await prompts(
-    {
-      type: 'text',
-      name: 'value',
-      message: 'Email verification code',
-      validate: (v: string) => (/^\d{3,8}$/.test(v.trim()) ? true : '3-8 digits.'),
-    },
-    {
-      onCancel: () => {
-        logHuman(colors.dim('Aborted. You can finish verification at https://myotp.app/dashboard.'));
-        process.exit(130);
-      },
-    }
-  );
-  const phoneCodeRes = await prompts(
-    {
-      type: 'text',
-      name: 'value',
-      message: 'Phone verification code',
-      validate: (v: string) => (/^\d{3,8}$/.test(v.trim()) ? true : '3-8 digits.'),
-    },
-    {
-      onCancel: () => {
-        logHuman(colors.dim('Aborted. You can finish verification at https://myotp.app/dashboard.'));
-        process.exit(130);
-      },
-    }
-  );
-
-  // The onboarding endpoints used here mirror the strategy doc. If they are not
-  // yet live, we fall through to the same friendly fallback message rather
-  // than crashing.
-  let verifiedKey: string | undefined;
-  try {
-    const emailVerify = await client.verifyEmail({
-      email: email!,
-      code: String(emailCodeRes.value).trim(),
-    });
-    if (emailVerify && emailVerify.api_key) {
-      verifiedKey = emailVerify.api_key;
-    }
-    await client.verifyPhone({
-      phone,
-      code: String(phoneCodeRes.value).trim(),
-    });
-  } catch (err) {
-    if (err instanceof MyOtpApiError && err.status === 404) {
-      logHuman('');
-      logHuman(colors.yellow(SIGNUP_FALLBACK_MESSAGE));
-      logHuman('');
-      return;
-    }
-    fail({ command: 'init', json: opts.json, err });
-  }
-
-  if (verifiedKey) {
-    await writeConfig({
-      apiKey: verifiedKey,
-      email,
-      accountId: registerRes?.account_id,
-      baseUrl: baseUrl === 'https://api.myotp.app' ? undefined : baseUrl,
-    });
-    logHuman('');
-    logHuman(`${colors.green('OK')}  Account active. API key saved to ${configPath()}.`);
-    logHuman('');
-    logHuman(colors.dim('Send your first OTP:'));
-    logHuman(`  npx myotp test +${phone}`);
-    logHuman('');
-  } else {
-    logHuman('');
-    logHuman(colors.yellow('Verification submitted, but no API key was returned. Check your dashboard at https://myotp.app/dashboard.'));
-    logHuman('');
-  }
+  logHuman(colors.dim('Try it now:'));
+  logHuman('  npx myotp test +14155551234');
+  logHuman('');
 }

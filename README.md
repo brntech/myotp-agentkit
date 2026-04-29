@@ -5,6 +5,7 @@
 [![mcp-server CI](https://github.com/brntech/myotp-agentkit/actions/workflows/mcp-server.yml/badge.svg)](https://github.com/brntech/myotp-agentkit/actions/workflows/mcp-server.yml)
 [![cli CI](https://github.com/brntech/myotp-agentkit/actions/workflows/cli.yml/badge.svg)](https://github.com/brntech/myotp-agentkit/actions/workflows/cli.yml)
 [![better-auth CI](https://github.com/brntech/myotp-agentkit/actions/workflows/better-auth.yml/badge.svg)](https://github.com/brntech/myotp-agentkit/actions/workflows/better-auth.yml)
+[![examples CI](https://github.com/brntech/myotp-agentkit/actions/workflows/examples.yml/badge.svg)](https://github.com/brntech/myotp-agentkit/actions/workflows/examples.yml)
 
 ---
 
@@ -21,7 +22,7 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 | Package | What it does | Install |
 |---------|--------------|---------|
 | [`@myotp/mcp`](mcp-server/) | Model Context Protocol server exposing 7 MyOTP tools to MCP clients (Claude Desktop, Cursor, Continue, etc.). Stdio + streamable HTTP. | `npx @myotp/mcp` |
-| [`@myotp/cli`](cli/) | CLI for testing OTP flows from a terminal. `init` provisions an account programmatically, `test`/`verify`/`status` exercise the API. | `npx @myotp/cli init` |
+| [`@myotp/cli`](cli/) | CLI for testing OTP flows from a terminal. `init` saves a key locally, `test`/`verify`/`status` exercise the API. | `npx @myotp/cli init` |
 | [`@myotp/better-auth`](better-auth/) | Drop-in adapter for [Better Auth](https://www.better-auth.com)'s `phoneNumber()` plugin. Twilio-free SMS / WhatsApp / Telegram delivery. | `npm install @myotp/better-auth` |
 
 ## Skills (drop into your agent's config)

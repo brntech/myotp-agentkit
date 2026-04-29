@@ -154,9 +154,9 @@ Under the hood the agent will pick the right tool, validate inputs against the J
 
 ## Account creation
 
-The `create_account` tool calls `POST /v1/agent/register` and currently returns a 404 with a friendly message asking the user to sign up at [myotp.app/sign-up/](https://myotp.app/sign-up/) (~60 seconds, 15 free trial credits). The decision (2026-04-29) is to keep signup human-driven — the actual ongoing-friction unlock is **Stripe x402** for autonomous top-up of paid credits, not skipping the one-time signup.
+The `create_account` tool calls `POST /v1/agent/register` and currently returns a 404 with a friendly message asking the user to sign up at [myotp.app/sign-up/](https://myotp.app/sign-up/) (~60 seconds, 15 free trial credits). The decision (2026-04-29) is to keep signup human-driven — the actual ongoing-friction unlock is **autonomous USDC top-up via x402** for paid credits, not skipping the one-time signup.
 
-A `top_up_credits` tool is shipping in a future release: when the agent's account exhausts paid credits mid-flow, `top_up_credits` returns a Stripe x402 challenge with a USDC deposit address; the agent pays from a pre-funded wallet; balance is credited via webhook in ~5-15 seconds. No human-in-the-loop after the initial wallet funding.
+A `top_up_credits` tool is shipping in a future release: when the agent's account exhausts paid credits mid-flow, `top_up_credits` returns an x402 challenge with a USDC deposit address on Base; the agent pays from a pre-funded wallet; settlement is verified via the Coinbase x402 facilitator and balance is credited in ~5-15 seconds. No human-in-the-loop after the initial wallet funding.
 
 ## Develop
 

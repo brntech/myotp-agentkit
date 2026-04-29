@@ -1,0 +1,118 @@
+name: examples
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - '.github/workflows/examples.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - '.github/workflows/examples.yml'
+
+# Verify each framework example's dependencies still resolve and (where applicable)
+# the project builds. We don't run the apps against the live MyOTP API — these jobs
+# only catch dependency drift and build breakage, which are the failure modes that
+# silently rot copy-paste templates over time.
+
+jobs:
+  nextjs:
+    name: Next.js — install + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+        env:
+          MYOTP_API_KEY: ci_dummy_key_examples_build_only
+
+  express:
+    name: Express — install + syntax check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/express
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - run: npm install --no-audit --no-fund
+      - run: node --check src/server.js
+      - run: node --check src/myotp.js
+      - run: node --check src/phone.js
+
+  flask:
+    name: Flask — install + import check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/flask
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -c "import app, myotp, phone"
+        env:
+          MYOTP_API_KEY: ci_dummy_key_examples_import_only
+          FLASK_SECRET_KEY: ci_dummy_secret
+
+  django:
+    name: Django — install + system check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/django
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+        env:
+          MYOTP_API_KEY: ci_dummy_key_examples_check_only
+          DJANGO_SECRET_KEY: ci_dummy_secret
+
+  rails:
+    name: Rails — install (skip boot, no DB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/rails
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: examples/rails
+      - run: bundle exec ruby -c app/lib/myotp_client.rb
+      - run: bundle exec ruby -c app/lib/phone_sanitizer.rb
+      - run: bundle exec ruby -c app/controllers/verification_controller.rb
+
+  laravel:
+    name: Laravel — install + syntax check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/laravel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: php -l app/Services/MyOtpClient.php
+      - run: php -l app/Http/Controllers/VerificationController.php
+      - run: php -l app/Support/PhoneSanitizer.php

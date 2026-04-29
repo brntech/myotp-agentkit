@@ -1,9 +1,5 @@
 # @myotp/mcp — MyOTP.App MCP Server
 
-[![npm version](https://img.shields.io/npm/v/@myotp/mcp.svg)](https://www.npmjs.com/package/@myotp/mcp)
-[![npm downloads](https://img.shields.io/npm/dm/@myotp/mcp.svg)](https://www.npmjs.com/package/@myotp/mcp)
-[![License: MIT](https://img.shields.io/npm/l/@myotp/mcp.svg)](LICENSE)
-
 A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes [MyOTP.App](https://myotp.app)'s OTP API to any MCP-compatible AI agent: Claude Desktop, Claude Code, Cursor, Windsurf, Codex, and anything else that speaks MCP.
 
 Send and verify one-time passwords (SMS, WhatsApp, Telegram) directly from a chat with your agent, or from any app it builds.
@@ -156,15 +152,17 @@ Once the server is wired up, you can ask the agent things like:
 
 Under the hood the agent will pick the right tool, validate inputs against the JSON Schema we publish, and call the MyOTP API.
 
-## Account creation (programmatic onboarding)
+## Account creation
 
-The `create_account` tool calls `POST /v1/agent/register` — a planned endpoint that's **not yet shipped**. Until it's live, the tool will return a 404 and a friendly message asking the user to sign up at [myotp.app/sign-up/](https://myotp.app/sign-up/) manually. Once the onboarding API is live, this tool will work end-to-end (and we'll add a paired `verify_account` tool that returns the freshly issued API key).
+The `create_account` tool calls `POST /v1/agent/register` and currently returns a 404 with a friendly message asking the user to sign up at [myotp.app/sign-up/](https://myotp.app/sign-up/) (~60 seconds, 15 free trial credits). The decision (2026-04-29) is to keep signup human-driven — the actual ongoing-friction unlock is **Stripe x402** for autonomous top-up of paid credits, not skipping the one-time signup.
+
+A `top_up_credits` tool is shipping in a future release: when the agent's account exhausts paid credits mid-flow, `top_up_credits` returns a Stripe x402 challenge with a USDC deposit address; the agent pays from a pre-funded wallet; balance is credited via webhook in ~5-15 seconds. No human-in-the-loop after the initial wallet funding.
 
 ## Develop
 
 ```bash
-git clone https://github.com/brntech/myotp-agentkit
-cd myotp-agentkit/mcp-server
+git clone https://github.com/broadnet/myotp-app
+cd myotp-app/MyOTP.AgentKit/mcp-server
 npm install
 npm run build
 npm run start:stdio   # or start:http

@@ -1,6 +1,6 @@
 {
   "name": "@myotp/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Model Context Protocol server for MyOTP.App — send and verify OTPs (SMS, WhatsApp, Telegram) from any MCP-compatible AI agent.",
   "license": "MIT",
   "author": "BroadNet Technologies <info@myotp.app>",

@@ -3,9 +3,7 @@ name: mcp-server
 on:
   push:
     branches: [main]
-    paths:
-      - "mcp-server/**"
-      - ".github/workflows/mcp-server.yml"
+    tags: ['mcp-server@*']
   pull_request:
     paths:
       - "mcp-server/**"

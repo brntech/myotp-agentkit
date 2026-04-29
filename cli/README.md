@@ -1,5 +1,9 @@
 # @myotp/cli
 
+[![npm version](https://img.shields.io/npm/v/@myotp/cli.svg)](https://www.npmjs.com/package/@myotp/cli)
+[![npm downloads](https://img.shields.io/npm/dm/@myotp/cli.svg)](https://www.npmjs.com/package/@myotp/cli)
+[![License: MIT](https://img.shields.io/npm/l/@myotp/cli.svg)](LICENSE)
+
 The official command line for [MyOTP.App](https://myotp.app). Send and verify OTPs over SMS, WhatsApp, and Telegram from your terminal, CI pipeline, or AI agent.
 
 ```bash

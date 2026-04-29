@@ -1,14 +1,17 @@
 /**
  * create_account — POST https://api.myotp.app/v1/agent/register
  *
- * PLACEHOLDER. The agent-registration endpoint is part of the planned
- * "programmatic onboarding API" that's not yet shipped (see strategy doc §4.1).
- * Until it's live, this tool calls the endpoint anyway and surfaces whatever
- * response (or 404) it gets back — agents can show the user a helpful message
- * and direct them to https://myotp.app/sign-up/ as a fallback.
+ * NOTE: As of 2026-04-29, MyOTP intentionally keeps initial account signup
+ * human-driven. The agent-registration endpoint (POST /v1/agent/register)
+ * is *not* shipping. Manual signup at myotp.app/sign-up takes ~60 seconds
+ * and gets the user 15 free trial credits. The actual ongoing-friction
+ * unlock for agents is autonomous *paid* top-up via Stripe x402 — that's
+ * handled by a separate `top_up_credits` tool (shipping).
  *
- * When the onboarding API ships, we'll add a paired `verify_account` tool
- * that takes the email/phone code and returns the freshly-issued API key.
+ * This tool stays in place so agents that try `create_account` get a clean
+ * fallback to the manual signup URL rather than a confusing error. It
+ * always returns `endpoint_not_available` until the project's stance on
+ * programmatic onboarding changes.
  */
 
 import { z } from "zod";
@@ -20,12 +23,12 @@ const inputSchema = {
   email: z
     .string()
     .email()
-    .describe("Email address for the new MyOTP.App account. Will receive a verification code."),
+    .describe("Email address for the new MyOTP.App account."),
   phone: z
     .string()
     .regex(/^[1-9]\d{6,14}$/)
     .describe(
-      "Phone number for the account holder (international format, no + or leading 0). May be used for phone verification during onboarding."
+      "Phone number for the account holder (international format, no + or leading 0)."
     ),
   company_name: z
     .string()
@@ -36,20 +39,26 @@ const inputSchema = {
 
 export const createAccountTool: ToolDefinition<typeof inputSchema> = {
   name: "create_account",
-  title: "Create MyOTP account (programmatic onboarding)",
+  title: "Direct user to MyOTP signup",
   description:
-    "Register a new MyOTP.App account programmatically. " +
-    "INTENDED USE: an AI agent helping a user set up phone verification for the first time can call this to bootstrap the account, then call a follow-up `verify_account` tool (coming soon) to confirm the email/phone and receive an API key. " +
-    "STATUS: the agent-registration endpoint (POST /v1/agent/register) is not yet live as of this MCP release. Until it ships, this tool will return a 404 — when that happens, ask the user to visit https://myotp.app/sign-up/ to create an account and generate an API key in the dashboard. " +
-    "Note: this tool does NOT require an API key — it's the one tool you can call before having one.",
+    "Account signup at MyOTP.App is currently human-driven (~60 seconds at https://myotp.app/sign-up/, 15 free trial credits, no card required). " +
+    "This tool returns a friendly fallback message that the agent can show the user; it does NOT create accounts programmatically. " +
+    "After the user signs up and pastes their API key, the agent should set MYOTP_API_KEY (or the X-API-Key header) and call generate_otp directly. " +
+    "For ongoing paid capacity (after the 15 trial credits exhaust), use the `top_up_credits` tool (shipping in a future release) which uses Stripe x402 for autonomous USDC top-up. " +
+    "This tool does NOT require an API key — it's the one tool you can call before having one.",
   inputSchema,
   annotations: {
-    readOnlyHint: false,
-    idempotentHint: false,
+    readOnlyHint: true,
+    idempotentHint: true,
     destructiveHint: false,
-    openWorldHint: true,
+    openWorldHint: false,
   },
   handler: async (args, ctx) => {
+    // We attempt the call so the rest of the surface area mirrors a "real"
+    // tool — but in practice the endpoint always returns 404, and we surface
+    // the fallback message below. If the project later flips and ships
+    // programmatic onboarding, this tool's success path will start working
+    // automatically without an MCP package update.
     try {
       const body = compact({
         email: args.email,
@@ -58,9 +67,6 @@ export const createAccountTool: ToolDefinition<typeof inputSchema> = {
         source: "mcp",
       });
 
-      // This endpoint accepts requests without an API key, but the client
-      // requires one. Use a sentinel value so the request still goes out;
-      // if the API later requires real auth here we'll surface the 401.
       const apiKeyForRegistration = ctx.apiKey || "registration";
 
       const result = await ctx.client.post<CreateAccountResponse>(
@@ -74,7 +80,7 @@ export const createAccountTool: ToolDefinition<typeof inputSchema> = {
         `Account registration submitted. ${result.message ?? "Check your email for a verification code."}`
       );
     } catch (err) {
-      // Graceful fallback: 404 means the endpoint isn't live yet.
+      // Expected path: 404 because the endpoint is not yet available.
       const isNotShipped =
         err && typeof err === "object" && "status" in err && (err as { status: number }).status === 404;
       if (isNotShipped) {
@@ -83,9 +89,10 @@ export const createAccountTool: ToolDefinition<typeof inputSchema> = {
             {
               type: "text",
               text:
-                "The programmatic onboarding API (POST /v1/agent/register) is not yet available. " +
-                "Please direct the user to sign up at https://myotp.app/sign-up/ — they'll receive 15 free trial credits and can generate an API key in the dashboard. " +
-                "Once they have an API key, set MYOTP_API_KEY in this MCP server's environment (or send X-API-Key on each HTTP request) and call generate_otp.",
+                "MyOTP account creation is currently human-driven and not yet available programmatically. " +
+                "Direct the user to https://myotp.app/sign-up/ — signup takes ~60 seconds and gets them 15 free trial credits, no card required. " +
+                "Once they have an API key, set MYOTP_API_KEY in this MCP server's environment (or send X-API-Key per request) and call generate_otp directly. " +
+                "For paid top-ups after the trial, the `top_up_credits` tool (shipping in a future release) will let agents pay autonomously via Stripe x402.",
             },
           ],
           structuredContent: {

@@ -3,9 +3,7 @@ name: better-auth
 on:
   push:
     branches: [main]
-    paths:
-      - "better-auth/**"
-      - ".github/workflows/better-auth.yml"
+    tags: ['better-auth@*']
   pull_request:
     paths:
       - "better-auth/**"

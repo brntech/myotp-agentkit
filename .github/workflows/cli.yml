@@ -3,9 +3,7 @@ name: cli
 on:
   push:
     branches: [main]
-    paths:
-      - "cli/**"
-      - ".github/workflows/cli.yml"
+    tags: ['cli@*']
   pull_request:
     paths:
       - "cli/**"

@@ -45,12 +45,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: cli/package-lock.json
-      - name: Upgrade npm for OIDC Trusted Publishing
-        run: npm install -g npm@latest
+      - name: Verify npm supports OIDC Trusted Publishing (>=11.5.1)
+        run: npm --version
       - run: npm ci
       - run: npm run build
       - run: npm publish --provenance --access public

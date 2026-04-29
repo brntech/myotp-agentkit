@@ -1,5 +1,9 @@
 # @myotp/better-auth
 
+[![npm version](https://img.shields.io/npm/v/@myotp/better-auth.svg)](https://www.npmjs.com/package/@myotp/better-auth)
+[![npm downloads](https://img.shields.io/npm/dm/@myotp/better-auth.svg)](https://www.npmjs.com/package/@myotp/better-auth)
+[![License: MIT](https://img.shields.io/npm/l/@myotp/better-auth.svg)](LICENSE)
+
 > MyOTP.App phone-number adapter for [Better Auth](https://www.better-auth.com/). Drop-in SMS, WhatsApp, and Telegram OTP delivery — a cleaner alternative to Twilio Verify in custom-code mode.
 
 ## Why

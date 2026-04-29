@@ -112,7 +112,10 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-      - run: composer install --no-interaction --no-progress --prefer-dist
+      # Laravel's post-autoload-dump script needs bootstrap/cache/ writable.
+      # We don't commit bootstrap/cache/ contents, so the dir may not exist.
+      - run: mkdir -p bootstrap/cache storage/framework/{sessions,views,cache}
+      - run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
       - run: php -l app/Services/MyOtpClient.php
       - run: php -l app/Http/Controllers/VerificationController.php
       - run: php -l app/Support/PhoneSanitizer.php

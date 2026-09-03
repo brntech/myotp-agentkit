@@ -1,0 +1,43 @@
+# Lists the MyOTP MCP server in the official Model Context Protocol registry
+# (registry.modelcontextprotocol.io), which is what agent clients read when a
+# user searches for a server. Separate from mcp-server.yml on purpose: the
+# registry verifies ownership by fetching @myotp/mcp from npm and matching its
+# `mcpName` against server.json, so the npm publish has to have landed first.
+name: Publish to MCP Registry
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['mcp-registry@*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC, so the io.github.brntech namespace needs no secret
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Confirm npm has the version server.json claims
+        run: |
+          WANT=$(jq -r '.version' mcp-server/server.json)
+          PKG=$(jq -r '.packages[0].version' mcp-server/server.json)
+          HAVE=$(npm view @myotp/mcp version)
+          echo "server.json=$WANT package entry=$PKG npm=$HAVE"
+          # Publishing a version npm does not have yet fails ownership
+          # verification with a confusing error, so stop here instead.
+          test "$WANT" = "$PKG" || { echo "server.json version != package entry"; exit 1; }
+          test "$PKG" = "$HAVE" || { echo "npm is still on $HAVE, not $PKG"; exit 1; }
+          test "$(npm view @myotp/mcp mcpName)" = "$(jq -r '.name' mcp-server/server.json)" \
+            || { echo "published mcpName does not match server.json name"; exit 1; }
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        run: ./mcp-publisher publish mcp-server/server.json

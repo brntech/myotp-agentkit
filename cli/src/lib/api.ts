@@ -49,16 +49,25 @@ export interface MeResponse {
 
 export interface RegisterRequest {
   email: string;
-  phone: string;
-  company_name: string;
-  source: string;
+  name?: string;
 }
 
 export interface RegisterResponse {
   account_id: string;
-  status: string;
-  api_key?: string;
-  next?: string;
+  api_key: string;
+  api_key_note: string;
+  email: string;
+  email_verified: boolean;
+  balance: number;
+  plan_id: number;
+  status: 'active';
+  topup: {
+    quote: string;
+    endpoint: string;
+    note: string;
+  };
+  docs: string;
+  verification_email_sent: boolean;
 }
 
 export interface TopupQuoteResponse {
@@ -148,7 +157,8 @@ export class MyOtpClient {
     method: 'GET' | 'POST',
     path: string,
     body?: unknown,
-    extraHeaders?: Record<string, string>
+    extraHeaders?: Record<string, string>,
+    authenticate = true
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
@@ -159,7 +169,7 @@ export class MyOtpClient {
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json';
     }
-    if (this.apiKey) {
+    if (authenticate && this.apiKey) {
       headers['X-API-Key'] = this.apiKey;
     }
 
@@ -230,12 +240,8 @@ export class MyOtpClient {
     );
   }
 
-  /**
-   * Onboarding API - not yet shipped at the time of writing. Callers should
-   * handle 404 gracefully.
-   */
   register(req: RegisterRequest): Promise<RegisterResponse> {
-    return this.request<RegisterResponse>('POST', '/v1/agent/register', req);
+    return this.request<RegisterResponse>('POST', '/v1/agent/register', req, undefined, false);
   }
 
   verifyEmail(req: { email: string; code: string }): Promise<{ account_id?: string; api_key?: string; status?: string }> {

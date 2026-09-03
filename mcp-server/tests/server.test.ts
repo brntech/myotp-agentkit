@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createServer, getHeader, SERVER_NAME, SERVER_VERSION } from "../src/server.js";
+import { createServer, getHeader, resolveApiKeyFromHeaders, SERVER_NAME, SERVER_VERSION } from "../src/server.js";
 import { allTools } from "../src/tools/index.js";
 
 describe("createServer", () => {
@@ -46,5 +46,48 @@ describe("getHeader", () => {
 
   it("returns undefined when headers is undefined", () => {
     expect(getHeader(undefined, "x-api-key")).toBeUndefined();
+  });
+});
+
+describe("resolveApiKeyFromHeaders", () => {
+  const KEY = "CmBdpSABCMaGsB6GdybMawy_cYDxqooO";
+
+  it("reads the documented X-API-Key header", () => {
+    expect(resolveApiKeyFromHeaders({ "x-api-key": KEY })).toBe(KEY);
+  });
+
+  it("is case-insensitive about the header name", () => {
+    expect(resolveApiKeyFromHeaders({ "X-API-Key": KEY })).toBe(KEY);
+  });
+
+  // Codex CLI can only attach a bearer token to a remote MCP server, so without
+  // this alias its users cannot reach the hosted endpoint at all.
+  it("accepts Authorization: Bearer as an alias", () => {
+    expect(resolveApiKeyFromHeaders({ authorization: `Bearer ${KEY}` })).toBe(KEY);
+  });
+
+  it("accepts a lowercase bearer scheme", () => {
+    expect(resolveApiKeyFromHeaders({ authorization: `bearer ${KEY}` })).toBe(KEY);
+  });
+
+  it("prefers X-API-Key when both are present", () => {
+    expect(
+      resolveApiKeyFromHeaders({ "x-api-key": KEY, authorization: "Bearer stale-token" })
+    ).toBe(KEY);
+  });
+
+  it("falls back to the bearer token when X-API-Key is present but blank", () => {
+    expect(
+      resolveApiKeyFromHeaders({ "x-api-key": "   ", authorization: `Bearer ${KEY}` })
+    ).toBe(KEY);
+  });
+
+  it("ignores a non-bearer Authorization scheme", () => {
+    expect(resolveApiKeyFromHeaders({ authorization: "Basic dXNlcjpwYXNz" })).toBe("");
+  });
+
+  it("returns empty string when nothing is supplied", () => {
+    expect(resolveApiKeyFromHeaders(undefined)).toBe("");
+    expect(resolveApiKeyFromHeaders({})).toBe("");
   });
 });

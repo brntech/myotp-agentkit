@@ -89,6 +89,29 @@ export function createServer(options: ServerOptions): McpServer {
  * Read a header value case-insensitively from a Node-style headers object.
  * Useful for resolveApiKey implementations.
  */
+/**
+ * Pick the MyOTP API key out of a request's headers.
+ *
+ * `X-API-Key` is the documented header and matches the REST API. `Authorization:
+ * Bearer <key>` is accepted as an alias because several MCP clients can only
+ * attach a bearer token to a remote server, never an arbitrary header: OpenAI's
+ * Codex CLI takes a `bearer_token_env_var` and nothing else, so without this
+ * alias a Codex user cannot reach the hosted endpoint at all.
+ *
+ * X-API-Key wins when both are present, so an explicit key is never overridden
+ * by a stale Authorization header some proxy attached.
+ */
+export function resolveApiKeyFromHeaders(
+  headers: Record<string, string | string[] | undefined> | undefined
+): string {
+  const direct = getHeader(headers, "x-api-key");
+  if (direct && direct.trim() !== "") return direct.trim();
+
+  const auth = getHeader(headers, "authorization") ?? "";
+  const bearer = /^Bearer\s+(.+)$/i.exec(auth.trim());
+  return bearer ? bearer[1].trim() : "";
+}
+
 export function getHeader(
   headers: Record<string, string | string[] | undefined> | undefined,
   name: string

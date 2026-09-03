@@ -12,7 +12,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import express, { type Request, type Response } from "express";
-import { createServer, getHeader } from "./server.js";
+import { createServer, resolveApiKeyFromHeaders } from "./server.js";
 
 interface CliConfig {
   transport: "stdio" | "http";
@@ -73,14 +73,12 @@ async function runHttp(config: CliConfig): Promise<void> {
     res.json({ ok: true, server: "myotp-mcp" });
   });
 
-  // Resolve API key from the X-API-Key header sent by the agent. We deliberately
-  // do NOT read MYOTP_API_KEY in HTTP mode — each request must carry its own key
-  // so a single hosted server can serve many tenants.
+  // Each request must carry its own key so one hosted server can serve many
+  // tenants; we deliberately do NOT fall back to MYOTP_API_KEY in HTTP mode.
+  // See resolveApiKeyFromHeaders for why Authorization: Bearer is also accepted.
   const resolveApiKey = (extra: {
     headers?: Record<string, string | string[] | undefined>;
-  }): string => {
-    return getHeader(extra.headers, "x-api-key") ?? "";
-  };
+  }): string => resolveApiKeyFromHeaders(extra.headers);
 
   const handleMcpRequest = async (req: Request, res: Response): Promise<void> => {
     const sessionId = req.header("mcp-session-id") ?? undefined;

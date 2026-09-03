@@ -52,7 +52,7 @@ Edit your Claude Desktop config (`~/Library/Application Support/Claude/claude_de
   "mcpServers": {
     "myotp": {
       "command": "npx",
-      "args": ["-y", "myotp-mcp"],
+      "args": ["-y", "@myotp/mcp"],
       "env": {
         "MYOTP_API_KEY": "your-32-character-api-key"
       }
@@ -72,7 +72,7 @@ Add it to your project's `.mcp.json`:
   "mcpServers": {
     "myotp": {
       "command": "npx",
-      "args": ["-y", "myotp-mcp"],
+      "args": ["-y", "@myotp/mcp"],
       "env": {
         "MYOTP_API_KEY": "your-32-character-api-key"
       }
@@ -97,7 +97,7 @@ Cursor reads the same `.mcp.json` format. Add to your workspace settings or `.cu
   "mcpServers": {
     "myotp": {
       "command": "npx",
-      "args": ["-y", "myotp-mcp"],
+      "args": ["-y", "@myotp/mcp"],
       "env": {
         "MYOTP_API_KEY": "your-32-character-api-key"
       }
@@ -105,6 +105,48 @@ Cursor reads the same `.mcp.json` format. Add to your workspace settings or `.cu
   }
 }
 ```
+
+## Use it with Codex CLI
+
+Codex reads TOML, not JSON. Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.myotp]
+command = "npx"
+args = ["-y", "@myotp/mcp"]
+
+[mcp_servers.myotp.env]
+MYOTP_API_KEY = "your-32-character-api-key"
+```
+
+Codex can also talk to the hosted server over HTTP instead of launching anything
+locally. It attaches the token as `Authorization: Bearer`, which the hosted
+endpoint accepts as an alias for `X-API-Key`:
+
+```toml
+[mcp_servers.myotp]
+url = "https://mcp.myotp.app/mcp"
+bearer_token_env_var = "MYOTP_API_KEY"
+```
+
+On older Codex builds that only pick up stdio servers, add
+`experimental_use_rmcp_client = true` above the entry.
+
+**If you use the hosted URL, add `108.61.176.199` to your API key's IP allowlist.**
+Hosted calls reach the MyOTP API from that address rather than from your machine,
+and every call returns 403 until it is allowed. The stdio option above has no such
+requirement because the request leaves your own machine.
+
+## Use it with anything else
+
+Any client that speaks MCP works. The stdio block is the same shape everywhere
+(`command: npx`, `args: ["-y", "@myotp/mcp"]`, `MYOTP_API_KEY` in the
+environment), so Windsurf, Zed, Continue, OpenClaw, Hermes and Grokbot all take
+the JSON or TOML equivalent of the blocks above.
+
+For a hosted client, point it at `https://mcp.myotp.app/mcp` and send your key as
+either `X-API-Key` or `Authorization: Bearer`. Use whichever one your client can
+actually set.
 
 ## Transport modes
 

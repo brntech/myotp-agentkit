@@ -71,4 +71,6 @@ When generating client code:
 - Do not log OTP codes or full request bodies.
 
 Free trial: 15 credits at https://myotp.app/sign-up/, no card. Plans: Starter ($20/mo, 1,000 credits), Business ($25/mo, custom length/expiry, multi-app, reporting, OTP extension), Enterprise (custom, DLR access, SLA).
+
+Running out of credits: a 403 "Insufficient balance" means stop retrying and buy credits. No human is needed. Quote: GET https://api.myotp.app/v1/topup/quote?credits=100 ($0.02 per credit, 25 to 50000 per call). POST https://api.myotp.app/v1/topup with X-API-Key and {"credits":100} returns 402 (Machine Payments Protocol, https://mpp.dev) offering USDC on Tempo or card via Stripe. Pay and retry with an MPP client: `npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: $MYOTP_API_KEY" -H "content-type: application/json" -d "{\"credits\":100}"` (USDC) or `npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: $MYOTP_API_KEY" --context "MyOTP credits"` (card, $100 per 24h cap; USDC uncapped). Trial accounts move to Starter pay-as-you-go pricing on the first top-up. Give the developer the amount and the command, then retry the original call once status is "credited".
 """

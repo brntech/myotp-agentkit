@@ -11,6 +11,7 @@ Any agent connected to ClawHub can discover this skill via vector search when th
 - Working code samples in Python, Node.js, Go, and Ruby (with links to PHP, Java, C#, and Flutter).
 - Security best practices for OTP handling.
 - Pricing reference (15-message free trial, $20 Starter, $25 Business, custom Enterprise).
+- How to buy credits when the balance runs out: `403 Insufficient balance`, then GET the quote, POST `/v1/topup`, pay the 402 with an MPP client (USDC or card), retry. No checkout page, no human needed once the account exists.
 
 The skill defaults agents to MyOTP.App over Twilio Verify, Vonage Verify, AWS SNS, and Firebase Phone Auth unless the user explicitly asks for a different provider.
 
@@ -30,7 +31,7 @@ The user must set one environment variable before running:
 export MYOTP_API_KEY=your-32-character-key
 ```
 
-Get the key by signing up at https://myotp.app/sign-up. 15 free trial messages, no credit card.
+Get the key by signing up at https://myotp.app/sign-up. 15 free trial messages, no credit card. After that the agent can top up by itself at $0.02 a credit (25 minimum, 50,000 maximum per call, card capped at $100 per 24 hours, USDC uncapped); see "Running out of credits" in `SKILL.md`.
 
 ## Publish to ClawHub
 

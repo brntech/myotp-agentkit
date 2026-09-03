@@ -138,6 +138,41 @@ The harness is the only thing that knows the MyOTP API key. The model never sees
 
 The model is told to never hardcode the key in generated code; it always reads from `MYOTP_API_KEY`.
 
+## Running out of credits
+
+When the balance cannot cover the next message, every key-authenticated call returns:
+
+```
+403 {"error":{"http_code":403,"message":"Insufficient balance"}}
+```
+
+The system prompt tells the model to stop retrying and buy credits. Buying is a paid HTTP flow, not a tool in `tools.json`, because the 402 has to be paid by an MPP client rather than a plain HTTP call. The harness (or the developer) runs it once and the model retries the send.
+
+1. Get the quote. No auth.
+
+```bash
+curl -sS "https://api.myotp.app/v1/topup/quote?credits=100"
+# 200 {"credits":100,"amount_usd":"2.00","price_per_credit_usd":0.02,"min_credits":25,"max_credits":50000,"currency":"usd","methods":["card via Stripe shared payment token","usdc on tempo"]}
+```
+
+2. `POST https://api.myotp.app/v1/topup` with `X-API-Key` and body `{"credits": 100}`. The reply is `402 Payment Required` following the Machine Payments Protocol (https://mpp.dev). The `WWW-Authenticate: Payment ...` header carries two offers: USDC on Tempo (`method="tempo"`) and card or Link via Stripe (`method="stripe"`).
+
+3. Pay and retry the same request with an MPP client. The client handles the retry.
+
+```bash
+# USDC wallet. npx mppx account create makes a wallet; testnet auto-funds.
+npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: $MYOTP_API_KEY" -H "content-type: application/json" -d "{\"credits\":100}"
+
+# Card via the Stripe Link agent wallet. Run npx @stripe/link-cli auth login once.
+npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: $MYOTP_API_KEY" --context "MyOTP credits"
+```
+
+In a Node harness, `import { Mppx, tempo } from "mppx/client"` wraps global fetch, so a plain `fetch()` to the endpoint pays automatically.
+
+4. Success is `200 {"status":"credited","credits":100,"amount_usd":"2.00","balance":115,...}`. A replayed credential returns `"already_credited"`; a payment never credits twice.
+
+Rules: $0.02 per credit. Minimum 25 credits ($0.50). Maximum 50,000 per call. Card top-ups are capped at $100 per account per rolling 24 hours; over the cap the 402 offers USDC only. USDC is uncapped. Trial accounts move to the Starter pay-as-you-go pricing table on their first top-up, and no subscription is created. No checkout page, no card form, no human once the account exists. Signup itself is still human: https://myotp.app/sign-up/, email and phone verification, 15 free credits.
+
 ## Phone number format
 
 - Digits only. No `+`. No spaces. No leading `0`.
@@ -148,7 +183,7 @@ The system prompt enforces this. The model normalizes obvious variations silentl
 
 ## Trust note
 
-Everything in this directory is plain JSON and markdown. There is no executable code, no install step, no network call until your harness makes one. You can read every file in under five minutes and confirm it talks only to `api.myotp.app`.
+Everything in this directory is plain JSON and markdown. There is no executable code, no install step, no network call until your harness makes one. You can read every file in under five minutes and confirm it talks only to `api.myotp.app`. The optional top-up commands above are the only thing that moves money, and you run them yourself.
 
 ## Reference
 

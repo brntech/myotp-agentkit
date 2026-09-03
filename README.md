@@ -17,6 +17,8 @@ If you're a developer using one of those agent tools and your app needs phone ve
 
 If you're building an app by hand, the [examples](examples/) are runnable starting points for the most common stacks.
 
+- **Agent payments.** Agents can buy MyOTP credits by themselves: one 402, one payment, no checkout page, no card form. $0.02 a credit, USDC or card. See [skills/myotp/patterns/topup.md](skills/myotp/patterns/topup.md).
+
 ## Packages
 
 | Package | What it does | Install |
@@ -29,10 +31,10 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 
 | Folder | For | How |
 |--------|-----|-----|
-| [`skills/myotp/`](skills/myotp/) | Claude Code | `npx skills add brntech/myotp-agentkit` (or copy `skills/myotp/` into `~/.claude/skills/myotp/`) |
+| [`skills/myotp/`](skills/myotp/) | Claude Code. Includes agent top-up: buy credits over a 402 when the balance runs out | `npx skills add brntech/myotp-agentkit` (or copy `skills/myotp/` into `~/.claude/skills/myotp/`) |
 | [`skills/myotp/niches/`](skills/myotp/niches/) | Vertical-specific (fintech, marketplace, emerging markets, healthcare) | Copy individual `.md` files into separate skill directories |
-| [`clawhub-skill/`](clawhub-skill/) | OpenClaw / ClawHub registry | `clawhub skill install myotp` — published on [ClawHub](https://clawhub.ai/skills/myotp) |
-| [`hermes-skill/`](hermes-skill/) | Nous Research Hermes models (Ollama, vLLM, LM Studio) | Use `ollama-modelfile.example` as a template |
+| [`clawhub-skill/`](clawhub-skill/) | OpenClaw / ClawHub registry. Agents can buy credits (402, USDC or card) | `clawhub skill install myotp`, published on [ClawHub](https://clawhub.ai/skills/myotp) |
+| [`hermes-skill/`](hermes-skill/) | Nous Research Hermes models (Ollama, vLLM, LM Studio). Prompt covers agent top-up | Use `ollama-modelfile.example` as a template |
 
 ## Framework examples
 

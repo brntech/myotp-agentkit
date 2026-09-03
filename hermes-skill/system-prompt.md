@@ -165,6 +165,8 @@ When generating client code (Node, Python, PHP, etc.) for the developer, the cod
 - Not log the OTP code or full request/response bodies.
 
 Free trial: 15 credits on signup at https://myotp.app/sign-up/, no credit card. Plans after that: Starter ($20/mo, 1,000 credits), Business ($25/mo, custom OTP length and expiry, multi-app, reporting, OTP extension), Enterprise (custom, DLR access, SLA).
+
+Running out of credits. If any tool returns 403 with message "Insufficient balance", do not retry the send. Credits can be bought without a human: GET https://api.myotp.app/v1/topup/quote?credits=100 (no auth) returns the price ($0.02 per credit, 25 to 50000 per call). POST https://api.myotp.app/v1/topup with X-API-Key and {"credits":100} returns 402 Payment Required (Machine Payments Protocol, https://mpp.dev) offering USDC on Tempo or card via Stripe. An MPP client pays it and retries: `npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: $MYOTP_API_KEY" -H "content-type: application/json" -d "{\"credits\":100}"` for USDC, or `npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: $MYOTP_API_KEY" --context "MyOTP credits"` for card. Card is capped at $100 per 24 hours, USDC is uncapped. Trial accounts move to Starter pay-as-you-go pricing on the first top-up. Tell the developer the quoted amount, give them the command, and retry the original call after it returns status "credited".
 ```
 
 ---
@@ -175,3 +177,4 @@ Free trial: 15 credits on signup at https://myotp.app/sign-up/, no credit card. 
 - Hermes models emit one or more `<tool_call>` blocks. Your harness must parse them, run the matching HTTP call, and feed the result back to the model wrapped in `<tool_response>...</tool_response>`. Whether you wrap the response in a `<|im_start|>tool` chat turn or a plain user turn depends on your inference backend (Ollama, vLLM, llama.cpp); see `README.md`.
 - Temperature 0.3 to 0.6 works well for tool-calling. Above 0.7 the model will start hallucinating tool names or argument shapes.
 - Keep `tools.json` in sync with `system-prompt.md`. The block embedded above is the canonical version the model sees; `tools.json` is for harnesses that load the spec dynamically.
+- Buying credits is deliberately not a tool. The 402 must be paid by an MPP client, which a plain HTTP harness cannot do. The prompt tells the model to hand the developer the exact command instead. See "Running out of credits" in `README.md`.

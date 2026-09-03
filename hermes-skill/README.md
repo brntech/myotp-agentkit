@@ -30,7 +30,7 @@ This kit adds MyOTP.App to that ecosystem. No SDK install, no third-party cloud,
 | `extend_otp` | POST /extend_otp | Push out an active OTP's expiry |
 | `get_account_info` | GET /me | Account email of the authenticated key |
 | `get_usage_report` | POST /report | Paginated transaction history |
-| `register_account` | POST /v1/agent/register | BETA. Programmatic signup. Returns 404 until live. |
+| `register_account` | POST /v1/agent/register | Create an account; returns the API key once. Zero balance, top up to send. |
 
 Full API spec: https://myotp.app/api-reference/
 
@@ -131,7 +131,7 @@ The harness is the only thing that knows the MyOTP API key. The model never sees
 
 ## API key setup
 
-1. Get a key at https://myotp.app/sign-up/. Free trial includes 15 credits, no credit card.
+1. Get a key. Agent path: `POST https://api.myotp.app/v1/agent/register` with `{"email":"dev@example.com","name":"Acme"}` returns it once (zero balance, no trial credits, no phone verification; top up before sending, USDC at once and card after the confirmation email is clicked; 5 registrations per IP per day). Human path: https://myotp.app/sign-up/ still exists and gives 15 free credits after email and phone verification.
 2. Add your server's IP to the dashboard whitelist (or `*` while testing).
 3. Set `MYOTP_API_KEY` in your harness environment.
 4. Have your harness send `X-API-Key: $MYOTP_API_KEY` on every request to `https://api.myotp.app/...`.
@@ -171,7 +171,7 @@ In a Node harness, `import { Mppx, tempo } from "mppx/client"` wraps global fetc
 
 4. Success is `200 {"status":"credited","credits":100,"amount_usd":"2.00","balance":115,...}`. A replayed credential returns `"already_credited"`; a payment never credits twice.
 
-Rules: $0.02 per credit. Minimum 25 credits ($0.50). Maximum 50,000 per call. Card top-ups are capped at $100 per account per rolling 24 hours; over the cap the 402 offers USDC only. USDC is uncapped. Trial accounts move to the Starter pay-as-you-go pricing table on their first top-up, and no subscription is created. No checkout page, no card form, no human once the account exists. Signup itself is still human: https://myotp.app/sign-up/, email and phone verification, 15 free credits.
+Rules: $0.02 per credit. Minimum 25 credits ($0.50). Maximum 50,000 per call. Card top-ups are capped at $100 per account per rolling 24 hours; over the cap the 402 offers USDC only. USDC is uncapped. Trial accounts move to the Starter pay-as-you-go pricing table on their first top-up, and no subscription is created. No checkout page, no card form, no human at all: the agent can create the account with `POST /v1/agent/register` (zero balance, then top up). The human path at https://myotp.app/sign-up/ still exists and gives 15 free credits with email and phone verification.
 
 ## Phone number format
 
@@ -189,7 +189,8 @@ Everything in this directory is plain JSON and markdown. There is no executable 
 
 - Nous Research Hermes Function Calling spec: https://github.com/NousResearch/Hermes-Function-Calling
 - MyOTP.App API reference: https://myotp.app/api-reference/
-- MyOTP.App signup: https://myotp.app/sign-up/
+- MyOTP.App agent signup: POST https://api.myotp.app/v1/agent/register (spec: https://api.myotp.app/swagger-ui/myotpapp-api.yaml)
+- MyOTP.App human signup: https://myotp.app/sign-up/
 
 ## License
 

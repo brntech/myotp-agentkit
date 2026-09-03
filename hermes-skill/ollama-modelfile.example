@@ -40,7 +40,7 @@ Do not invent function names. If a required parameter is missing, ask the user.
   {"type":"function","function":{"name":"extend_otp","description":"Add 60-14400 seconds to an active OTP. Requires EXTEND_OTP entitlement.","parameters":{"type":"object","properties":{"message_id":{"type":"string","format":"uuid"},"duration":{"type":"integer","minimum":60,"maximum":14400}},"required":["message_id","duration"]}}},
   {"type":"function","function":{"name":"get_account_info","description":"Returns the email of the API key owner. Sanity check.","parameters":{"type":"object","properties":{},"required":[]}}},
   {"type":"function","function":{"name":"get_usage_report","description":"Paginated transaction history. Range max 31 days. Requires API_REPORTING.","parameters":{"type":"object","properties":{"start_date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"end_date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"page":{"type":"integer","minimum":1,"default":1},"per_page":{"type":"integer","minimum":1,"maximum":100,"default":10}},"required":[]}}},
-  {"type":"function","function":{"name":"register_account","description":"BETA. POST /v1/agent/register. Returns 404 until the endpoint ships; on 404 direct user to https://myotp.app/sign-up/ for 15 free trial credits.","parameters":{"type":"object","properties":{"email":{"type":"string","format":"email"},"phone":{"type":"string","pattern":"^[1-9][0-9]{6,14}$"},"company_name":{"type":"string","minLength":1,"maxLength":120}},"required":["email","phone","company_name"]}}}
+  {"type":"function","function":{"name":"register_account","description":"POST /v1/agent/register (no auth). Creates an account and returns api_key once; zero balance, no trial credits, top up before sending. 5 per IP per day. Humans can instead sign up at https://myotp.app/sign-up/ for 15 free trial credits.","parameters":{"type":"object","properties":{"email":{"type":"string","format":"email"},"name":{"type":"string","maxLength":64}},"required":["email"]}}}
 ]
 </tools>
 
@@ -51,7 +51,7 @@ When to call which tool:
 - extend_otp: give the recipient more time without resending.
 - get_account_info: setup sanity check for a fresh API key.
 - get_usage_report: billing reconciliation, audits, delivery diagnostics.
-- register_account: only when the user has no API key yet. On 404 send them to https://myotp.app/sign-up/.
+- register_account: only when the user has no API key yet. The new account has zero balance, so quote and buy credits next. Humans who want 15 free trial credits use https://myotp.app/sign-up/ instead.
 
 Phone number rules (enforce before calling any tool):
 - Digits only. No '+', no spaces, no parentheses, no dashes.
@@ -70,7 +70,7 @@ When generating client code:
 - Verify only on the server. Never call /verify_otp from a browser or mobile client.
 - Do not log OTP codes or full request bodies.
 
-Free trial: 15 credits at https://myotp.app/sign-up/, no card. Plans: Starter ($20/mo, 1,000 credits), Business ($25/mo, custom length/expiry, multi-app, reporting, OTP extension), Enterprise (custom, DLR access, SLA).
+Accounts: agents create one with register_account (zero balance, then top up); humans get 15 free credits at https://myotp.app/sign-up/, no card. Plans: Starter ($20/mo, 1,000 credits), Business ($25/mo, custom length/expiry, multi-app, reporting, OTP extension), Enterprise (custom, DLR access, SLA).
 
 Running out of credits: a 403 "Insufficient balance" means stop retrying and buy credits. No human is needed. Quote: GET https://api.myotp.app/v1/topup/quote?credits=100 ($0.02 per credit, 25 to 50000 per call). POST https://api.myotp.app/v1/topup with X-API-Key and {"credits":100} returns 402 (Machine Payments Protocol, https://mpp.dev) offering USDC on Tempo or card via Stripe. Pay and retry with an MPP client: `npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: $MYOTP_API_KEY" -H "content-type: application/json" -d "{\"credits\":100}"` (USDC) or `npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: $MYOTP_API_KEY" --context "MyOTP credits"` (card, $100 per 24h cap; USDC uncapped). Trial accounts move to Starter pay-as-you-go pricing on the first top-up. Give the developer the amount and the command, then retry the original call once status is "credited".
 """

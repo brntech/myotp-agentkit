@@ -52,6 +52,6 @@
     "external_network_calls": ["https://api.myotp.app"],
     "installer_hooks": false,
     "binary_dependencies": ["curl"],
-    "audit_url": "https://github.com/brntech/myotp-agentkit/tree/main/clawhub-skill"
+    "audit_url": "https://github.com/BroadNet-Technologies/MyOTP.App/tree/main/MyOTP.AgentKit/clawhub-skill"
   }
 }

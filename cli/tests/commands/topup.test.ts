@@ -318,3 +318,33 @@ describe("topup command - validation", () => {
     }
   });
 });
+
+describe("topup platform handling", () => {
+  it("rejects --json on the payment path without spawning a wallet", async () => {
+    const { runTopup } = await import("../../src/commands/topup.js");
+    const io = captureIo();
+    try {
+      await expect(runTopup({ json: true, apiKey: "k_test_topup", baseUrl: "https://api.example.test/" })).rejects.toBeInstanceOf(ExitError);
+      expect(spawnMock).not.toHaveBeenCalled();
+      expect(stdout(io) + stderr(io)).toContain("--quote");
+    } finally {
+      io.restore();
+    }
+  });
+
+  it("runs npx-cli.js through the node binary on win32 and plain npx elsewhere", async () => {
+    const { npxInvocation } = await import("../../src/commands/topup.js");
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    try {
+      Object.defineProperty(process, "platform", { value: "linux" });
+      expect(npxInvocation(["-y", "mppx@0.9.2"])).toEqual({ command: "npx", args: ["-y", "mppx@0.9.2"] });
+      Object.defineProperty(process, "platform", { value: "win32" });
+      const inv = npxInvocation(["-y", "mppx@0.9.2"]);
+      expect(["npx.cmd", process.execPath]).toContain(inv.command);
+      expect(inv.args.slice(-2)).toEqual(["-y", "mppx@0.9.2"]);
+      expect(inv.command === "npx.cmd" || inv.args[0].endsWith("npx-cli.js")).toBe(true);
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+    }
+  });
+});

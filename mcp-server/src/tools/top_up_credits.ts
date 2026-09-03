@@ -130,12 +130,15 @@ export function parsePaymentOffers(header: string): TopUpPaymentOffer[] {
     const encodedRequest = requireParam(params, "request");
     const request = decodePaymentRequest(encodedRequest, id);
 
+    const unit = amountUnit(method);
     const offer: TopUpPaymentOffer = {
       method,
       intent,
       id,
       expires,
       amount: request.amount,
+      amount_unit: unit.label,
+      amount_usd: unit.divisor ? (Number(request.amount) / unit.divisor).toFixed(2) : undefined,
       currency: request.currency,
     };
     return offer;
@@ -173,8 +176,18 @@ function splitPaymentChallenges(header: string): string[] {
     }
   }
 
+  if (quoted || escaped) {
+    throw new Error("The WWW-Authenticate Payment challenge contains an unterminated quoted value.");
+  }
   parts.push(header.slice(start).trim());
   return parts.filter((part) => /^Payment(?:\s|$)/i.test(part));
+}
+
+/** Amount units differ per rail: Tempo quotes USDC atomic units (6 decimals), Stripe quotes cents. */
+function amountUnit(method: string): { label: string; divisor: number | null } {
+  if (method === "tempo") return { label: "USDC atomic units (6 decimals)", divisor: 1_000_000 };
+  if (method === "stripe") return { label: "USD cents", divisor: 100 };
+  return { label: "method-defined units", divisor: null };
 }
 
 function parseAuthParams(challenge: string): Record<string, string> {

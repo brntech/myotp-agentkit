@@ -35,7 +35,7 @@ export async function runStatus(rawOpts: StatusOptionsInput): Promise<void> {
       command: 'status',
       json: opts.json,
       err: new Error('No API key configured.'),
-      hint: 'Run `npx myotp init` to create an account, or `npx myotp config --set-key <KEY>` to save an existing key.',
+      hint: 'Run `npx @myotp/cli init` to create an account, or `npx @myotp/cli config --set-key <KEY>` to save an existing key.',
     });
   }
 

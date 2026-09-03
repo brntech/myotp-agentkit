@@ -1,6 +1,6 @@
 {
   "name": "@myotp/cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "MyOTP.App command line interface. Save an API key, send OTPs, verify codes, and check account status from your terminal or AI agent.",
   "license": "MIT",
   "author": "BroadNet Technologies <info@myotp.app>",

@@ -123,7 +123,7 @@ export async function runConfig(rawOpts: ConfigOptionsInput): Promise<void> {
     logHuman(`  ${colors.dim('env var  :')} MYOTP_API_KEY is set (overrides config)`);
   }
   logHuman('');
-  logHuman(colors.dim('Update with: npx myotp config --set-key <KEY>'));
-  logHuman(colors.dim('Reset with : npx myotp config --reset'));
+  logHuman(colors.dim('Update with: npx @myotp/cli config --set-key <KEY>'));
+  logHuman(colors.dim('Reset with : npx @myotp/cli config --reset'));
   logHuman('');
 }

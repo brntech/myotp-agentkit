@@ -166,6 +166,6 @@ export async function runInit(rawOpts: InitOptionsInput): Promise<void> {
   logHuman(`${colors.green('OK')}  Saved to ${configPath()}${email ? ` (${email})` : ''}.`);
   logHuman('');
   logHuman(colors.dim('Try it now:'));
-  logHuman('  npx myotp test +14155551234');
+  logHuman('  npx @myotp/cli test +14155551234');
   logHuman('');
 }

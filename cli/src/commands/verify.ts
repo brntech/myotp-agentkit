@@ -58,7 +58,7 @@ export async function runVerify(
       command: 'verify',
       json: opts.json,
       err: new Error('No API key configured.'),
-      hint: 'Run `npx myotp init` first, or set MYOTP_API_KEY in your environment.',
+      hint: 'Run `npx @myotp/cli init` first, or set MYOTP_API_KEY in your environment.',
     });
   }
 

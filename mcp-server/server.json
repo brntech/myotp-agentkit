@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.brntech/myotp",
   "title": "MyOTP.App",
-  "description": "Send and verify one-time passcodes over SMS, WhatsApp and Telegram. Check delivery status, extend expiry, and pull usage reports.",
+  "description": "Send and verify one-time passcodes over SMS, WhatsApp and Telegram.",
   "version": "0.1.5",
   "websiteUrl": "https://mcp.myotp.app",
   "repository": {

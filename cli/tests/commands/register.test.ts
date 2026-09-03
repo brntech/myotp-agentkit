@@ -217,3 +217,37 @@ describe("register command", () => {
     }
   });
 });
+
+describe("register command - guards", () => {
+  it("refuses to replace an existing configured key unless --force", async () => {
+    const { writeConfig } = await import("../../src/lib/config.js");
+    await writeConfig({ apiKey: "existingexistingexistingexisting" });
+    const { runRegister } = await import("../../src/commands/register.js");
+    const io = captureIo();
+    try {
+      await expect(runRegister({ email: "new@example.com" })).rejects.toBeInstanceOf(ExitError);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(stdout(io) + stderr(io)).toContain("--force");
+    } finally {
+      io.restore();
+    }
+  });
+
+  it("does not save a config when the 201 body lacks a valid api_key", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ account_id: "a0000000000001", email: "x@example.com" }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const { runRegister } = await import("../../src/commands/register.js");
+    const { readConfig } = await import("../../src/lib/config.js");
+    const io = captureIo();
+    try {
+      await expect(runRegister({ email: "x@example.com" })).rejects.toBeInstanceOf(ExitError);
+      expect((await readConfig()).apiKey).toBeUndefined();
+    } finally {
+      io.restore();
+    }
+  });
+});

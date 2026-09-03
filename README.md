@@ -29,9 +29,9 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 
 | Folder | For | How |
 |--------|-----|-----|
-| [`skill/`](skill/) | Claude Code | Copy `skill/` into `~/.claude/skills/myotp/` |
-| [`skill/niches/`](skill/niches/) | Vertical-specific (fintech, marketplace, emerging markets, healthcare) | Copy individual `.md` files into separate skill directories |
-| [`clawhub-skill/`](clawhub-skill/) | OpenClaw / ClawHub registry | Submit via [clawhub.ai](https://clawhub.ai) |
+| [`skills/myotp/`](skills/myotp/) | Claude Code | `npx skills add brntech/myotp-agentkit` (or copy `skills/myotp/` into `~/.claude/skills/myotp/`) |
+| [`skills/myotp/niches/`](skills/myotp/niches/) | Vertical-specific (fintech, marketplace, emerging markets, healthcare) | Copy individual `.md` files into separate skill directories |
+| [`clawhub-skill/`](clawhub-skill/) | OpenClaw / ClawHub registry | `clawhub skill install myotp` — published on [ClawHub](https://clawhub.ai/skills/myotp) |
 | [`hermes-skill/`](hermes-skill/) | Nous Research Hermes models (Ollama, vLLM, LM Studio) | Use `ollama-modelfile.example` as a template |
 
 ## Framework examples

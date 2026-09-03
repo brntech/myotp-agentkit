@@ -2,8 +2,8 @@
  * Thin HTTP client for the MyOTP.App REST API.
  *
  * Auth: authenticated requests carry an `X-API-Key` header. We don't bake the
- * key in; callers hand it in per request. The public top-up quote is the sole
- * anonymous request exposed by this client.
+ * key in; callers hand it in per request. Public endpoints use explicit
+ * unauthenticated helpers so a configured key is never sent accidentally.
  */
 
 import { MyOtpApiError } from "./types.js";
@@ -34,7 +34,7 @@ export class MyOtpClient {
   constructor(options: MyOtpClientOptions = {}) {
     const envBase = process.env.MYOTP_BASE_URL?.trim();
     this.baseUrl = (options.baseUrl ?? envBase ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
-    this.userAgent = options.userAgent ?? "myotp-mcp/0.1.0";
+    this.userAgent = options.userAgent ?? "myotp-mcp/0.1.7";
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
@@ -46,6 +46,11 @@ export class MyOtpClient {
   /** GET an endpoint and parse the JSON response. Throws MyOtpApiError on failure. */
   async get<T>(path: string, apiKey: string): Promise<T> {
     return this.request<T>("GET", path, undefined, apiKey);
+  }
+
+  /** POST a JSON body without sending or requiring an API key. */
+  async postUnauthenticated<T>(path: string, body: Record<string, unknown>): Promise<T> {
+    return this.request<T>("POST", path, body, "", false);
   }
 
   /** Fetch a public top-up quote without sending an API key. */
@@ -199,13 +204,15 @@ function extractErrorMessage(body: unknown, status: number, statusText: string):
       }
     }
 
-    const nestedError = obj.error;
-    if (nestedError && typeof nestedError === "object") {
-      const nested = nestedError as Record<string, unknown>;
-      for (const key of ["message", "description", "detail"]) {
-        const v = nested[key];
-        if (typeof v === "string" && v.trim().length > 0) {
-          return `MyOTP API error (${status}): ${v}`;
+    for (const containerKey of ["error", "detail"]) {
+      const nestedValue = obj[containerKey];
+      if (nestedValue && typeof nestedValue === "object") {
+        const nested = nestedValue as Record<string, unknown>;
+        for (const key of ["message", "description", "detail"]) {
+          const v = nested[key];
+          if (typeof v === "string" && v.trim().length > 0) {
+            return `MyOTP API error (${status}): ${v}`;
+          }
         }
       }
     }

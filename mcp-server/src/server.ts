@@ -23,7 +23,7 @@ export interface ServerOptions {
 }
 
 export const SERVER_NAME = "myotp-mcp";
-export const SERVER_VERSION = "0.1.6";
+export const SERVER_VERSION = "0.1.7";
 
 export function createServer(options: ServerOptions): McpServer {
   const client = options.client ?? new MyOtpClient();

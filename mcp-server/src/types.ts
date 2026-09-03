@@ -140,11 +140,45 @@ export interface ReportResponse {
   message?: string;
 }
 
-/** Provisional shape for the not-yet-shipped agent registration endpoint. */
-export interface CreateAccountResponse {
-  account_id?: string;
-  status?: string;
-  message?: string;
+/** POST /v1/agent/register request body. */
+export interface CreateAccountRequest {
+  email: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+/** Top-up links and guidance included with an agent account. */
+export interface AgentAccountTopUp {
+  quote: string;
+  endpoint: string;
+  note: string;
+  [key: string]: unknown;
+}
+
+/** GET /v1/agent/account response. */
+export interface AgentAccountResponse {
+  account_id: string;
+  email: string;
+  email_verified: boolean;
+  balance: number;
+  plan_id: number;
+  status: string;
+  topup: AgentAccountTopUp;
+  docs: string;
+  verification_email_sent: boolean;
+  [key: string]: unknown;
+}
+
+/** POST /v1/agent/register response. The API key is only returned once. */
+export interface CreateAccountResponse extends AgentAccountResponse {
+  api_key: string;
+  api_key_note: string;
+}
+
+/** POST /v1/agent/resend-verification response. */
+export interface ResendVerificationResponse {
+  email_verified: boolean;
+  verification_email_sent: boolean;
   [key: string]: unknown;
 }
 

@@ -20,11 +20,15 @@ That's it. Restart Claude Code (or run `/skills`) and the `myotp` skill becomes 
 
 Programmatic signup endpoint (`POST /v1/agent/register`) is in development. The skill probes for it and falls back to the dashboard flow.
 
+## Running out of credits
+
+Once the account exists, the agent can buy credits by itself. A `403 Insufficient balance` means: GET `https://api.myotp.app/v1/topup/quote?credits=100`, POST `/v1/topup`, pay the 402 with an MPP client (`mppx` for USDC, `@stripe/link-cli` for card), and retry. No checkout page, no card form. $0.02 a credit, 25 minimum, 50,000 maximum per call, card capped at $100 per 24 hours, USDC uncapped. Details and exact commands: `patterns/topup.md`.
+
 ## What's inside
 
 - `SKILL.md` — skill manifest and trigger description.
 - `samples/` — working integration code in 9 languages.
-- `patterns/` — sequence diagrams and code outlines for signup verification, password reset, and transaction step-up auth.
+- `patterns/`: sequence diagrams and code outlines for signup verification, password reset, transaction step-up auth, and agent top-up when credits run out.
 
 ## Reference
 

@@ -4,6 +4,7 @@ import { runInit } from './commands/init.js';
 import { runTest } from './commands/test.js';
 import { runVerify } from './commands/verify.js';
 import { runStatus } from './commands/status.js';
+import { runTopup } from './commands/topup.js';
 import { runConfig } from './commands/config.js';
 import { colors, logErrorHuman, logHuman } from './lib/output.js';
 
@@ -68,6 +69,18 @@ globalOptions(
     .description('Show account info: email, balance, plan, message count, trial status')
     .action(async (opts) => {
       await runStatus(opts);
+    })
+);
+
+globalOptions(
+  program
+    .command('topup')
+    .description('Quote or buy MyOTP credits with USDC or card')
+    .option('--credits <n>', 'number of credits to buy (25-50000)', '100')
+    .option('--quote', 'show the price, payment methods, and cap rules without paying', false)
+    .option('--method <method>', 'usdc | card', 'usdc')
+    .action(async (opts) => {
+      await runTopup(opts);
     })
 );
 

@@ -56,6 +56,22 @@ npx @myotp/cli verify +14155551234 482917
 npx @myotp/cli status
 ```
 
+## Create an account from the CLI
+
+Create an agent account without opening the signup page. The CLI saves the returned API key to `~/.myotp/config.json`, so `myotp status`, `myotp test`, and authenticated top-ups can use it immediately.
+
+```bash
+npx @myotp/cli register --email dev@example.com --name "Acme"
+```
+
+New agent accounts start with a zero balance. The command shows the one-time API key once in human output, confirms that the account email was sent, and prints the next steps. Start by reviewing top-up options:
+
+```bash
+myotp topup --quote
+```
+
+Click the link in the confirmation email to unlock card top-ups; USDC top-ups work before email confirmation. For scripts and agents, add `--json` to receive the full registration response, including the one-time API key, and treat that output as sensitive.
+
 ## Buy credits from the CLI
 
 Agents can quote and buy MyOTP credits without opening a checkout page. The default payment method is USDC through `mppx`; card payments use Stripe Link.

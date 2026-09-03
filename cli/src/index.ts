@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command, Option } from 'commander';
+import { runRegister } from './commands/register.js';
 import { runInit } from './commands/init.js';
 import { runTest } from './commands/test.js';
 import { runVerify } from './commands/verify.js';
@@ -25,6 +26,17 @@ const globalOptions = (cmd: Command): Command =>
     .addOption(new Option('--verbose', 'show extra detail in human output').default(false))
     .addOption(new Option('--api-key <key>', 'API key (overrides env and config)'))
     .addOption(new Option('--base-url <url>', 'override API base URL (default https://api.myotp.app)'));
+
+globalOptions(
+  program
+    .command('register')
+    .description('Create a MyOTP account and save its API key locally')
+    .requiredOption('--email <email>', 'email address for the account')
+    .option('--name <name>', 'name or company name (maximum 64 characters)')
+    .action(async (opts) => {
+      await runRegister(opts);
+    })
+);
 
 globalOptions(
   program

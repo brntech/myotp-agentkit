@@ -61,6 +61,29 @@ export interface RegisterResponse {
   next?: string;
 }
 
+export interface TopupQuoteResponse {
+  credits: number;
+  amount_usd: string;
+  price_per_credit_usd: number;
+  min_credits: number;
+  max_credits: number;
+  currency: string;
+  methods: string[];
+}
+
+export interface TopupResponse {
+  status: 'credited' | 'already_credited';
+  credits: number;
+  amount_usd: string;
+  currency: string;
+  payment: {
+    method: string;
+    reference: string;
+  };
+  balance: number;
+  plan_id: number;
+}
+
 export interface ApiError extends Error {
   status: number;
   body: unknown;
@@ -198,6 +221,13 @@ export class MyOtpClient {
 
   me(): Promise<MeResponse> {
     return this.request<MeResponse>('GET', '/me');
+  }
+
+  getTopupQuote(credits: number): Promise<TopupQuoteResponse> {
+    return this.request<TopupQuoteResponse>(
+      'GET',
+      `/v1/topup/quote?credits=${encodeURIComponent(String(credits))}`
+    );
   }
 
   /**

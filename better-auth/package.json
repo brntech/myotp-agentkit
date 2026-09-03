@@ -1,7 +1,7 @@
 {
   "name": "@myotp/better-auth",
-  "version": "0.1.1",
-  "description": "MyOTP.App phone-number adapter for Better Auth — drop-in SMS, WhatsApp, and Telegram OTP delivery for the better-auth phoneNumber() plugin.",
+  "version": "0.1.2",
+  "description": "MyOTP.App phone-number adapter for Better Auth. Drop-in SMS, WhatsApp, and Telegram OTP delivery for the better-auth phoneNumber() plugin.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

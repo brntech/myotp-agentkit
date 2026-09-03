@@ -257,7 +257,7 @@ In `--json` mode, `init` requires `--email`, `--phone`, and `--company` as flags
 ## Security notes
 
 - The config file is created with mode `0600` on POSIX systems so other users on the same machine cannot read your API key.
-- The CLI never logs the full API key. The `config` and `status` commands show a masked version (first 4 and last 4 characters).
+- The CLI prints a full API key exactly once, when `init` or `register` saves it. Every other command (`config`, `status`) shows a masked version (first 4 and last 4 characters).
 - The CLI only talks to `https://api.myotp.app` by default. Override with `--base-url` or `MYOTP_BASE_URL` for self-hosted or staging environments.
 
 ## Source and license

@@ -6,6 +6,7 @@ import {
   readConfig,
   resolveBaseUrl,
   writeConfig,
+  maskApiKey,
 } from '../lib/config.js';
 import { fail } from '../lib/errors.js';
 import { colors, emitJsonError, emitJsonSuccess, logErrorHuman, logHuman } from '../lib/output.js';
@@ -16,6 +17,7 @@ const optionsSchema = z.object({
   baseUrl: z.string().optional(),
   json: z.boolean().default(false),
   verbose: z.boolean().default(false),
+  force: z.boolean().default(false),
 });
 
 export interface RegisterOptionsInput {
@@ -24,6 +26,7 @@ export interface RegisterOptionsInput {
   baseUrl?: string;
   json?: boolean;
   verbose?: boolean;
+  force?: boolean;
 }
 
 function nestedDetailMessage(body: unknown): string | undefined {
@@ -73,6 +76,16 @@ export async function runRegister(rawOpts: RegisterOptionsInput): Promise<void> 
   const opts = parsed.data;
 
   const cfg = await readConfig();
+  if (cfg.apiKey && !opts.force) {
+    fail({
+      command: 'register',
+      json: opts.json,
+      err: new Error(
+        `A MyOTP API key is already configured (${maskApiKey(cfg.apiKey)}). Registering would replace it. ` +
+          'Re-run with --force to create a new account anyway, or use `myotp config` to inspect the current one.'
+      ),
+    });
+  }
   const baseUrl = resolveBaseUrl(opts.baseUrl, cfg);
   const client = new MyOtpClient({ baseUrl });
 
@@ -87,6 +100,18 @@ export async function runRegister(rawOpts: RegisterOptionsInput): Promise<void> 
       command: 'register',
       json: opts.json,
       err: err instanceof MyOtpApiError ? friendlyRegistrationError(err) : err,
+    });
+  }
+  if (
+    typeof account?.api_key !== 'string' ||
+    !/^[A-Za-z0-9_-]{32}$/.test(account.api_key) ||
+    typeof account.account_id !== 'string' ||
+    !account.account_id
+  ) {
+    fail({
+      command: 'register',
+      json: opts.json,
+      err: new Error('The server returned a malformed registration response (missing api_key or account_id). Nothing was saved.'),
     });
   }
 

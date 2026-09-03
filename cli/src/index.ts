@@ -33,6 +33,7 @@ globalOptions(
     .description('Create a MyOTP account and save its API key locally')
     .requiredOption('--email <email>', 'email address for the account')
     .option('--name <name>', 'name or company name (maximum 64 characters)')
+    .option('--force', 'replace an already configured API key')
     .action(async (opts) => {
       await runRegister(opts);
     })

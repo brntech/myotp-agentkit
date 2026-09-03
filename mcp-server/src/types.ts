@@ -49,6 +49,67 @@ export interface AccountInfoResponse {
   [key: string]: unknown;
 }
 
+/** GET /v1/topup/quote response. */
+export interface TopUpQuoteResponse {
+  credits: number;
+  amount_usd: string;
+  price_per_credit_usd: number;
+  min_credits: number;
+  max_credits: number;
+  currency: string;
+  methods: string[];
+  [key: string]: unknown;
+}
+
+/** Payment details returned after a successful top-up. */
+export interface TopUpPayment {
+  method: string;
+  reference: string;
+  [key: string]: unknown;
+}
+
+/** POST /v1/topup success response. */
+export interface TopUpCreditsResponse {
+  status: "credited" | "already_credited" | string;
+  credits: number;
+  amount_usd: string;
+  currency: string;
+  payment: TopUpPayment;
+  balance: number;
+  plan_id: number;
+  [key: string]: unknown;
+}
+
+/** RFC 9457 body returned with a 402 top-up challenge. */
+export interface TopUpPaymentRequiredResponse {
+  challengeId: string;
+  [key: string]: unknown;
+}
+
+/** A decoded Payment offer from the WWW-Authenticate challenge. */
+export interface TopUpPaymentOffer {
+  method: string;
+  intent: string;
+  id: string;
+  expires: string;
+  amount: string | number;
+  currency: string;
+}
+
+/** Raw result of asking the top-up endpoint for a payment challenge. */
+export type TopUpFetchResponse =
+  | {
+      status: 200;
+      url: string;
+      body: TopUpCreditsResponse;
+    }
+  | {
+      status: 402;
+      url: string;
+      body: TopUpPaymentRequiredResponse;
+      wwwAuthenticate: string;
+    };
+
 /** Single transaction row inside a /report response. */
 export interface ReportTransaction {
   message_id: string;

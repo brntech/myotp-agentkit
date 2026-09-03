@@ -4,9 +4,8 @@
  * NOTE: As of 2026-04-29, MyOTP intentionally keeps initial account signup
  * human-driven. The agent-registration endpoint (POST /v1/agent/register)
  * is *not* shipping. Manual signup at myotp.app/sign-up takes ~60 seconds
- * and gets the user 15 free trial credits. The actual ongoing-friction
- * unlock for agents is autonomous *paid* top-up via Stripe x402 — that's
- * handled by a separate `top_up_credits` tool (shipping).
+ * and gets the user 15 free trial credits. Paid top-up is now live through
+ * `top_up_credits`, so agents can buy more credits autonomously after signup.
  *
  * This tool stays in place so agents that try `create_account` get a clean
  * fallback to the manual signup URL rather than a confusing error. It
@@ -92,7 +91,7 @@ export const createAccountTool: ToolDefinition<typeof inputSchema> = {
                 "MyOTP account creation is currently human-driven and not yet available programmatically. " +
                 "Direct the user to https://myotp.app/sign-up/ — signup takes ~60 seconds and gets them 15 free trial credits, no card required. " +
                 "Once they have an API key, set MYOTP_API_KEY in this MCP server's environment (or send X-API-Key per request) and call generate_otp directly. " +
-                "For paid top-ups after the trial, the `top_up_credits` tool (shipping in a future release) will let agents pay autonomously via Stripe x402.",
+                "Paid top-up is now live through `top_up_credits`, so after signup agents can buy more credits autonomously with USDC or card.",
             },
           ],
           structuredContent: {

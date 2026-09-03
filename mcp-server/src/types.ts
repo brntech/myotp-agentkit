@@ -93,6 +93,10 @@ export interface TopUpPaymentOffer {
   id: string;
   expires: string;
   amount: string | number;
+  /** What `amount` is denominated in: USDC atomic units for tempo, cents for stripe. */
+  amount_unit: string;
+  /** `amount` converted to USD with two decimals when the unit is known. */
+  amount_usd?: string;
   currency: string;
 }
 

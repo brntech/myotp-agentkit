@@ -43,7 +43,7 @@ export const createAccountTool: ToolDefinition<typeof inputSchema> = {
     "Account signup at MyOTP.App is currently human-driven (~60 seconds at https://myotp.app/sign-up/, 15 free trial credits, no card required). " +
     "This tool returns a friendly fallback message that the agent can show the user; it does NOT create accounts programmatically. " +
     "After the user signs up and pastes their API key, the agent should set MYOTP_API_KEY (or the X-API-Key header) and call generate_otp directly. " +
-    "For ongoing paid capacity (after the 15 trial credits exhaust), use the `top_up_credits` tool (shipping in a future release) which uses Stripe x402 for autonomous USDC top-up. " +
+    "For ongoing paid capacity (after the 15 trial credits exhaust), use the `top_up_credits` tool (live): the agent pays a 402 over the Machine Payments Protocol, in USDC or by card, and credits land without a human. " +
     "This tool does NOT require an API key — it's the one tool you can call before having one.",
   inputSchema,
   annotations: {

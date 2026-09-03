@@ -127,6 +127,8 @@ describe("top_up_credits — handler", () => {
         id: "tempo_offer",
         expires: "2026-09-03T18:00:00Z",
         amount: "2000000",
+        amount_unit: "USDC atomic units (6 decimals)",
+        amount_usd: "2.00",
         currency: "0x20c0000000000000000000000000000000000000",
       },
       {
@@ -135,6 +137,8 @@ describe("top_up_credits — handler", () => {
         id: "stripe_offer",
         expires: "2026-09-03T18:00:00Z",
         amount: "200",
+        amount_unit: "USD cents",
+        amount_usd: "2.00",
         currency: "usd",
       },
     ]);
@@ -249,5 +253,12 @@ describe("top_up_credits — handler", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("WWW-Authenticate");
+  });
+});
+
+describe("top_up_credits challenge parsing edge cases", () => {
+  it("rejects an unterminated quoted value instead of merging challenges", async () => {
+    const { parsePaymentOffers } = await import("../../src/tools/top_up_credits.js");
+    expect(() => parsePaymentOffers('Payment id="abc, realm=x')).toThrow(/unterminated/);
   });
 });

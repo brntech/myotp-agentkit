@@ -56,6 +56,30 @@ npx @myotp/cli verify +14155551234 482917
 npx @myotp/cli status
 ```
 
+## Buy credits from the CLI
+
+Agents can quote and buy MyOTP credits without opening a checkout page. The default payment method is USDC through `mppx`; card payments use Stripe Link.
+
+```bash
+# Show a quote without paying
+npx @myotp/cli topup --credits 100 --quote
+
+# Buy with USDC (the default)
+npx @myotp/cli topup --credits 100
+
+# Buy with a card through Stripe Link
+npx @myotp/cli topup --credits 100 --method card
+```
+
+Top-ups cost $0.02 per credit, with a minimum of 25 credits and a maximum of 50,000 credits per call. Card top-ups are capped at $100 per account per rolling 24 hours. USDC top-ups have no rolling account cap, though the 50,000-credit per-call maximum still applies. The CLI prints the quote before starting either wallet tool.
+
+Set up the wallet you plan to use once before paying:
+
+```bash
+npx mppx account create
+npx @stripe/link-cli auth login
+```
+
 ## Commands
 
 ### `myotp init`

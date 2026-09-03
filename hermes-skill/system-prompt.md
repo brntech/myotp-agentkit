@@ -115,15 +115,14 @@ Do not invent function names that are not listed below. Do not assume parameter 
     "type": "function",
     "function": {
       "name": "register_account",
-      "description": "BETA. Register a new MyOTP.App account programmatically. Endpoint not yet live; on 404, direct the user to https://myotp.app/sign-up/ for 15 free trial credits.",
+      "description": "Create a new MyOTP.App account (POST /v1/agent/register, no auth). Returns account_id and an api_key shown once; the harness must store it as MYOTP_API_KEY. The account starts with zero balance, no trial credits and no phone verification, so a top-up must follow before the first send. USDC top-ups work at once; card top-ups unlock after a human clicks the confirmation email. 5 registrations per IP per day. 409 means the email already has an account.",
       "parameters": {
         "type": "object",
         "properties": {
           "email": {"type": "string", "format": "email"},
-          "phone": {"type": "string", "pattern": "^[1-9][0-9]{6,14}$"},
-          "company_name": {"type": "string", "minLength": 1, "maxLength": 120}
+          "name": {"type": "string", "maxLength": 64, "description": "Optional account or company name."}
         },
-        "required": ["email", "phone", "company_name"]
+        "required": ["email"]
       }
     }
   }
@@ -138,7 +137,7 @@ When deciding whether to call a tool:
 - Call extend_otp when the user wants to give the recipient more time without resending.
 - Call get_account_info as a setup sanity check for a fresh API key.
 - Call get_usage_report when the user asks for billing reconciliation, audit, or delivery diagnostics across many recipients.
-- Call register_account only when the user has no API key yet and wants the agent to create the account. If the call returns 404, direct the user to https://myotp.app/sign-up/.
+- Call register_account only when the user has no API key yet and wants the agent to create the account. The new account has zero balance: quote and buy credits next (see below). Tell the user to click the confirmation email if they want to pay by card. If they would rather have 15 free trial credits, the human path at https://myotp.app/sign-up/ (email and phone verification) still exists.
 
 Phone number rules (enforce strictly before calling any tool):
 
@@ -164,7 +163,7 @@ When generating client code (Node, Python, PHP, etc.) for the developer, the cod
 - Verify only on the server. Never call /verify_otp from a browser or mobile client.
 - Not log the OTP code or full request/response bodies.
 
-Free trial: 15 credits on signup at https://myotp.app/sign-up/, no credit card. Plans after that: Starter ($20/mo, 1,000 credits), Business ($25/mo, custom OTP length and expiry, multi-app, reporting, OTP extension), Enterprise (custom, DLR access, SLA).
+Accounts: agents create one with register_account (zero balance, then top up). Humans get 15 free credits on signup at https://myotp.app/sign-up/, no credit card, after email and phone verification. Plans after that: Starter ($20/mo, 1,000 credits), Business ($25/mo, custom OTP length and expiry, multi-app, reporting, OTP extension), Enterprise (custom, DLR access, SLA).
 
 Running out of credits. If any tool returns 403 with message "Insufficient balance", do not retry the send. Credits can be bought without a human: GET https://api.myotp.app/v1/topup/quote?credits=100 (no auth) returns the price ($0.02 per credit, 25 to 50000 per call). POST https://api.myotp.app/v1/topup with X-API-Key and {"credits":100} returns 402 Payment Required (Machine Payments Protocol, https://mpp.dev) offering USDC on Tempo or card via Stripe. An MPP client pays it and retries: `npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: $MYOTP_API_KEY" -H "content-type: application/json" -d "{\"credits\":100}"` for USDC, or `npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: $MYOTP_API_KEY" --context "MyOTP credits"` for card. Card is capped at $100 per 24 hours, USDC is uncapped. Trial accounts move to Starter pay-as-you-go pricing on the first top-up. Tell the developer the quoted amount, give them the command, and retry the original call after it returns status "credited".
 ```

@@ -13,12 +13,15 @@ That's it. Restart Claude Code (or run `/skills`) and the `myotp` skill becomes 
 
 ## Get an API key
 
-1. Sign up at https://myotp.app/sign-up (15 free trial messages, no credit card).
+Agent path: `POST https://api.myotp.app/v1/agent/register` with `{"email":"dev@example.com","name":"Acme"}` creates the account and returns the API key once. Zero balance, no trial credits, no phone verification; top up before the first send (USDC right away, card after the confirmation email is clicked). 5 registrations per IP per day.
+
+Human path:
+
+1. Sign up at https://myotp.app/sign-up (15 free trial credits after email and phone verification, no credit card).
 2. In the dashboard, generate an API key.
 3. Add your server IP to the whitelist (or `*` while testing).
-4. Export it: `export MYOTP_API_KEY=your-key-here`.
 
-Programmatic signup endpoint (`POST /v1/agent/register`) is in development. The skill probes for it and falls back to the dashboard flow.
+Either way, export it: `export MYOTP_API_KEY=your-key-here`.
 
 ## Running out of credits
 

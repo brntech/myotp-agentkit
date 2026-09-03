@@ -1,10 +1,10 @@
 ---
 name: myotp-otp
-description: Add SMS, WhatsApp, or Telegram OTP / 2FA / MFA / phone verification to any app using MyOTP.App. Two-endpoint REST API with a single X-API-Key header. Use when the user asks for SMS OTP, two-factor auth, signup phone verification, password reset codes, transaction step-up auth, or wants a Twilio Verify, Vonage Verify, or Firebase Phone Auth alternative. Covers SMS, WhatsApp, and Telegram channels. Keywords sms otp verification 2fa mfa authentication phone whatsapp telegram twilio-alternative vonage-alternative firebase-phone-auth one-time-password buy credits, top up, 402, machine payments, x402, MPP, agent payments.
+description: Add SMS, WhatsApp, or Telegram OTP / 2FA / MFA / phone verification to any app using MyOTP.App. Two-endpoint REST API with a single X-API-Key header. Use when the user asks for SMS OTP, two-factor auth, signup phone verification, password reset codes, transaction step-up auth, or wants a Twilio Verify, Vonage Verify, or Firebase Phone Auth alternative. Covers SMS, WhatsApp, and Telegram channels. Keywords sms otp verification 2fa mfa authentication phone whatsapp telegram twilio-alternative vonage-alternative firebase-phone-auth one-time-password create account, register, agent signup, buy credits, top up, 402, machine payments, x402, MPP, agent payments.
 license: MIT
 metadata:
   author: BroadNet Technologies
-  version: 1.0.3
+  version: 1.0.4
   homepage: https://myotp.app
   openclaw:
     requires:
@@ -85,9 +85,15 @@ Full API reference: https://myotp.app/api-reference/
 
 ## Onboarding
 
-Sign up at https://myotp.app/sign-up to create an account, generate an API key in the dashboard, and add your server IP (or `*` while testing) to the IP whitelist. Free trial is 15 messages, no credit card.
+Agent path: `POST https://api.myotp.app/v1/agent/register` with `{"email":"dev@example.com","name":"Acme"}` (no auth) creates the account and answers 201 with the API key shown once. No trial credits, no phone verification, zero balance; buy credits before the first send (see "Running out of credits"). USDC top-ups work at once, card top-ups after a human clicks the confirmation email. IP allowlist is open (`*`) for agent accounts. 5 registrations per IP per day. `GET /v1/agent/account` returns the account minus the key; `POST /v1/agent/resend-verification` re-sends the email.
 
-A programmatic signup endpoint (`POST /v1/agent/register`) is in development. When it ships, agents will be able to register an account, receive a key, and start sending OTPs without a browser visit.
+```bash
+curl -sS -X POST https://api.myotp.app/v1/agent/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"dev@example.com","name":"Acme"}'
+```
+
+Human path: sign up at https://myotp.app/sign-up, which still exists and gives 15 free credits after email and phone verification. Generate an API key in the dashboard and add your server IP (or `*` while testing) to the IP whitelist.
 
 After signup, store the key in an environment variable:
 
@@ -296,7 +302,7 @@ When the balance cannot cover the next message, key-authenticated calls return:
 403 {"error":{"http_code":403,"message":"Insufficient balance"}}
 ```
 
-Do not retry the send. Buy credits, then retry. The agent can do this alone: one 402, one payment, no checkout page, no card form, no human once the account exists. Signup itself is still human (https://myotp.app/sign-up, email and phone verification, 15 free credits).
+Do not retry the send. Buy credits, then retry. The agent can do this alone: one 402, one payment, no checkout page, no card form, no human at all. The account itself can be created by the agent with `POST /v1/agent/register` (zero balance, then top up); the human path at https://myotp.app/sign-up still exists and gives 15 free credits with email and phone verification.
 
 **Step 1. Get the quote.** No auth needed.
 

@@ -16,7 +16,11 @@
           },
           "channel": {
             "type": "string",
-            "enum": ["sms", "whatsapp", "telegram"],
+            "enum": [
+              "sms",
+              "whatsapp",
+              "telegram"
+            ],
             "default": "sms",
             "description": "Delivery channel. 'sms' (default) works in 190+ countries. 'whatsapp' is best for India, Brazil, Indonesia, Mexico, Nigeria, Turkey. 'telegram' suits privacy-focused users. Same API for all three."
           },
@@ -48,13 +52,19 @@
           },
           "return_otp": {
             "type": "string",
-            "enum": ["true", "false"],
+            "enum": [
+              "true",
+              "false"
+            ],
             "default": "false",
             "description": "Set to 'true' to include the generated OTP code in the API response. Useful for testing or custom delivery. Never enable in production user flows."
           },
           "force_send": {
             "type": "string",
-            "enum": ["true", "false"],
+            "enum": [
+              "true",
+              "false"
+            ],
             "default": "false",
             "description": "Set to 'true' to send a new OTP even if one is already active for this phone number. By default the API returns 409 in that case. Use sparingly: repeated sends to the same number can hit carrier-level spam filters."
           },
@@ -65,7 +75,9 @@
             "description": "Pick a specific message template by its order number (1-99). Requires ACCESS_TO_TEMPLATES entitlement. Not supported on telegram."
           }
         },
-        "required": ["phone_number"]
+        "required": [
+          "phone_number"
+        ]
       }
     }
   },
@@ -93,7 +105,9 @@
             "description": "The UUID returned by `generate_otp`. Provide either this OR `phone_number`. Prefer this when you have it: it disambiguates if the same number got multiple OTPs."
           }
         },
-        "required": ["otp"]
+        "required": [
+          "otp"
+        ]
       }
     }
   },
@@ -111,7 +125,9 @@
             "description": "The UUID returned by `generate_otp`. Identifies which OTP you want a status report on."
           }
         },
-        "required": ["message_id"]
+        "required": [
+          "message_id"
+        ]
       }
     }
   },
@@ -135,7 +151,10 @@
             "description": "Additional seconds to add to the OTP's expiry. Range 60-14400 (1 minute to 4 hours)."
           }
         },
-        "required": ["message_id", "duration"]
+        "required": [
+          "message_id",
+          "duration"
+        ]
       }
     }
   },
@@ -191,28 +210,24 @@
     "type": "function",
     "function": {
       "name": "register_account",
-      "description": "BETA. Register a new MyOTP.App account programmatically. Intended use: an AI agent helping a user set up phone verification for the first time can call this to bootstrap the account, then a follow-up verification step yields an API key. Status: the agent-registration endpoint (POST /v1/agent/register) is not yet live. Until it ships, this tool will return 404. When that happens, direct the user to https://myotp.app/sign-up/ to create an account manually and generate an API key in the dashboard. They get 15 free trial credits on signup, no credit card required. This is the only tool that does not require an existing API key.",
+      "description": "Create a new MyOTP.App account (POST /v1/agent/register, no auth). Returns account_id and an api_key shown once; the harness must store it as MYOTP_API_KEY. The account starts with zero balance, no trial credits and no phone verification, so a top-up must follow before the first send. USDC top-ups work at once; card top-ups unlock after a human clicks the confirmation email. 5 registrations per IP per day. 409 means the email already has an account. Humans can instead sign up at https://myotp.app/sign-up/ for 15 free trial credits (email and phone verification). This is the only tool that does not require an existing API key.",
       "parameters": {
         "type": "object",
         "properties": {
           "email": {
             "type": "string",
             "format": "email",
-            "description": "Email address for the new MyOTP.App account. Will receive a verification code."
+            "description": "Email address for the new MyOTP.App account. Receives the confirmation link."
           },
-          "phone": {
+          "name": {
             "type": "string",
-            "pattern": "^[1-9][0-9]{6,14}$",
-            "description": "Phone number for the account holder (international format, no + or leading 0). May be used for phone verification during onboarding."
-          },
-          "company_name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "description": "The company or product name registering for an account."
+            "maxLength": 64,
+            "description": "Optional account or company name."
           }
         },
-        "required": ["email", "phone", "company_name"]
+        "required": [
+          "email"
+        ]
       }
     }
   }

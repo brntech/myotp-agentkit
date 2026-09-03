@@ -1,6 +1,10 @@
 # Pattern: running out of credits (agent top-up)
 
-Every `generate_otp` call deducts credits. When the balance cannot cover the next message the API refuses the send. The fix is a paid top-up, and an agent can do it alone. There is no checkout page, no card form, and no human step once the account exists.
+## Creating the account first
+
+If there is no account yet, the agent can create one: `POST https://api.myotp.app/v1/agent/register` with `{"email":"dev@example.com","name":"Acme"}` (no auth) answers 201 with the `api_key` shown once. The new account has a zero balance, no trial credits and no phone verification, so the very next step is the top-up below. USDC top-ups work immediately; card top-ups unlock once a human clicks the confirmation email (`POST /v1/agent/resend-verification` re-sends it, `GET /v1/agent/account` shows `email_verified`). Limit: 5 registrations per IP per day. The human path at https://myotp.app/sign-up still exists and gives 15 free credits with email and phone verification.
+
+Every `generate_otp` call deducts credits. When the balance cannot cover the next message the API refuses the send. The fix is a paid top-up, and an agent can do it alone. There is no checkout page, no card form, and no human step; the account itself can be created by the agent too.
 
 ## What running out looks like
 
@@ -126,7 +130,7 @@ send_otp(phone):
 
 ## Gotchas
 
-- The account must already exist. Signup is still human: https://myotp.app/sign-up, email and phone verification, 15 free credits. The top-up endpoint cannot create accounts.
+- The top-up endpoint cannot create accounts. Create one first with `POST /v1/agent/register` (see the preface above) or use the human path at https://myotp.app/sign-up.
 - Keep `TOPUP_CREDITS` between 25 and 50,000 or the quote returns 400 before any payment happens.
 - Decide the spend limit in code, not in the prompt. The quote endpoint exists so the agent can check the dollar amount before paying.
 - Treat the retry as the same request. Changing the body between the 402 and the paid retry invalidates the challenge.

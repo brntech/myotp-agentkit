@@ -3,7 +3,7 @@
   "name": "io.github.brntech/myotp",
   "title": "MyOTP.App",
   "description": "Send and verify one-time passcodes over SMS, WhatsApp and Telegram.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "websiteUrl": "https://mcp.myotp.app",
   "repository": {
     "url": "https://github.com/brntech/myotp-agentkit",
@@ -15,7 +15,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@myotp/mcp",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "transport": {
         "type": "stdio"
       },

@@ -6,7 +6,7 @@ Send and verify one-time passwords (SMS, WhatsApp, Telegram) directly from a cha
 
 ## What it does
 
-Exposes 9 tools:
+Exposes 10 tools:
 
 | Tool | Purpose |
 |---|---|
@@ -16,7 +16,8 @@ Exposes 9 tools:
 | `extend_otp` | Add more time to an active OTP without resending. |
 | `get_account_info` | Sanity-check the API key and IP whitelist (calls `GET /me`). |
 | `get_usage_report` | Paginated transaction history for a date range. |
-| `create_account` | Programmatic onboarding (placeholder — see "Account creation" below). |
+| `create_account` | Create an agent account without an API key and return its one-time key. |
+| `get_account_status` | Check verification, balance, plan, and status; optionally resend verification. |
 | `get_topup_quote` | Quote a credit purchase and return USDC and card payment commands. |
 | `top_up_credits` | Return an MPP payment challenge and retry details, or the credited result. |
 
@@ -41,9 +42,16 @@ npm install --save-dev @myotp/mcp
 
 ## Get an API key
 
-1. Sign up at [myotp.app/sign-up/](https://myotp.app/sign-up/) — 15 free trial credits, no card required.
-2. In the dashboard, generate an API key.
-3. Add your machine's public IP (or `*` for testing) to the IP whitelist for that key.
+Call `create_account` with an email address and optional name. It is the one
+account tool that needs no configured key. Save the returned API key immediately:
+it is shown once, and the new account starts with a zero balance. Configure that
+key as `MYOTP_API_KEY` for stdio or send it with hosted requests, then call
+`get_topup_quote` or `top_up_credits` to add credits.
+
+The confirmation email requires a human click. Confirmation unlocks card
+top-ups; USDC top-ups work before confirmation. Human signup at
+[myotp.app/sign-up/](https://myotp.app/sign-up/) remains available and follows
+the dashboard's email, phone, API-key, and IP-allowlist flow.
 
 ## Use it with Claude Desktop
 
@@ -164,7 +172,9 @@ MYOTP_API_KEY=sk_... npx @myotp/mcp --stdio
 
 ### Streamable HTTP (for hosted servers)
 
-Run an HTTP server that any MCP-compatible agent can point at. The API key is provided per-request via the `X-API-Key` header — so a single hosted instance can serve many tenants.
+Run an HTTP server that any MCP-compatible agent can point at. Authenticated
+tools receive the API key per request via `X-API-Key`, so one hosted instance
+can serve many tenants; anonymous tools do not require the header.
 
 ```bash
 npx @myotp/mcp --http --port 3000
@@ -174,13 +184,14 @@ MYOTP_MCP_TRANSPORT=http PORT=3000 npx @myotp/mcp
 
 The MCP endpoint is `POST /mcp` (also accepts `GET` and `DELETE` per the spec). Health check at `GET /healthz`.
 
-This is what we host at `https://mcp.myotp.app/mcp`. Point your client at that URL and send `X-API-Key: <your-key>` on every request.
+This is what we host at `https://mcp.myotp.app/mcp`. Point your client at that
+URL and send `X-API-Key: <your-key>` on authenticated tool requests.
 
 ## Configuration
 
 | Env var | Default | Description |
 |---|---|---|
-| `MYOTP_API_KEY` | — | Your MyOTP.App API key (required in stdio mode). |
+| `MYOTP_API_KEY` | — | Your MyOTP.App API key. Required for authenticated tools; `create_account` and `get_topup_quote` work without it. |
 | `MYOTP_BASE_URL` | `https://api.myotp.app` | API base URL. Override for staging. |
 | `MYOTP_MCP_TRANSPORT` | `stdio` | Set to `http` to start in HTTP mode. |
 | `PORT` | `3000` | HTTP listen port. |
@@ -196,6 +207,8 @@ Once the server is wired up, you can ask the agent things like:
 - *"Did the last OTP get delivered? Check status for message_id `a1b2…`."*
 - *"Show me my OTP usage for the last 7 days."*
 - *"How much credit do I have on this MyOTP account?"*
+- *"Create a MyOTP agent account for dev@example.com."*
+- *"Check whether my agent account email is verified, and resend the email if needed."*
 - *"Quote 500 more MyOTP credits."*
 - *"That send failed with NoBalance. Top up 100 credits."*
 
@@ -238,11 +251,19 @@ npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"cr
 
 ## Account creation
 
-The `create_account` tool calls `POST /v1/agent/register` and currently returns a
-404 with a friendly message asking the user to sign up at
-[myotp.app/sign-up/](https://myotp.app/sign-up/) (~60 seconds, 15 free trial
-credits). Signup remains human-driven. After the user supplies the API key,
-paid top-up is live through `top_up_credits` with USDC or card.
+The `create_account` tool calls the live unauthenticated
+`POST /v1/agent/register` endpoint with an email and optional name. The response
+contains the full account record and a 32-character API key that is shown once.
+Save it immediately and set `MYOTP_API_KEY` (or configure the hosted client to
+send it). Agent accounts have an open IP allowlist, need no phone verification,
+and start with balance 0 and the Starter pay-as-you-go plan.
+
+A confirmation email is sent to the supplied address. A human must click the
+link within 24 hours to unlock card top-ups; USDC top-ups work immediately.
+Use `get_account_status` to check `email_verified`, balance, plan, and account
+status, or call it with `resend_verification: true` to send another email. Then
+use `get_topup_quote` or `top_up_credits` to fund the account before sending an
+OTP.
 
 ## Develop
 

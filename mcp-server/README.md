@@ -6,7 +6,7 @@ Send and verify one-time passwords (SMS, WhatsApp, Telegram) directly from a cha
 
 ## What it does
 
-Exposes 7 tools:
+Exposes 9 tools:
 
 | Tool | Purpose |
 |---|---|
@@ -17,6 +17,8 @@ Exposes 7 tools:
 | `get_account_info` | Sanity-check the API key and IP whitelist (calls `GET /me`). |
 | `get_usage_report` | Paginated transaction history for a date range. |
 | `create_account` | Programmatic onboarding (placeholder — see "Account creation" below). |
+| `get_topup_quote` | Quote a credit purchase and return USDC and card payment commands. |
+| `top_up_credits` | Return an MPP payment challenge and retry details, or the credited result. |
 
 All tools call the public MyOTP REST API at `https://api.myotp.app`. Override with the `MYOTP_BASE_URL` env var for staging.
 
@@ -194,14 +196,53 @@ Once the server is wired up, you can ask the agent things like:
 - *"Did the last OTP get delivered? Check status for message_id `a1b2…`."*
 - *"Show me my OTP usage for the last 7 days."*
 - *"How much credit do I have on this MyOTP account?"*
+- *"Quote 500 more MyOTP credits."*
+- *"That send failed with NoBalance. Top up 100 credits."*
 
 Under the hood the agent will pick the right tool, validate inputs against the JSON Schema we publish, and call the MyOTP API.
 
+## Buying credits as an agent
+
+Agents can buy MyOTP credits by themselves: one 402, one payment, no checkout
+page, no card form. Credits cost $0.02 each, with a 25-credit ($0.50) minimum
+and a 50,000-credit maximum per call. Card top-ups are capped at $100 per
+account per rolling 24 hours; USDC is uncapped. A trial account moves to the
+Starter pay-as-you-go pricing table on its first top-up, without creating a
+subscription.
+
+When an OTP send returns HTTP 403 `insufficient balance` or `NoBalance`, call
+`get_topup_quote` to inspect the price or call `top_up_credits` to start the
+purchase. `top_up_credits` fetches the quote first, then posts to `/v1/topup`
+with the configured API key and no payment credential. The expected 402
+response contains MPP offers for USDC on Tempo and, while the card cap permits,
+card or Link through Stripe. The tool returns the decoded offers, challenge ID,
+exact retry URL and body, and headers with credential placeholders.
+
+The MCP server cannot hold the agent's wallet. Run one of the returned commands
+with `your MyOTP API key` replaced locally; the MPP client pays and retries the
+same request with its payment credential. That retry credits the account. If
+the runtime already wraps `fetch` with an MPP credential provider, the tool can
+receive and return the successful credited response directly.
+
+USDC wallet (creating an mppx account makes a wallet, and testnet auto-funds):
+
+```bash
+npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: your MyOTP API key" -H "content-type: application/json" -d "{\"credits\":100}"
+```
+
+Card or Link wallet (run `npx @stripe/link-cli auth login` once first):
+
+```bash
+npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: your MyOTP API key" --context "MyOTP credits"
+```
+
 ## Account creation
 
-The `create_account` tool calls `POST /v1/agent/register` and currently returns a 404 with a friendly message asking the user to sign up at [myotp.app/sign-up/](https://myotp.app/sign-up/) (~60 seconds, 15 free trial credits). The decision (2026-04-29) is to keep signup human-driven — the actual ongoing-friction unlock is **autonomous USDC top-up via x402** for paid credits, not skipping the one-time signup.
-
-A `top_up_credits` tool is shipping in a future release: when the agent's account exhausts paid credits mid-flow, `top_up_credits` returns an x402 challenge with a USDC deposit address on Base; the agent pays from a pre-funded wallet; settlement is verified via the Coinbase x402 facilitator and balance is credited in ~5-15 seconds. No human-in-the-loop after the initial wallet funding.
+The `create_account` tool calls `POST /v1/agent/register` and currently returns a
+404 with a friendly message asking the user to sign up at
+[myotp.app/sign-up/](https://myotp.app/sign-up/) (~60 seconds, 15 free trial
+credits). Signup remains human-driven. After the user supplies the API key,
+paid top-up is live through `top_up_credits` with USDC or card.
 
 ## Develop
 

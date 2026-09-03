@@ -1,10 +1,10 @@
 ---
 name: myotp-otp
-description: Add SMS, WhatsApp, or Telegram OTP / 2FA / MFA / phone verification to any app using MyOTP.App. Two-endpoint REST API with a single X-API-Key header. Use when the user asks for SMS OTP, two-factor auth, signup phone verification, password reset codes, transaction step-up auth, or wants a Twilio Verify, Vonage Verify, or Firebase Phone Auth alternative. Covers SMS, WhatsApp, and Telegram channels. Keywords sms otp verification 2fa mfa authentication phone whatsapp telegram twilio-alternative vonage-alternative firebase-phone-auth one-time-password.
+description: Add SMS, WhatsApp, or Telegram OTP / 2FA / MFA / phone verification to any app using MyOTP.App. Two-endpoint REST API with a single X-API-Key header. Use when the user asks for SMS OTP, two-factor auth, signup phone verification, password reset codes, transaction step-up auth, or wants a Twilio Verify, Vonage Verify, or Firebase Phone Auth alternative. Covers SMS, WhatsApp, and Telegram channels. Keywords sms otp verification 2fa mfa authentication phone whatsapp telegram twilio-alternative vonage-alternative firebase-phone-auth one-time-password buy credits, top up, 402, machine payments, x402, MPP, agent payments.
 license: MIT
 metadata:
   author: BroadNet Technologies
-  version: 1.0.0
+  version: 1.0.2
   homepage: https://myotp.app
   openclaw:
     requires:
@@ -287,6 +287,54 @@ For PHP, Java, C#, Flutter, and copy-pasteable cURL examples, see the official d
 Volume credit packs (5K to 100K) available on top of any plan. Per-message cost varies by destination country and channel and is returned in the `cost` field of every `generate_otp` response.
 
 Pricing page: https://myotp.app/pricing/
+
+## Running out of credits
+
+When the balance cannot cover the next message, key-authenticated calls return:
+
+```
+403 {"error":{"http_code":403,"message":"Insufficient balance"}}
+```
+
+Do not retry the send. Buy credits, then retry. The agent can do this alone: one 402, one payment, no checkout page, no card form, no human once the account exists. Signup itself is still human (https://myotp.app/sign-up, email and phone verification, 15 free credits).
+
+**Step 1. Get the quote.** No auth needed.
+
+```bash
+curl -sS "https://api.myotp.app/v1/topup/quote?credits=100"
+# 200 {"credits":100,"amount_usd":"2.00","price_per_credit_usd":0.02,"min_credits":25,"max_credits":50000,"currency":"usd","methods":["card via Stripe shared payment token","usdc on tempo"]}
+# 400 {"error":{"http_code":400,"message":"credits must be an integer between 25 and 50000"}}
+```
+
+**Step 2. POST /v1/topup.** Header `X-API-Key: <key>`, body `{"credits": 100}`. The reply is `402 Payment Required` following the Machine Payments Protocol (https://mpp.dev). The `WWW-Authenticate: Payment ...` header carries two offers: USDC on Tempo (`method="tempo"`, amount in USDC atomic units) and card or Link via a Stripe shared payment token (`method="stripe"`, amount in cents). The body is RFC 9457 problem+json with a `challengeId`. Other replies: `401` invalid or missing key, `403` account not active.
+
+**Step 3. Pay and retry with an MPP client.** The client replays the same request with the payment credential.
+
+```bash
+# USDC wallet. npx mppx account create makes a wallet; testnet auto-funds.
+npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: YOUR_KEY" -H "content-type: application/json" -d "{\"credits\":100}"
+
+# Card via the Stripe Link agent wallet. Run npx @stripe/link-cli auth login once.
+npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: YOUR_KEY" --context "MyOTP credits"
+```
+
+In code, `import { Mppx, tempo } from "mppx/client"` wraps global fetch, so a plain `fetch()` to the endpoint pays automatically.
+
+**Step 4. Read the result.**
+
+```
+200 {"status":"credited","credits":100,"amount_usd":"2.00","currency":"usd","payment":{"method":"tempo","reference":"0x..."},"balance":115,"plan_id":6452}
+```
+
+`status` is `"already_credited"` when a credential is replayed. A payment never credits twice. A `500` means the payment settled but crediting failed; email support@myotp.app with the payment reference and it is applied from the ledger.
+
+**Rules.**
+
+- $0.02 per credit. Minimum 25 credits ($0.50, the Stripe card minimum). Maximum 50,000 per call.
+- Card top-ups are capped at $100 per account per rolling 24 hours. Over the cap the 402 offers USDC only. USDC is uncapped.
+- Trial accounts (15 free credits) move to the Starter pay-as-you-go pricing table on their first top-up. No subscription is created.
+- Phone verification is unchanged. You need an API key, and the dashboard shows it after email and phone verification.
+- Decide the spend limit in code and check the quote before paying.
 
 ## Security best practices
 

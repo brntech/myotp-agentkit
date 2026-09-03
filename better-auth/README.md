@@ -119,7 +119,7 @@ myotpSendOtp({ apiKey: "...", fetch: undiciFetch });
 
 ```bash
 # 1. Get a key
-npx myotp init             # interactive (after @myotp/cli ships)
+npx @myotp/cli init        # interactive
 # or sign up manually at https://myotp.app/sign-up
 
 # 2. Verify the adapter directly

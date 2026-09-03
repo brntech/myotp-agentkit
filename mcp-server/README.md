@@ -25,8 +25,11 @@ All tools call the public MyOTP REST API at `https://api.myotp.app`. Override wi
 You don't need to install anything globally — `npx` will fetch and run the latest version on demand:
 
 ```bash
-npx myotp-mcp
+npx @myotp/mcp
 ```
+
+> Use the scoped name. `myotp-mcp` is the bin name inside the package, not a
+> package on npm, so `npx myotp-mcp` does not resolve.
 
 If you want to pin a version or install it locally:
 
@@ -81,7 +84,7 @@ Add it to your project's `.mcp.json`:
 Or register it globally with the Claude Code CLI:
 
 ```bash
-claude mcp add myotp -- npx -y myotp-mcp
+claude mcp add myotp -- npx -y @myotp/mcp
 # Set the env var separately, then restart claude.
 ```
 
@@ -110,9 +113,9 @@ Cursor reads the same `.mcp.json` format. Add to your workspace settings or `.cu
 The server reads JSON-RPC messages from stdin and writes them to stdout. The API key comes from the `MYOTP_API_KEY` env var, set when the agent launches the server. This is the right mode for desktop apps like Claude Desktop, Claude Code, and Cursor.
 
 ```bash
-MYOTP_API_KEY=sk_... npx myotp-mcp
+MYOTP_API_KEY=sk_... npx @myotp/mcp
 # or explicitly
-MYOTP_API_KEY=sk_... npx myotp-mcp --stdio
+MYOTP_API_KEY=sk_... npx @myotp/mcp --stdio
 ```
 
 ### Streamable HTTP (for hosted servers)
@@ -120,9 +123,9 @@ MYOTP_API_KEY=sk_... npx myotp-mcp --stdio
 Run an HTTP server that any MCP-compatible agent can point at. The API key is provided per-request via the `X-API-Key` header — so a single hosted instance can serve many tenants.
 
 ```bash
-npx myotp-mcp --http --port 3000
+npx @myotp/mcp --http --port 3000
 # or with the env switch
-MYOTP_MCP_TRANSPORT=http PORT=3000 npx myotp-mcp
+MYOTP_MCP_TRANSPORT=http PORT=3000 npx @myotp/mcp
 ```
 
 The MCP endpoint is `POST /mcp` (also accepts `GET` and `DELETE` per the spec). Health check at `GET /healthz`.

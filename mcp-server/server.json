@@ -1,0 +1,44 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.brntech/myotp",
+  "title": "MyOTP.App",
+  "description": "Send and verify one-time passcodes over SMS, WhatsApp and Telegram. Check delivery status, extend expiry, and pull usage reports.",
+  "version": "0.1.4",
+  "websiteUrl": "https://mcp.myotp.app",
+  "repository": {
+    "url": "https://github.com/brntech/myotp-agentkit",
+    "source": "github",
+    "subfolder": "mcp-server"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@myotp/mcp",
+      "version": "0.1.4",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "MYOTP_API_KEY",
+          "description": "MyOTP.App API key. Get one free at https://myotp.app/sign-up/ (15 trial credits, no card).",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.myotp.app/mcp",
+      "headers": [
+        {
+          "name": "X-API-Key",
+          "description": "MyOTP.App API key, sent per request so the hosted server never stores it. Note: calls reach the MyOTP API from 108.61.176.199, so add that IP to your key's allowlist or every call returns 403.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

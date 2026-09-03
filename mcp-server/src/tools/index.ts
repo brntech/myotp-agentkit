@@ -10,6 +10,8 @@ import { extendOtpTool } from "./extend_otp.js";
 import { getAccountInfoTool } from "./get_account_info.js";
 import { getUsageReportTool } from "./get_usage_report.js";
 import { createAccountTool } from "./create_account.js";
+import { getTopUpQuoteTool } from "./get_topup_quote.js";
+import { topUpCreditsTool } from "./top_up_credits.js";
 import type { ToolDefinition } from "./types.js";
 
 // Cast each tool to a heterogeneous-shape array so we can register them in a
@@ -22,6 +24,8 @@ export const allTools: ReadonlyArray<ToolDefinition<ZodRawShape>> = [
   getAccountInfoTool,
   getUsageReportTool,
   createAccountTool,
+  getTopUpQuoteTool,
+  topUpCreditsTool,
 ] as ReadonlyArray<ToolDefinition<ZodRawShape>>;
 
 export type { ToolDefinition, ToolContext, ToolResult } from "./types.js";

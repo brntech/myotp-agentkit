@@ -1,13 +1,18 @@
 /**
  * Thin HTTP client for the MyOTP.App REST API.
  *
- * Auth: every request must carry an `X-API-Key` header. We don't bake the key in;
- * callers (tool handlers) hand it in per-request so we can support both stdio
- * (single key from env) and HTTP (per-request header forwarded from the agent)
- * transport modes with the same client.
+ * Auth: authenticated requests carry an `X-API-Key` header. We don't bake the
+ * key in; callers hand it in per request. The public top-up quote is the sole
+ * anonymous request exposed by this client.
  */
 
 import { MyOtpApiError } from "./types.js";
+import type {
+  TopUpFetchResponse,
+  TopUpPaymentRequiredResponse,
+  TopUpQuoteResponse,
+  TopUpCreditsResponse,
+} from "./types.js";
 
 export interface MyOtpClientOptions {
   /** Base URL of the MyOTP API. Defaults to env `MYOTP_BASE_URL` or production. */
@@ -43,13 +48,81 @@ export class MyOtpClient {
     return this.request<T>("GET", path, undefined, apiKey);
   }
 
+  /** Fetch a public top-up quote without sending an API key. */
+  async getTopUpQuote(credits: number): Promise<TopUpQuoteResponse> {
+    return this.request<TopUpQuoteResponse>(
+      "GET",
+      `/v1/topup/quote?credits=${encodeURIComponent(String(credits))}`,
+      undefined,
+      "",
+      false
+    );
+  }
+
+  /**
+   * Ask the top-up endpoint to credit or challenge the request. A 402 is an
+   * expected result here, so preserve its WWW-Authenticate header for the tool.
+   */
+  async requestTopUp(credits: number, apiKey: string): Promise<TopUpFetchResponse> {
+    const path = "/v1/topup";
+    const { response, parsed, url } = await this.fetchJson(
+      "POST",
+      path,
+      { credits },
+      apiKey,
+      true
+    );
+
+    if (response.status === 200) {
+      return {
+        status: 200,
+        url,
+        body: parsed as TopUpCreditsResponse,
+      };
+    }
+
+    if (response.status === 402) {
+      return {
+        status: 402,
+        url,
+        body: parsed as TopUpPaymentRequiredResponse,
+        wwwAuthenticate: response.headers.get("www-authenticate") ?? "",
+      };
+    }
+
+    throw makeApiError(response, path, parsed);
+  }
+
   private async request<T>(
     method: "GET" | "POST",
     path: string,
     body: Record<string, unknown> | undefined,
-    apiKey: string
+    apiKey: string,
+    requireApiKey = true
   ): Promise<T> {
-    if (!apiKey || apiKey.trim() === "") {
+    const { response, parsed } = await this.fetchJson(
+      method,
+      path,
+      body,
+      apiKey,
+      requireApiKey
+    );
+
+    if (!response.ok) {
+      throw makeApiError(response, path, parsed);
+    }
+
+    return parsed as T;
+  }
+
+  private async fetchJson(
+    method: "GET" | "POST",
+    path: string,
+    body: Record<string, unknown> | undefined,
+    apiKey: string,
+    requireApiKey: boolean
+  ): Promise<{ response: Response; parsed: unknown; url: string }> {
+    if (requireApiKey && (!apiKey || apiKey.trim() === "")) {
       throw new MyOtpApiError(
         "Missing MyOTP API key. In stdio mode, set MYOTP_API_KEY in your MCP server config. In HTTP mode, send the X-API-Key header on every request.",
         401,
@@ -61,17 +134,20 @@ export class MyOtpClient {
     const url = `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": this.userAgent,
+    };
+    if (requireApiKey) {
+      headers["X-API-Key"] = apiKey;
+    }
 
     let response: Response;
     try {
       response = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "X-API-Key": apiKey,
-          "User-Agent": this.userAgent,
-        },
+        headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       });
@@ -100,13 +176,13 @@ export class MyOtpClient {
       }
     }
 
-    if (!response.ok) {
-      const message = extractErrorMessage(parsed, response.status, response.statusText);
-      throw new MyOtpApiError(message, response.status, path, parsed);
-    }
-
-    return parsed as T;
+    return { response, parsed, url };
   }
+}
+
+function makeApiError(response: Response, path: string, body: unknown): MyOtpApiError {
+  const message = extractErrorMessage(body, response.status, response.statusText);
+  return new MyOtpApiError(message, response.status, path, body);
 }
 
 /**
@@ -120,6 +196,17 @@ function extractErrorMessage(body: unknown, status: number, statusText: string):
       const v = obj[key];
       if (typeof v === "string" && v.trim().length > 0) {
         return `MyOTP API error (${status}): ${v}`;
+      }
+    }
+
+    const nestedError = obj.error;
+    if (nestedError && typeof nestedError === "object") {
+      const nested = nestedError as Record<string, unknown>;
+      for (const key of ["message", "description", "detail"]) {
+        const v = nested[key];
+        if (typeof v === "string" && v.trim().length > 0) {
+          return `MyOTP API error (${status}): ${v}`;
+        }
       }
     }
   }

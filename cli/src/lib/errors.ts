@@ -46,7 +46,7 @@ export function fail(opts: FailOptions): never {
     if (status === 401) {
       logErrorHuman(
         colors.dim(
-          'Hint: API key is invalid or missing. Run `npx myotp init` or `npx myotp config --set-key <KEY>`.'
+          'Hint: API key is invalid or missing. Run `npx @myotp/cli init` or `npx @myotp/cli config --set-key <KEY>`.'
         )
       );
     } else if (status === 403) {

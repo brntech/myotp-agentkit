@@ -51,7 +51,7 @@ export async function runTest(rawPhone: string, rawOpts: TestOptionsInput): Prom
       command: 'test',
       json: opts.json,
       err: new Error('No API key configured.'),
-      hint: 'Run `npx myotp init` to create an account, or `npx myotp config --set-key <KEY>` to save an existing key.',
+      hint: 'Run `npx @myotp/cli init` to create an account, or `npx @myotp/cli config --set-key <KEY>` to save an existing key.',
     });
   }
 
@@ -98,7 +98,7 @@ export async function runTest(rawPhone: string, rawOpts: TestOptionsInput): Prom
       logHuman(`     ${colors.dim('otp       :')} ${colors.yellow(res.otp)} ${colors.dim('(returned because --return-otp was set)')}`);
     }
     logHuman('');
-    logHuman(colors.dim(`Verify with: npx myotp verify +${phone} <code>`));
+    logHuman(colors.dim(`Verify with: npx @myotp/cli verify +${phone} <code>`));
   } catch (err) {
     fail({ command: 'test', json: opts.json, err });
   }

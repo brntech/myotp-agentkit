@@ -94,12 +94,12 @@ program
 program.addHelpText(
   'after',
   `\nExamples:\n` +
-    `  $ npx myotp init\n` +
-    `  $ npx myotp test +14155551234\n` +
-    `  $ npx myotp test +14155551234 --channel whatsapp\n` +
-    `  $ npx myotp verify +14155551234 123456\n` +
-    `  $ npx myotp status --json\n` +
-    `  $ npx myotp config --reset\n` +
+    `  $ npx @myotp/cli init\n` +
+    `  $ npx @myotp/cli test +14155551234\n` +
+    `  $ npx @myotp/cli test +14155551234 --channel whatsapp\n` +
+    `  $ npx @myotp/cli verify +14155551234 123456\n` +
+    `  $ npx @myotp/cli status --json\n` +
+    `  $ npx @myotp/cli config --reset\n` +
     `\nEnvironment variables:\n` +
     `  MYOTP_API_KEY    API key (overrides config file)\n` +
     `  MYOTP_BASE_URL   API base URL (defaults to https://api.myotp.app)\n` +
@@ -107,7 +107,7 @@ program.addHelpText(
 );
 
 // Friendlier handling of unknown commands.
-program.showHelpAfterError('(run `npx myotp help` for usage)');
+program.showHelpAfterError('(run `npx @myotp/cli help` for usage)');
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   // Anything that bubbles up here is a bug, not a user-facing API or input

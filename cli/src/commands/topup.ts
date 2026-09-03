@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { MyOtpClient, type TopupQuoteResponse } from '../lib/api.js';
 import { readConfig, resolveApiKey, resolveBaseUrl } from '../lib/config.js';
@@ -55,9 +57,24 @@ function printQuote(quote: TopupQuoteResponse): void {
   logHuman('');
 }
 
+/**
+ * Resolve how to run `npx` without a shell. On Windows the `npx` on PATH is a .cmd shim, which
+ * spawn() cannot execute directly, so run npm's own npx-cli.js with the current node binary.
+ * Argv stays discrete either way, so the API key and JSON body are never shell-parsed.
+ */
+export function npxInvocation(args: string[]): { command: string; args: string[] } {
+  if (process.platform === 'win32') {
+    const npxCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js');
+    if (existsSync(npxCli)) return { command: process.execPath, args: [npxCli, ...args] };
+    return { command: 'npx.cmd', args };
+  }
+  return { command: 'npx', args };
+}
+
 function waitForWallet(args: string[]): Promise<number | null> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', args, { stdio: 'inherit' });
+    const inv = npxInvocation(args);
+    const child = spawn(inv.command, inv.args, { stdio: 'inherit' });
     child.once('error', reject);
     child.once('close', (code) => resolve(code));
   });
@@ -93,6 +110,10 @@ export async function runTopup(rawOpts: TopupOptionsInput): Promise<void> {
   }
 
   const client = new MyOtpClient({ baseUrl });
+  if (opts.json && !opts.quote) {
+    fail({ command: 'topup', json: true, err: new Error('--json is only available with --quote; payment runs interactively') });
+  }
+
   let quote: TopupQuoteResponse;
   try {
     quote = await client.getTopupQuote(credits);

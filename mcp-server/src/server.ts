@@ -36,7 +36,8 @@ export function createServer(options: ServerOptions): McpServer {
         "Typical flow: call `generate_otp` with a phone number to send a code, save the returned `message_id`, " +
         "then call `verify_otp` with the code the end user typed. Use `check_otp_status` to debug delivery, " +
         "`extend_otp` to give users more time, and `get_usage_report` for transaction history. " +
-        "All operations require a MyOTP API key — get one at https://myotp.app/sign-up/ (15 free trial credits, no card required). " +
+        "Every tool except `create_account` needs a MyOTP API key. No key yet? Call `create_account` (zero balance, then `top_up_credits`), " +
+        "or a human can sign up at https://myotp.app/sign-up/ for 15 free trial credits. " +
         "Phone numbers must be in international format with no leading + or 0 (e.g. '14155551234' for a US number).",
     }
   );

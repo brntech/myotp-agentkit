@@ -3,7 +3,7 @@
   "name": "myotp-otp",
   "display_name": "MyOTP.App",
   "description": "Add SMS, WhatsApp, or Telegram OTP / 2FA / MFA / phone verification to any app using MyOTP.App. Two-endpoint REST API with a single X-API-Key header. Use when the user asks for SMS OTP, 2FA, signup phone verification, password reset codes, transaction step-up auth, or wants a Twilio Verify, Vonage Verify, or Firebase Phone Auth alternative. Agents can buy credits over a 402 (USDC or card, MPP).",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "BroadNet Technologies",
   "author_email": "info@myotp.app",
   "license": "MIT",

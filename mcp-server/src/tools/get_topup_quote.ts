@@ -28,7 +28,7 @@ export function buildTopUpCommands(
       `-H "x-api-key: your MyOTP API key" -H "content-type: application/json" -d "${body}"`,
     card:
       `npx -y @stripe/link-cli mpp pay ${url} -X POST -d "${body}" ` +
-      `-H "x-api-key: your MyOTP API key" --context "MyOTP credits"`,
+      `-H "x-api-key: your MyOTP API key" --context "Buying MyOTP.App credits to send one-time passcodes over SMS, WhatsApp and Telegram for phone verification in my app."`,
   };
 }
 

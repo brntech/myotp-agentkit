@@ -559,7 +559,7 @@ paths:
         (npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: KEY"
         -H "content-type: application/json" -d '{"credits":100}') or with a Link
         agent wallet (npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup
-        -X POST -d '{"credits":100}' -H "x-api-key: KEY" --context "MyOTP credits").
+        -X POST -d '{"credits":100}' -H "x-api-key: KEY" --context "Buying MyOTP.App credits to send one-time passcodes over SMS, WhatsApp and Telegram for phone verification in my app.").
       operationId: topup_endpoint
       parameters:
         - name: X-API-Key

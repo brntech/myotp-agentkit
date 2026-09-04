@@ -12,7 +12,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import express, { type Request, type Response } from "express";
-import { createServer, resolveApiKeyFromHeaders } from "./server.js";
+import { createServer, resolveApiKeyFromHeaders, resolveApiKeyFromQuery } from "./server.js";
 
 interface CliConfig {
   transport: "stdio" | "http";
@@ -82,6 +82,13 @@ async function runHttp(config: CliConfig): Promise<void> {
 
   const handleMcpRequest = async (req: Request, res: Response): Promise<void> => {
     const sessionId = req.header("mcp-session-id") ?? undefined;
+
+    // Gateways that pass config in the URL: lift the key into the header the
+    // tools read, unless a header already carries one.
+    if (!resolveApiKeyFromHeaders(req.headers)) {
+      const fromQuery = resolveApiKeyFromQuery(req.originalUrl ?? req.url);
+      if (fromQuery) req.headers["x-api-key"] = fromQuery;
+    }
 
     let transport: StreamableHTTPServerTransport | undefined = sessionId
       ? transports.get(sessionId)

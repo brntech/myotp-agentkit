@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createServer, getHeader, resolveApiKeyFromHeaders, SERVER_NAME, SERVER_VERSION } from "../src/server.js";
+import { createServer, getHeader, resolveApiKeyFromHeaders, resolveApiKeyFromQuery, SERVER_NAME, SERVER_VERSION } from "../src/server.js";
 import { allTools } from "../src/tools/index.js";
 
 describe("createServer", () => {
@@ -89,5 +89,28 @@ describe("resolveApiKeyFromHeaders", () => {
   it("returns empty string when nothing is supplied", () => {
     expect(resolveApiKeyFromHeaders(undefined)).toBe("");
     expect(resolveApiKeyFromHeaders({})).toBe("");
+  });
+});
+
+describe("resolveApiKeyFromQuery", () => {
+  const KEY = "k7Qz2mV9xL4pR8sT1wY6bN3cF5hJ0dGb";
+
+  it("reads ?apiKey=", () => {
+    expect(resolveApiKeyFromQuery(`/mcp?apiKey=${KEY}`)).toBe(KEY);
+  });
+
+  it("reads ?api_key=", () => {
+    expect(resolveApiKeyFromQuery(`/mcp?api_key=${KEY}&x=1`)).toBe(KEY);
+  });
+
+  it("reads a base64url ?config= blob", () => {
+    const blob = Buffer.from(JSON.stringify({ apiKey: KEY })).toString("base64url");
+    expect(resolveApiKeyFromQuery(`/mcp?config=${blob}`)).toBe(KEY);
+  });
+
+  it("returns empty for no query, garbage config, or a missing url", () => {
+    expect(resolveApiKeyFromQuery("/mcp")).toBe("");
+    expect(resolveApiKeyFromQuery("/mcp?config=%%%")).toBe("");
+    expect(resolveApiKeyFromQuery(undefined)).toBe("");
   });
 });

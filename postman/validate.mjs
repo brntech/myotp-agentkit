@@ -34,6 +34,14 @@ check(send?.event?.[0]?.script?.exec?.join("\n").includes('set("message_id"'), "
 const verify = col.item.find((i) => i.request.url.path.join("/") === "verify_otp");
 check(verify?.request?.body?.raw?.includes("{{message_id}}"), "Verify OTP does not use {{message_id}}");
 check(env.values?.some((v) => v.key === "api_key" && v.type === "secret"), "environment api_key is not secret");
+// Environment scope beats collection scope, so a script-set variable must not exist there.
+const scriptSet = new Set();
+for (const it of col.item ?? []) {
+  for (const line of it.event?.[0]?.script?.exec ?? []) {
+    for (const m of line.matchAll(/collectionVariables\.set\("([^"]+)"/g)) scriptSet.add(m[1]);
+  }
+}
+for (const v of env.values ?? []) check(!scriptSet.has(v.key), `environment shadows script-set variable ${v.key}`);
 
 if (problems.length) {
   console.error(problems.join("\n"));

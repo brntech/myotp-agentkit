@@ -67,7 +67,11 @@ The Make CLI has `sdk-apps create`, `sdk-apps set-section`, `sdk-connections cre
 6. **Check OTP Status** with the same `message_id` shows the carrier delivery report a few seconds after the send.
 7. For the public review, also run a scenario that fails on purpose (a wrong API key, or a phone number that is not a number) so the error handling shows up in the execution log.
 
-Errors come back as `[<http status>] <message>` using the `error.message` field every rejected MyOTP request carries. The API key is stripped from Make's logs by the `log.sanitize` rule, and so is the `otp` field of the Send OTP response.
+Errors come back as `[<http status>] <message>` using the `error.message` field every rejected MyOTP request carries, with fallbacks to the `detail.message` envelope of the agent endpoints and the RFC 9457 `detail` string of a 402. A 401 is typed `InvalidAccessTokenError` so Make prompts to fix the connection, a 403 is `InvalidConfigurationError` (the IP allowlist), a 429 is `RateLimitError` so Make retries. The API key is stripped from Make's logs by the `log.sanitize` rule, and so is the `otp` field of the Send OTP response.
+
+**Make an API Call** only reaches `https://api.myotp.app`. The path must start with `/`; a full URL is stripped to its path before the request is sent, and the headers you add are merged with the connection's `X-API-Key` rather than replacing it. This is Make's security rule for universal modules.
+
+Date-time outputs (`date_sent`, `expires_at`) are parsed with `parseDate` so they map as real dates in later modules.
 
 ## Validate the definition
 

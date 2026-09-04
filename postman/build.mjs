@@ -17,17 +17,49 @@ const VARIABLE_FIELDS = {
   otp: "{{otp}}",
 };
 
+// Variables the collection scripts write. They must never be defined in the
+// environment: Postman resolves environment scope before collection scope, so an
+// empty environment value would shadow what the script stored.
+export const SCRIPT_SET_VARIABLES = ["message_id", "otp"];
+
 const SEND_OTP_TEST = [
   "const json = pm.response.json();",
-  'pm.test("status is 200", () => pm.response.to.have.status(200));',
   'pm.test("message_id present", () => pm.expect(json.message_id).to.be.a("string"));',
-  "// Verify OTP, Extend OTP and Check OTP Status read this variable.",
+  "// Verify OTP, Extend OTP and Check OTP Status read this collection variable.",
   'pm.collectionVariables.set("message_id", json.message_id);',
   "// Only present when the request asked for return_otp: true.",
   'if (json.otp) pm.collectionVariables.set("otp", json.otp);',
 ];
 
-const JSON_TEST = ['pm.test("response is JSON", () => pm.response.to.be.json);'];
+// Documented success codes and the content type the spec attaches to them.
+export function successResponses(op) {
+  const out = [];
+  for (const [code, res] of Object.entries(op.responses ?? {})) {
+    const n = Number(code);
+    if (n < 200 || n >= 300) continue;
+    const types = Object.keys(res.content ?? {});
+    out.push({ code: n, contentType: types[0] });
+  }
+  return out;
+}
+
+export function testScript(path, op) {
+  const ok = successResponses(op);
+  const codes = ok.map((r) => r.code);
+  const lines = [
+    `pm.test("status is one of ${codes.join(", ")}", () => pm.expect(pm.response.code).to.be.oneOf(${JSON.stringify(codes)}));`,
+  ];
+  const types = new Set(ok.map((r) => r.contentType).filter(Boolean));
+  if (types.size === 1) {
+    const t = [...types][0];
+    if (t === "application/json") lines.push('pm.test("response is JSON", () => pm.response.to.be.json);');
+    else if (t === "text/html") {
+      lines.push('pm.test("response is HTML", () => pm.expect(pm.response.headers.get("Content-Type")).to.include("text/html"));');
+    } else lines.push(`pm.test("content type is ${t}", () => pm.expect(pm.response.headers.get("Content-Type")).to.include("${t}"));`);
+  }
+  if (path === "/generate_otp") lines.push(...SEND_OTP_TEST);
+  return lines;
+}
 
 export function loadSpec(path = SPEC) {
   return YAML.parse(readFileSync(path, "utf8"));
@@ -98,6 +130,20 @@ function needsApiKey(op) {
   return (op.parameters ?? []).some((p) => p.in === "header" && p.name === "X-API-Key");
 }
 
+// Documented headers other than the API key (which the collection auth sends).
+// Optional ones are emitted disabled with a placeholder so the request works as
+// is and the retry variant is one checkbox away.
+function extraHeaders(op) {
+  return (op.parameters ?? [])
+    .filter((p) => p.in === "header" && p.name !== "X-API-Key")
+    .map((p) => ({
+      key: p.name,
+      value: p.example !== undefined ? String(p.example) : `<${p.name.toLowerCase()}>`,
+      description: (p.description ?? "").trim(),
+      disabled: !p.required,
+    }));
+}
+
 function queryParams(op) {
   return (op.parameters ?? [])
     .filter((p) => p.in === "query")
@@ -151,13 +197,13 @@ export function buildItem(spec, path, method, op) {
     description: (op.description ?? "").trim(),
   };
   if (body?.mode === "raw") request.header.push({ key: "Content-Type", value: "application/json" });
+  request.header.push(...extraHeaders(op));
   if (body) request.body = body;
   if (!needsApiKey(op)) request.auth = { type: "noauth" };
 
-  const exec = path === "/generate_otp" ? SEND_OTP_TEST : JSON_TEST;
   return {
     name: op.summary ?? `${method.toUpperCase()} ${path}`,
-    event: [{ listen: "test", script: { type: "text/javascript", exec } }],
+    event: [{ listen: "test", script: { type: "text/javascript", exec: testScript(path, op) } }],
     request,
     response: [],
   };
@@ -207,8 +253,7 @@ export function buildEnvironment(spec) {
       { key: "base_url", value: baseUrl, type: "default", enabled: true },
       { key: "api_key", value: "", type: "secret", enabled: true },
       { key: "phone_number", value: "19876543210", type: "default", enabled: true },
-      { key: "message_id", value: "", type: "default", enabled: true },
-      { key: "otp", value: "", type: "default", enabled: true },
+      // message_id and otp are deliberately absent: see SCRIPT_SET_VARIABLES.
     ],
     _postman_variable_scope: "environment",
   };

@@ -9,7 +9,7 @@
     "output": {
       "status": "{{body.status}}",
       "message": "{{body.message}}",
-      "expires_at": "{{body.expires_at}}"
+      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ssZ'))}}"
     }
   }
 }

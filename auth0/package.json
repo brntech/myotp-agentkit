@@ -1,0 +1,33 @@
+{
+  "name": "@myotp/auth0-phone-provider",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Auth0 Custom Phone Provider Action that delivers passwordless and MFA codes through MyOTP.App (SMS, WhatsApp, Telegram).",
+  "main": "action/send-phone-message.js",
+  "scripts": {
+    "test": "node --test action/send-phone-message.test.js",
+    "build": "node -e \"require('./action/send-phone-message.js'); console.log('ok')\""
+  },
+  "keywords": [
+    "auth0",
+    "auth0-actions",
+    "custom-phone-provider",
+    "myotp",
+    "otp",
+    "sms",
+    "whatsapp",
+    "telegram",
+    "mfa",
+    "passwordless"
+  ],
+  "author": "BroadNet Technologies <info@myotp.app>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brntech/myotp-agentkit.git",
+    "directory": "auth0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

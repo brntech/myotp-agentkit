@@ -1,0 +1,8 @@
+# Every text file is LF in the working tree as well as the index. The WordPress plugin
+# tests and phpcs, and the Postman/Make committed-output pins, all compare bytes.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.tgz binary

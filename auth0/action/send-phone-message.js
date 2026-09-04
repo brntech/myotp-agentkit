@@ -10,15 +10,29 @@
  *   MYOTP_API_KEY   required. From https://myotp.app/dashboard/user-api-keys/
  *   MYOTP_CHANNEL   optional. sms (default), whatsapp or telegram.
  *   MYOTP_BRAND     optional. 3 to 16 letters, digits or dots, shown in the message.
- *   MYOTP_BASE_URL  optional. Defaults to https://api.myotp.app.
+ *
+ * The API host is fixed to https://api.myotp.app. There is no override: a
+ * secret that could point the request elsewhere would also ship the API key,
+ * the phone number and the code to that host.
+ *
+ * Retry policy: every send uses force_send so an Auth0 "resend" always goes
+ * out. To avoid duplicate messages and duplicate billing, the Action asks
+ * Auth0 to retry only when the request provably never reached MyOTP (DNS or
+ * connection failures, or a 429 from the rate limiter). Timeouts, connection
+ * resets and 5xx responses are ambiguous, so they are dropped with a logged
+ * reason and the user can press resend.
  *
  * No npm dependencies. Uses the fetch built into the Actions runtime (Node 18+).
  */
 
-const DEFAULT_BASE_URL = "https://api.myotp.app";
+const API_ORIGIN = "https://api.myotp.app";
 const CHANNELS = ["sms", "whatsapp", "telegram"];
 const OTP_TYPES = ["otp_verify", "otp_enroll"];
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 8000;
+const MAX_BODY_BYTES = 8192;
+const MAX_DETAIL_CHARS = 300;
+// Errors raised before any bytes leave the runtime. Safe to retry.
+const NEVER_SENT_CODES = ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "EHOSTUNREACH", "ENETUNREACH"];
 
 /**
  * Handler for the custom-phone-provider trigger (Unified Phone Experience).
@@ -28,17 +42,17 @@ exports.onExecuteCustomPhoneProvider = async (event, api) => {
   const n = event.notification || {};
 
   if (!OTP_TYPES.includes(n.message_type)) {
-    return fail(api, "drop", `MyOTP delivers OTP codes only; notification type "${n.message_type}" has no code and was not sent`);
+    return fail(api, "drop", `MyOTP delivers OTP codes only; notification type "${clean(n.message_type)}" has no code and was not sent`);
   }
   if (n.delivery_method && n.delivery_method !== "text") {
-    return fail(api, "drop", `MyOTP has no voice channel; delivery_method "${n.delivery_method}" was not sent`);
+    return fail(api, "drop", `MyOTP has no voice channel; delivery_method "${clean(n.delivery_method)}" was not sent`);
   }
 
   const outcome = await deliver({
     secrets: event.secrets || {},
     recipient: n.recipient,
     code: n.code,
-    fetchImpl: event.fetch || globalThis.fetch,
+    fetchImpl: event.fetch,
   });
   if (!outcome.ok) {
     return fail(api, outcome.retryable ? "retry" : "drop", outcome.reason);
@@ -46,26 +60,29 @@ exports.onExecuteCustomPhoneProvider = async (event, api) => {
 };
 
 /**
- * Handler for the legacy send-phone-message trigger (MFA only, deprecated by
- * Auth0 in favour of custom-phone-provider). Same delivery, different event shape.
+ * Handler for the legacy send-phone-message trigger (MFA Notifications flow,
+ * MFA only). This needs its own Action bound in that flow; the export is
+ * inert inside a custom-phone-provider Action. Same delivery, different event
+ * shape, and no api.notification, so failures are thrown.
  */
 exports.onExecuteSendPhoneMessage = async (event) => {
   const m = event.message_options || {};
   if (m.message_type && m.message_type !== "sms") {
-    throw new Error(`MyOTP has no voice channel; message_type "${m.message_type}" was not sent`);
+    throw new Error(`MyOTP has no voice channel; message_type "${clean(m.message_type)}" was not sent`);
   }
   const outcome = await deliver({
     secrets: event.secrets || {},
     recipient: m.recipient,
     code: m.code,
-    fetchImpl: event.fetch || globalThis.fetch,
+    fetchImpl: event.fetch,
   });
   if (!outcome.ok) throw new Error(outcome.reason);
 };
 
 /**
  * Build the /generate_otp request. Exported for tests.
- * Returns { url, init } or throws on bad configuration.
+ * Returns { url, init } or throws on bad configuration. Error messages never
+ * contain the full phone number or the code.
  */
 function buildRequest({ secrets, recipient, code }) {
   const apiKey = (secrets.MYOTP_API_KEY || "").trim();
@@ -73,32 +90,32 @@ function buildRequest({ secrets, recipient, code }) {
 
   const channel = (secrets.MYOTP_CHANNEL || "sms").trim().toLowerCase();
   if (!CHANNELS.includes(channel)) {
-    throw new Error(`MYOTP_CHANNEL must be one of ${CHANNELS.join(", ")}; got "${secrets.MYOTP_CHANNEL}"`);
+    throw new Error(`MYOTP_CHANNEL must be one of ${CHANNELS.join(", ")}; got "${clean(secrets.MYOTP_CHANNEL)}"`);
   }
 
   const phone = String(recipient || "").replace(/[^0-9]/g, "");
   if (!/^[1-9][0-9]{6,14}$/.test(phone)) {
-    throw new Error(`recipient "${recipient}" is not a valid E.164 number`);
+    throw new Error(`recipient ${maskPhone(recipient)} is not a valid E.164 number`);
   }
 
   const otp = String(code || "");
-  if (!/^[0-9]{3,8}$/.test(otp)) {
-    throw new Error("Auth0 did not supply a numeric code (3 to 8 digits) for this notification");
+  const minDigits = channel === "telegram" ? 4 : 3;
+  if (!/^[0-9]{3,8}$/.test(otp) || otp.length < minDigits) {
+    throw new Error(`Auth0 did not supply a numeric code of ${minDigits} to 8 digits for this notification`);
   }
 
+  // otp_length is ignored by MyOTP when otp_code is supplied, so it is not sent.
   const body = {
     phone_number: phone,
     channel,
     otp_code: otp,
-    otp_length: otp.length,
     force_send: true,
   };
   const brand = (secrets.MYOTP_BRAND || "").trim();
   if (brand) body.brand = brand;
 
-  const baseUrl = (secrets.MYOTP_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
   return {
-    url: `${baseUrl}/generate_otp`,
+    url: `${API_ORIGIN}/generate_otp`,
     init: {
       method: "POST",
       headers: {
@@ -115,52 +132,105 @@ function buildRequest({ secrets, recipient, code }) {
 /**
  * Send the request. Never throws on transport or API errors; returns
  * { ok, retryable, reason } so the caller can report through the Auth0 api.
+ * The timeout covers the whole exchange, response body included.
  */
-async function deliver({ secrets, recipient, code, fetchImpl }) {
+async function deliver({ secrets, recipient, code, fetchImpl, timeoutMs = TIMEOUT_MS }) {
   let req;
   try {
     req = buildRequest({ secrets, recipient, code });
   } catch (err) {
     return { ok: false, retryable: false, reason: `MyOTP configuration error: ${err.message}` };
   }
-  if (typeof fetchImpl !== "function") {
+  const doFetch = typeof fetchImpl === "function" ? fetchImpl : globalThis.fetch;
+  if (typeof doFetch !== "function") {
     return { ok: false, retryable: false, reason: "MyOTP configuration error: fetch is not available in this runtime" };
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
+  let text;
   try {
-    response = await fetchImpl(req.url, { ...req.init, signal: controller.signal });
+    response = await doFetch(req.url, { ...req.init, signal: controller.signal });
+    text = await readBounded(response, MAX_BODY_BYTES);
   } catch (err) {
-    const msg = err && err.name === "AbortError" ? `timed out after ${TIMEOUT_MS}ms` : (err && err.message) || String(err);
-    return { ok: false, retryable: true, reason: `MyOTP request failed: ${msg}` };
+    const timedOut = err && err.name === "AbortError";
+    const msg = timedOut ? `timed out after ${timeoutMs}ms` : clean(err && err.message ? err.message : String(err));
+    const stage = response ? "response body read failed" : "request failed";
+    return { ok: false, retryable: !response && neverSent(err), reason: `MyOTP ${stage}: ${msg}` };
   } finally {
     clearTimeout(timer);
   }
 
-  const text = await response.text();
   let parsed = null;
   if (text) {
     try { parsed = JSON.parse(text); } catch { parsed = text; }
   }
 
   if (!response.ok) {
-    const detail = extractMessage(parsed) || response.statusText || "no error body";
-    const retryable = response.status >= 500 || response.status === 429;
+    const detail = extractMessage(parsed) || clean(response.statusText) || "no error body";
+    // 429 comes from the rate limiter before the send is processed, so a retry cannot duplicate.
+    const retryable = response.status === 429;
     return { ok: false, retryable, reason: `MyOTP responded ${response.status}: ${detail}` };
   }
   return { ok: true, retryable: false, reason: "", body: parsed };
 }
 
+/**
+ * Read at most `limit` bytes of the body. Honours the fetch abort signal
+ * because the reader is on the same response. Cancels the rest.
+ */
+async function readBounded(response, limit) {
+  if (!response.body || typeof response.body.getReader !== "function") {
+    const t = await response.text();
+    return t.slice(0, limit);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let out = "";
+  let bytes = 0;
+  while (bytes < limit) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    out += decoder.decode(value, { stream: true });
+  }
+  if (bytes >= limit) {
+    try { await reader.cancel(); } catch { /* already closed */ }
+  }
+  out += decoder.decode();
+  return out.slice(0, limit);
+}
+
+function neverSent(err) {
+  const code = err && (err.code || (err.cause && err.cause.code));
+  return NEVER_SENT_CODES.includes(code);
+}
+
 function extractMessage(parsed) {
   if (!parsed) return null;
-  if (typeof parsed === "string") return parsed.slice(0, 500);
-  if (parsed.error && typeof parsed.error === "object" && parsed.error.message) return parsed.error.message;
-  if (typeof parsed.error === "string") return parsed.error;
-  if (typeof parsed.message === "string") return parsed.message;
-  if (typeof parsed.detail === "string") return parsed.detail;
-  return JSON.stringify(parsed).slice(0, 500);
+  if (typeof parsed === "string") return clean(parsed);
+  if (parsed.error && typeof parsed.error === "object" && parsed.error.message) return clean(parsed.error.message);
+  if (typeof parsed.error === "string") return clean(parsed.error);
+  if (typeof parsed.message === "string") return clean(parsed.message);
+  if (typeof parsed.detail === "string") return clean(parsed.detail);
+  return clean(JSON.stringify(parsed));
+}
+
+/** Strip control characters and newlines from provider-supplied text, and cap it. */
+function clean(value) {
+  return String(value == null ? "" : value)
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_DETAIL_CHARS);
+}
+
+/** Show only the last two digits of a phone number in log text. */
+function maskPhone(value) {
+  const digits = String(value == null ? "" : value).replace(/[^0-9]/g, "");
+  if (digits.length < 3) return "(unreadable)";
+  return "*".repeat(digits.length - 2) + digits.slice(-2);
 }
 
 /**

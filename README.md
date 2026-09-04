@@ -43,7 +43,7 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 |--------|-----|-----|
 | [`skills/myotp/`](skills/myotp/) | Claude Code. Includes agent top-up: buy credits over a 402 when the balance runs out | `npx skills add brntech/myotp-agentkit` (or copy `skills/myotp/` into `~/.claude/skills/myotp/`) |
 | [`skills/myotp/niches/`](skills/myotp/niches/) | Vertical-specific (fintech, marketplace, emerging markets, healthcare) | Copy individual `.md` files into separate skill directories |
-| [`clawhub-skill/`](clawhub-skill/) | OpenClaw / ClawHub registry. Agents can buy credits (402, USDC or card) | `clawhub skill install myotp`, published on [ClawHub](https://clawhub.ai/skills/myotp) |
+| [`clawhub-skill/`](clawhub-skill/) | OpenClaw / ClawHub registry. Agents can buy credits (402, USDC or card) | `openclaw skills install @myotp/myotp`, published on [ClawHub](https://clawhub.ai/myotp/skills/myotp) |
 | [`hermes-skill/`](hermes-skill/) | Nous Research Hermes models (Ollama, vLLM, LM Studio). Prompt covers agent top-up | Use `ollama-modelfile.example` as a template |
 
 ## Framework examples

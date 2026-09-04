@@ -1,0 +1,27 @@
+[
+  {
+    "name": "otp",
+    "type": "text",
+    "label": "OTP",
+    "help": "The code the user typed, 3 to 8 digits.",
+    "required": true,
+    "validate": {
+      "pattern": "^[0-9]{3,8}$"
+    }
+  },
+  {
+    "name": "phone_number",
+    "type": "text",
+    "label": "Phone number",
+    "help": "The number the OTP was sent to. Digits only, country code first. Give this or the Message ID.",
+    "validate": {
+      "pattern": "^[1-9][0-9]{6,14}$"
+    }
+  },
+  {
+    "name": "message_id",
+    "type": "text",
+    "label": "Message ID",
+    "help": "The message_id returned by Send OTP. Give this or the phone number."
+  }
+]

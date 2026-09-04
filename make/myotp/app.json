@@ -1,0 +1,11 @@
+{
+  "name": "myotp",
+  "label": "MyOTP.App",
+  "description": "Send and verify one-time passcodes over SMS, WhatsApp and Telegram with one API key. Pay per message, no monthly minimum.",
+  "theme": "#1d4ed8",
+  "language": "en",
+  "audience": "global",
+  "docsUrl": "https://myotp.app/developer-api/",
+  "openapi": "../../openapi-reference.yaml",
+  "apiVersion": "1.4.0"
+}

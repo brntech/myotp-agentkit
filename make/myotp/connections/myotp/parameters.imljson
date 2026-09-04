@@ -1,0 +1,9 @@
+[
+  {
+    "name": "apiKey",
+    "type": "password",
+    "label": "API key",
+    "help": "32 characters. Copy it from the API keys page of your MyOTP.App dashboard at https://myotp.app. The IP allowlist on the key must include Make's egress addresses, or every call answers 403.",
+    "required": true
+  }
+]

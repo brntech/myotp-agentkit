@@ -1,0 +1,4 @@
+[
+  { "name": "status", "type": "text", "label": "Status", "help": "success, failed or expired" },
+  { "name": "message", "type": "text", "label": "Message" }
+]

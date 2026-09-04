@@ -1,0 +1,30 @@
+{
+  "url": "https://api.myotp.app/me",
+  "method": "GET",
+  "headers": {
+    "X-API-Key": "{{parameters.apiKey}}"
+  },
+  "response": {
+    "valid": "{{statusCode === 200 && !body.error}}",
+    "error": {
+      "message": "[{{statusCode}}] {{ifempty(body.error.message, body.message)}}",
+      "401": {
+        "type": "InvalidAccessTokenError",
+        "message": "[401] {{ifempty(body.error.message, 'Missing or invalid API key')}}"
+      },
+      "403": {
+        "type": "InvalidConfigurationError",
+        "message": "[403] {{ifempty(body.error.message, 'The calling IP is not on this API key allowlist')}}"
+      }
+    },
+    "metadata": {
+      "type": "email",
+      "value": "{{body.email}}"
+    }
+  },
+  "log": {
+    "sanitize": [
+      "request.headers.x-api-key"
+    ]
+  }
+}

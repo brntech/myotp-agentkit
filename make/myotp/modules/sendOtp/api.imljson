@@ -1,0 +1,25 @@
+{
+  "url": "/generate_otp",
+  "method": "POST",
+  "body": {
+    "phone_number": "{{parameters.phone_number}}",
+    "channel": "{{parameters.channel}}",
+    "otp_length": "{{parameters.otp_length}}",
+    "otp_validity": "{{parameters.otp_validity}}",
+    "template_order": "{{parameters.template_order}}",
+    "brand": "{{parameters.brand}}",
+    "force_send": "{{parameters.force_send}}",
+    "return_otp": "{{parameters.return_otp}}"
+  },
+  "response": {
+    "output": {
+      "message_id": "{{body.message_id}}",
+      "status": "{{body.status}}",
+      "message": "{{body.message}}",
+      "date_sent": "{{if(body.date_sent, parseDate(body.date_sent, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}",
+      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}",
+      "cost": "{{body.cost}}",
+      "otp": "{{body.otp}}"
+    }
+  }
+}

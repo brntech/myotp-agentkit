@@ -1,0 +1,15 @@
+{
+  "url": "/verify_otp",
+  "method": "POST",
+  "body": {
+    "otp": "{{parameters.otp}}",
+    "phone_number": "{{parameters.phone_number}}",
+    "message_id": "{{parameters.message_id}}"
+  },
+  "response": {
+    "output": {
+      "status": "{{body.status}}",
+      "message": "{{body.message}}"
+    }
+  }
+}

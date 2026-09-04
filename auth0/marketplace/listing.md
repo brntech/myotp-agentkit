@@ -25,10 +25,10 @@ What you get:
 - Passwordless SMS login and SMS MFA (enrollment and challenge) delivered by MyOTP.
 - A channel switch: SMS by default, or WhatsApp or Telegram through a single secret.
 - Optional brand name in the message, screened against an impersonation denylist.
-- Clear failure reasons in Auth0 tenant logs, with automatic retries on transient errors.
+- Failure reasons from the MyOTP API in Auth0 tenant logs, with phone numbers masked. Retries only when a request never reached MyOTP, so a lost reply never produces duplicate messages or charges.
 - No npm dependencies. The Action uses the runtime's built-in fetch.
 
-Setup takes a few minutes: select Custom on Branding > Phone Provider, paste the Action, add your MyOTP API key as a secret, save, and enable the tenant-level provider for Passwordless or MFA.
+Setup takes a few minutes: select Custom on Branding > Phone Provider, paste the Action, add your MyOTP API key as a secret, save and deploy, and enable the tenant-level provider for Passwordless or MFA.
 
 Not supported: voice calls, and Auth0's non-OTP phone notifications (blocked account, password change, password breach).
 
@@ -66,5 +66,7 @@ Auth0 asks for a square logo, PNG or SVG, on a transparent background, minimum 5
 
 ## Reviewer notes
 
+- TODO before submitting: Auth0's partner documentation for Actions Integrations currently lists the legacy Send Phone Message flow, not the `custom-phone-provider` trigger. Confirm with the Auth0 partner team which trigger the listing should target. The Action file supports both.
+
 - The Action needs the tenant's Auth0 outbound IP addresses allowlisted on the MyOTP API key, or the key's allowlist set open. The README's troubleshooting table covers the 403 this causes.
-- Tests: `node --test` under Node 22, 12 tests, mocked fetch, no network.
+- Tests: `node --test` under Node 22, 18 tests, mocked fetch, no network.

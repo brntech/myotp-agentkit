@@ -1,6 +1,8 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { onExecuteCustomPhoneProvider, onExecuteSendPhoneMessage, buildRequest } = require("./send-phone-message.js");
+const { onExecuteCustomPhoneProvider, onExecuteSendPhoneMessage, buildRequest, deliver } = require("./send-phone-message.js");
+
+const KEY = "k".repeat(32);
 
 function mockFetch(status, body, calls) {
   return async (url, init) => {
@@ -9,6 +11,7 @@ function mockFetch(status, body, calls) {
       ok: status >= 200 && status < 300,
       status,
       statusText: "",
+      body: null,
       text: async () => (typeof body === "string" ? body : JSON.stringify(body)),
     };
   };
@@ -27,7 +30,7 @@ function mockApi() {
 
 function otpEvent(overrides = {}, secrets = {}) {
   return {
-    secrets: { MYOTP_API_KEY: "k".repeat(32), ...secrets },
+    secrets: { MYOTP_API_KEY: KEY, ...secrets },
     notification: {
       message_type: "otp_verify",
       delivery_method: "text",
@@ -50,9 +53,24 @@ test("happy path: posts Auth0's code to /generate_otp with X-API-Key", async () 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "https://api.myotp.app/generate_otp");
   assert.equal(calls[0].init.method, "POST");
-  assert.equal(calls[0].init.headers["X-API-Key"], "k".repeat(32));
+  assert.equal(calls[0].init.headers["X-API-Key"], KEY);
   assert.equal(calls[0].init.headers["Content-Type"], "application/json");
   assert.deepEqual(api.log, []);
+});
+
+test("uses globalThis.fetch when the event carries no fetch", async () => {
+  const calls = [];
+  const saved = globalThis.fetch;
+  globalThis.fetch = mockFetch(200, { message_id: "g1" }, calls);
+  try {
+    const api = mockApi();
+    await onExecuteCustomPhoneProvider(otpEvent(), api);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].body.otp_code, "482913");
+    assert.deepEqual(api.log, []);
+  } finally {
+    globalThis.fetch = saved;
+  }
 });
 
 test("strips the leading + and any non-digits from the recipient", async () => {
@@ -63,14 +81,38 @@ test("strips the leading + and any non-digits from the recipient", async () => {
   assert.equal(calls[0].body.phone_number, "447700900123");
 });
 
-test("code passthrough: otp_code is the code Auth0 generated, otp_length matches", async () => {
+test("code passthrough: otp_code is the code Auth0 generated, no otp_length, force_send on", async () => {
   const calls = [];
   const event = otpEvent({ code: "1234" });
   event.fetch = mockFetch(200, {}, calls);
   await onExecuteCustomPhoneProvider(event, mockApi());
   assert.equal(calls[0].body.otp_code, "1234");
-  assert.equal(calls[0].body.otp_length, 4);
+  assert.equal("otp_length" in calls[0].body, false);
   assert.equal(calls[0].body.force_send, true);
+});
+
+test("three-digit code is sent on sms but refused on telegram", async () => {
+  const calls = [];
+  let event = otpEvent({ code: "123" });
+  event.fetch = mockFetch(200, {}, calls);
+  await onExecuteCustomPhoneProvider(event, mockApi());
+  assert.equal(calls[0].body.otp_code, "123");
+
+  const api = mockApi();
+  event = otpEvent({ code: "123" }, { MYOTP_CHANNEL: "telegram" });
+  event.fetch = mockFetch(200, {}, calls);
+  await onExecuteCustomPhoneProvider(event, api);
+  assert.equal(calls.length, 1);
+  assert.match(api.log[0][1], /4 to 8 digits/);
+});
+
+test("the API origin is fixed: a base URL secret is ignored", () => {
+  const req = buildRequest({
+    secrets: { MYOTP_API_KEY: KEY, MYOTP_BASE_URL: "http://collector.invalid" },
+    recipient: "+14155550123",
+    code: "123456",
+  });
+  assert.equal(req.url, "https://api.myotp.app/generate_otp");
 });
 
 test("channel defaults to sms and follows the MYOTP_CHANNEL secret", async () => {
@@ -117,18 +159,96 @@ test("API 4xx is surfaced as drop with status and MyOTP's message", async () => 
   assert.deepEqual(api.log, [["drop", "MyOTP responded 403: Access from this IP not allowed"]]);
 });
 
-test("API 5xx and network failures are surfaced as retry", async () => {
+test("retry policy: 5xx, timeouts and resets are dropped; DNS/refused and 429 are retried", async () => {
   let api = mockApi();
   let event = otpEvent();
   event.fetch = mockFetch(502, "Bad Gateway", []);
   await onExecuteCustomPhoneProvider(event, api);
-  assert.deepEqual(api.log, [["retry", "MyOTP responded 502: Bad Gateway"]]);
+  assert.deepEqual(api.log, [["drop", "MyOTP responded 502: Bad Gateway"]]);
 
   api = mockApi();
   event = otpEvent();
-  event.fetch = async () => { throw new Error("ECONNRESET"); };
+  event.fetch = async () => { const e = new Error("fetch failed"); e.cause = { code: "ECONNRESET" }; throw e; };
   await onExecuteCustomPhoneProvider(event, api);
-  assert.deepEqual(api.log, [["retry", "MyOTP request failed: ECONNRESET"]]);
+  assert.deepEqual(api.log, [["drop", "MyOTP request failed: fetch failed"]]);
+
+  api = mockApi();
+  event = otpEvent();
+  event.fetch = async () => { const e = new Error("fetch failed"); e.cause = { code: "ENOTFOUND" }; throw e; };
+  await onExecuteCustomPhoneProvider(event, api);
+  assert.deepEqual(api.log, [["retry", "MyOTP request failed: fetch failed"]]);
+
+  api = mockApi();
+  event = otpEvent();
+  event.fetch = mockFetch(429, "", []);
+  await onExecuteCustomPhoneProvider(event, api);
+  assert.deepEqual(api.log, [["retry", "MyOTP responded 429: no error body"]]);
+});
+
+test("timeout covers the response body read and is reported as a drop", async () => {
+  const fetchImpl = async (url, init) => ({
+    ok: true,
+    status: 200,
+    statusText: "",
+    body: null,
+    text: () => new Promise((_, reject) => {
+      init.signal.addEventListener("abort", () => {
+        const e = new Error("aborted");
+        e.name = "AbortError";
+        reject(e);
+      });
+    }),
+  });
+  const outcome = await deliver({
+    secrets: { MYOTP_API_KEY: KEY }, recipient: "+14155550123", code: "123456", fetchImpl, timeoutMs: 20,
+  });
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.retryable, false);
+  assert.equal(outcome.reason, "MyOTP response body read failed: timed out after 20ms");
+
+  const rejecting = async () => ({
+    ok: true, status: 200, statusText: "", body: null,
+    text: async () => { throw new Error("socket hang up"); },
+  });
+  const out2 = await deliver({ secrets: { MYOTP_API_KEY: KEY }, recipient: "+14155550123", code: "123456", fetchImpl: rejecting });
+  assert.equal(out2.reason, "MyOTP response body read failed: socket hang up");
+});
+
+test("response body is capped at 8 KB before parsing", async () => {
+  const chunks = [new TextEncoder().encode("x".repeat(6000)), new TextEncoder().encode("y".repeat(6000))];
+  let cancelled = false;
+  let i = 0;
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 500,
+    statusText: "",
+    body: {
+      getReader: () => ({
+        read: async () => (i < chunks.length ? { value: chunks[i++], done: false } : { value: undefined, done: true }),
+        cancel: async () => { cancelled = true; },
+      }),
+    },
+  });
+  const outcome = await deliver({ secrets: { MYOTP_API_KEY: KEY }, recipient: "+14155550123", code: "123456", fetchImpl });
+  assert.equal(cancelled, true);
+  assert.equal(outcome.reason.length <= "MyOTP responded 500: ".length + 300, true);
+});
+
+test("log reasons mask the phone and strip control characters from provider text", async () => {
+  let api = mockApi();
+  let event = otpEvent({ recipient: "+1\n555" });
+  event.fetch = mockFetch(200, {}, []);
+  await onExecuteCustomPhoneProvider(event, api);
+  assert.equal(api.log[0][1], "MyOTP configuration error: recipient **55 is not a valid E.164 number");
+
+  api = mockApi();
+  event = otpEvent();
+  event.fetch = mockFetch(400, { error: { message: "bad\r\nfake log line " + "z".repeat(500) } }, []);
+  await onExecuteCustomPhoneProvider(event, api);
+  const reason = api.log[0][1];
+  assert.equal(/[\r\n]/.test(reason), false);
+  assert.match(reason, /^MyOTP responded 400: bad fake log line z+$/);
+  assert.equal(reason.length <= "MyOTP responded 400: ".length + 300, true);
 });
 
 test("throws when the api object has no notification methods (never swallows)", async () => {
@@ -167,7 +287,7 @@ test("non-OTP notification types and voice delivery are dropped, not sent", asyn
 test("legacy send-phone-message trigger: delivers from message_options and throws on error", async () => {
   const calls = [];
   const event = {
-    secrets: { MYOTP_API_KEY: "k".repeat(32), MYOTP_CHANNEL: "telegram" },
+    secrets: { MYOTP_API_KEY: KEY, MYOTP_CHANNEL: "telegram" },
     message_options: { recipient: "+9611234567", code: "55667", message_type: "sms", action: "enrollment" },
     fetch: mockFetch(200, { message_id: "m1" }, calls),
   };

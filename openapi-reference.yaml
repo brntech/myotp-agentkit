@@ -607,7 +607,7 @@ paths:
                 currency: usd
                 payment:
                   method: tempo
-                  reference: "0x9c1f3a4e5b6d7c8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60"
+                  reference: "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
                 balance: 115
                 plan_id: 6452
         '400':

@@ -95,11 +95,38 @@ function myotp_pv_privacy_policy() {
 add_action( 'admin_init', 'myotp_pv_privacy_policy' );
 
 /**
- * Seed defaults on activation.
+ * Daily sweep of expired store rows (counters, pending codes, verified records).
+ */
+function myotp_pv_sweep() {
+	MyOTP_PV_Store::instance()->sweep_expired( 200 );
+}
+add_action( 'myotp_pv_sweep', 'myotp_pv_sweep' );
+
+/**
+ * Make sure the daily sweep is scheduled.
+ */
+function myotp_pv_schedule_sweep() {
+	if ( ! wp_next_scheduled( 'myotp_pv_sweep' ) ) {
+		wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'myotp_pv_sweep' );
+	}
+}
+add_action( 'init', 'myotp_pv_schedule_sweep' );
+
+/**
+ * Seed defaults and schedule the sweep on activation.
  */
 function myotp_pv_activate() {
 	if ( false === get_option( MYOTP_PV_OPTION, false ) ) {
 		add_option( MYOTP_PV_OPTION, myotp_pv_default_options() );
 	}
+	myotp_pv_schedule_sweep();
 }
 register_activation_hook( MYOTP_PV_FILE, 'myotp_pv_activate' );
+
+/**
+ * Unschedule the sweep on deactivation.
+ */
+function myotp_pv_deactivate() {
+	wp_clear_scheduled_hook( 'myotp_pv_sweep' );
+}
+register_deactivation_hook( MYOTP_PV_FILE, 'myotp_pv_deactivate' );

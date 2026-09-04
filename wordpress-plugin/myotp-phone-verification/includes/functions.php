@@ -162,23 +162,26 @@ function myotp_pv_release_slot( $store, $key, $now, $window ) {
 }
 
 /**
- * Take one slot on every dimension, all or nothing. $dims is a list of
- * array( key, max ). When any dimension denies, the ones already taken are
- * released so a denied request costs nothing.
+ * Take one slot on every dimension, best effort all or nothing. $dims is a
+ * list of array( key, max ) or array( key, max, window ). When any
+ * dimension denies, the ones already taken are released so a denied
+ * request costs nothing. Sequential, not a transaction: under contention
+ * another request can briefly see a partial take.
  *
  * @param object $store  Store.
- * @param array  $dims   List of array( key, max ).
+ * @param array  $dims   List of array( key, max[, window] ).
  * @param int    $now    Unix time.
- * @param int    $window Window seconds shared by all dimensions.
+ * @param int    $window Default window seconds.
  * @return array{allowed: bool, retry_after: int, denied: string, taken: array}
  */
 function myotp_pv_take_send_slots( $store, array $dims, $now, $window ) {
 	$taken = array();
 	foreach ( $dims as $dim ) {
-		$r = myotp_pv_take_slot( $store, $dim[0], $now, (int) $dim[1], $window );
+		$w = isset( $dim[2] ) ? (int) $dim[2] : $window;
+		$r = myotp_pv_take_slot( $store, $dim[0], $now, (int) $dim[1], $w );
 		if ( ! $r['allowed'] ) {
 			foreach ( $taken as $k ) {
-				myotp_pv_release_slot( $store, $k, $now, $window );
+				myotp_pv_release_slot( $store, $k[0], $now, $k[1] );
 			}
 			return array(
 				'allowed'     => false,
@@ -187,7 +190,7 @@ function myotp_pv_take_send_slots( $store, array $dims, $now, $window ) {
 				'taken'       => array(),
 			);
 		}
-		$taken[] = $dim[0];
+		$taken[] = array( $dim[0], $w );
 	}
 	return array(
 		'allowed'     => true,
@@ -200,7 +203,9 @@ function myotp_pv_take_send_slots( $store, array $dims, $now, $window ) {
 /**
  * Atomically reserve one verification attempt on a pending record. The
  * record is JSON with at least phone, message_id, attempts. When attempts
- * already reached $max the record is deleted and locked is true.
+ * already reached $max the record is deleted (conditionally, on the value
+ * read) and locked is true. The store's delete( $key, $expected_raw )
+ * must only remove the row when it still holds $expected_raw.
  *
  * @param object $store Store.
  * @param string $key   Pending key.
@@ -220,7 +225,7 @@ function myotp_pv_reserve_attempt( $store, $key, $max ) {
 		}
 		$data = json_decode( $raw, true );
 		if ( ! is_array( $data ) || empty( $data['phone'] ) ) {
-			$store->delete( $key );
+			$store->delete( $key, $raw );
 			return array(
 				'ok'       => false,
 				'locked'   => false,
@@ -230,7 +235,7 @@ function myotp_pv_reserve_attempt( $store, $key, $max ) {
 		}
 		$attempts = isset( $data['attempts'] ) ? (int) $data['attempts'] : 0;
 		if ( $attempts >= $max ) {
-			$store->delete( $key );
+			$store->delete( $key, $raw );
 			return array(
 				'ok'       => false,
 				'locked'   => true,
@@ -258,7 +263,65 @@ function myotp_pv_reserve_attempt( $store, $key, $max ) {
 }
 
 /**
- * The phone in a verified record, or empty when missing or older than $ttl.
+ * Give back one reserved attempt (the provider was never reached). Floors
+ * at zero and leaves a missing record alone.
+ *
+ * @param object $store Store.
+ * @param string $key   Pending key.
+ * @return bool
+ */
+function myotp_pv_release_attempt( $store, $key ) {
+	for ( $try = 0; $try < 8; $try++ ) {
+		$raw = $store->get( $key );
+		if ( null === $raw ) {
+			return false;
+		}
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || empty( $data['attempts'] ) ) {
+			return false;
+		}
+		$data['attempts'] = (int) $data['attempts'] - 1;
+		$ttl              = isset( $data['ttl'] ) ? (int) $data['ttl'] : 3600;
+		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), $ttl ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Atomically claim a verified record: state "verified" becomes
+ * "consumed:<tag>". Returns the phone when this caller won the claim,
+ * empty when the record is missing, expired, or already consumed.
+ *
+ * @param object $store Store.
+ * @param string $key   Verified key.
+ * @param string $tag   Consumer tag, e.g. order:123.
+ * @param int    $now   Unix time.
+ * @param int    $ttl   Seconds a verification stays valid.
+ * @return string
+ */
+function myotp_pv_claim_verified( $store, $key, $tag, $now, $ttl = 1800 ) {
+	for ( $try = 0; $try < 8; $try++ ) {
+		$raw = $store->get( $key );
+		if ( null === $raw ) {
+			return '';
+		}
+		$data  = json_decode( $raw, true );
+		$phone = myotp_pv_verified_phone_from( $data, $now, $ttl );
+		if ( '' === $phone ) {
+			return '';
+		}
+		$data['state'] = 'consumed:' . $tag;
+		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), max( 60, (int) $data['at'] + $ttl - $now ) ) ) {
+			return $phone;
+		}
+	}
+	return '';
+}
+
+/**
+ * The phone in a verified record, or empty when missing, consumed, or older than $ttl.
  *
  * @param mixed $record Array with phone and at, or anything else.
  * @param int   $now    Unix time.
@@ -267,6 +330,9 @@ function myotp_pv_reserve_attempt( $store, $key, $max ) {
  */
 function myotp_pv_verified_phone_from( $record, $now, $ttl = 1800 ) {
 	if ( ! is_array( $record ) || empty( $record['phone'] ) || ! isset( $record['at'] ) ) {
+		return '';
+	}
+	if ( isset( $record['state'] ) && 'verified' !== $record['state'] ) {
 		return '';
 	}
 	if ( (int) $record['at'] + $ttl <= $now || (int) $record['at'] > $now ) {
@@ -300,6 +366,7 @@ function myotp_pv_default_options() {
 		'wc_enabled'       => 1,
 		'wc_guests_only'   => 0,
 		'register_enabled' => 0,
+		'site_hourly_cap'  => 100,
 	);
 }
 
@@ -348,6 +415,11 @@ function myotp_pv_sanitize_options( $input, $current = array() ) {
 
 	// Checkboxes are absent when unticked, so only reset them when a form was actually submitted.
 	if ( ! empty( $input ) ) {
+		if ( isset( $input['site_hourly_cap'] ) ) {
+			$cap                    = (int) $input['site_hourly_cap'];
+			$out['site_hourly_cap'] = ( $cap >= 1 && $cap <= 100000 ) ? $cap : $current['site_hourly_cap'];
+		}
+
 		foreach ( array( 'wc_enabled', 'wc_guests_only', 'register_enabled' ) as $flag ) {
 			$out[ $flag ] = empty( $input[ $flag ] ) ? 0 : 1;
 		}

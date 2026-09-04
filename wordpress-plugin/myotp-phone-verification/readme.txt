@@ -25,9 +25,9 @@ How it stays safe:
 
 * The API key never leaves the server. The browser talks to admin-ajax.php only.
 * Every AJAX call carries a nonce. Admin actions check `manage_options`.
-* Send limits, enforced together with atomic counters: 5 codes per visitor, 10 per client IP, 3 per destination number, each per 10 minutes. An unexpired code for the same number is reused rather than sent again.
-* 5 wrong codes discard the pending code; the visitor must request a new one.
-* A verification is valid for 30 minutes and is consumed when the order or the account is created.
+* Send limits, enforced together with atomic counters: 5 codes per visitor, 10 per client IP, 3 per destination number, each per 10 minutes, plus a site-wide ceiling of 100 codes per hour (setting and `myotp_pv_site_hourly_cap` filter). An unexpired code for the same number is reused rather than sent again, and reusing it does not reset the attempt count.
+* 5 wrong codes discard the pending code; the visitor must request a new one. Attempts are counted on every provider answer, never on a network failure.
+* A verification is valid for 30 minutes and is claimed atomically by exactly one order or one account.
 * Phone numbers are reduced to digits before they are sent. Leading zeros are kept.
 
 Not in this version: the WooCommerce block checkout. The classic shortcode checkout is supported.
@@ -39,11 +39,11 @@ This plugin sends the phone number a visitor enters to the MyOTP.App API at http
 = Data stored on your site =
 
 * A cookie `myotp_pv_sid` (random id, one day) so a guest's verification can be tied to their browser.
-* Short-lived rows in the options table: rate-limit counters (10 minutes), the pending number with its code reference and attempt count (up to one hour), and the verified number (30 minutes, in the WooCommerce session when one exists, otherwise a transient).
+* Short-lived rows in the options table (`myotp_pv_kv_` prefix, not autoloaded): rate-limit counters (10 minutes, site-wide counter 1 hour), the pending number with its code reference and attempt count (up to one hour), and the verified number (30 minutes). Expired rows are removed on the next read or by a daily WP-Cron sweep, so within 24 hours of expiry.
 * Order meta `_myotp_verified_phone` on each verified WooCommerce order.
 * User meta `myotp_verified_phone` on each account registered through the verified form.
 
-Uninstalling removes the settings, the counters, the pending records and the transients. Order meta and user meta are part of your customer records and are kept. The plugin registers suggested text for your privacy policy under Settings > Privacy.
+Uninstalling removes the settings, the scheduled sweep, the counters, the pending records and the verified records. Order meta and user meta are part of your customer records and are kept. The plugin registers suggested text for your privacy policy under Settings > Privacy.
 
 == Installation ==
 
@@ -72,6 +72,10 @@ Yes. Tick "Only for guests" under WooCommerce checkout in Settings > MyOTP.
 Listen for the event:
 
 `document.addEventListener('myotp:verified', function (e) { console.log(e.detail.phone); });`
+
+= I am behind a reverse proxy or CDN. Does the per-IP limit work? =
+
+The plugin reads REMOTE_ADDR only, because forwarding headers can be forged by the client. Behind a proxy that address may be the proxy itself, so every visitor shares one per-IP bucket and the site-wide hourly ceiling is the real backstop. If your host guarantees a trusted header, return the real address from the `myotp_pv_client_ip` filter.
 
 = Does each test send cost credits? =
 

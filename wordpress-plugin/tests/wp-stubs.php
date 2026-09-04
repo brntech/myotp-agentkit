@@ -1,15 +1,18 @@
 <?php
 /**
- * Minimal WordPress fakes so tests/run.php can load the plugin and call the
- * AJAX handlers without WordPress. Nothing here is used by the plugin
- * itself. Escaping functions are identity functions on purpose: the tests
- * check behaviour, not markup.
+ * Minimal WordPress fakes so tests/run.php can load the plugin, boot it
+ * through the hooks it registers, and call handlers through those hooks.
+ * add_action / add_filter record into a registry; myotp_test_do_action()
+ * and apply_filters() run what was registered, so an unwired hook fails.
+ * Escaping functions are identity functions on purpose: the tests check
+ * behaviour, not markup.
  */
 
 declare(strict_types=1);
 
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'DAY_IN_SECONDS', 86400 );
+define( 'HOUR_IN_SECONDS', 3600 );
 define( 'COOKIEPATH', '/' );
 define( 'COOKIE_DOMAIN', '' );
 
@@ -31,6 +34,7 @@ class MyOTP_Mem_Store {
 	public $rows       = array();
 	public $before_cas = null;
 	public $cas_calls  = 0;
+	public $deletes    = array();
 	public function get( $key ) {
 		return isset( $this->rows[ $key ] ) ? $this->rows[ $key ] : null;
 	}
@@ -57,8 +61,19 @@ class MyOTP_Mem_Store {
 	public function set( $key, $raw, $ttl ) {
 		$this->rows[ $key ] = $raw;
 	}
-	public function delete( $key ) {
+	public function delete( $key, $expected_raw = null ) {
+		$this->deletes[] = array( $key, $expected_raw );
+		if ( ! isset( $this->rows[ $key ] ) ) {
+			return false;
+		}
+		if ( null !== $expected_raw && $this->rows[ $key ] !== $expected_raw ) {
+			return false;
+		}
 		unset( $this->rows[ $key ] );
+		return true;
+	}
+	public function sweep_expired( $batch = 200 ) {
+		return 0;
 	}
 }
 
@@ -72,23 +87,57 @@ class WP_Error {
 	}
 }
 
+class WP_Post {
+	public $post_content = '';
+}
+
+/** Presence of this class makes the plugin register its WooCommerce hooks. */
+class WooCommerce {}
+
+/** WC() with no session, so the plugin falls back to the cookie visitor id. */
+function WC() {
+	static $wc = null;
+	if ( null === $wc ) {
+		$wc          = new stdClass();
+		$wc->session = null;
+	}
+	return $wc;
+}
+
 class MyOTP_Fake_Order {
-	public $meta = array();
+	public $id;
+	public $meta  = array();
+	public $notes = array();
+	public $saved = 0;
+	public function __construct( $id ) {
+		$this->id = $id;
+	}
+	public function get_id() {
+		return $this->id;
+	}
 	public function update_meta_data( $k, $v ) {
 		$this->meta[ $k ] = $v;
+	}
+	public function save() {
+		$this->saved++;
+	}
+	public function add_order_note( $note ) {
+		$this->notes[] = $note;
 	}
 }
 
 $GLOBALS['myotp_test'] = array(
-	'options'     => array(),
-	'transients'  => array(),
-	'user_meta'   => array(),
-	'http_queue'  => array(),
-	'http_log'    => array(),
-	'nonce_ok'    => true,
-	'can_manage'  => false,
-	'logged_in'   => false,
-	'privacy'     => null,
+	'options'    => array(),
+	'transients' => array(),
+	'user_meta'  => array(),
+	'http_queue' => array(),
+	'http_log'   => array(),
+	'nonce_ok'   => true,
+	'can_manage' => false,
+	'logged_in'  => false,
+	'privacy'    => null,
+	'hooks'      => array(),
+	'cron'       => array(),
 );
 
 function myotp_test_reset() {
@@ -111,16 +160,67 @@ function myotp_test_http( $code, $body ) {
 	$GLOBALS['myotp_test']['http_queue'][] = array( $code, $body );
 }
 
-// Hooks and plugin plumbing.
-function add_action( $hook, $cb, $prio = 10, $args = 1 ) {}
-function add_filter( $hook, $cb, $prio = 10, $args = 1 ) {}
-function add_shortcode( $tag, $cb ) {}
-function register_activation_hook( $file, $cb ) {}
+// Hook registry.
+function add_action( $hook, $cb, $prio = 10, $args = 1 ) {
+	$GLOBALS['myotp_test']['hooks'][ $hook ][] = array( $cb, $prio, $args );
+}
+function add_filter( $hook, $cb, $prio = 10, $args = 1 ) {
+	add_action( $hook, $cb, $prio, $args );
+}
+function myotp_test_has_hook( string $hook, $cb = null ): bool {
+	if ( empty( $GLOBALS['myotp_test']['hooks'][ $hook ] ) ) {
+		return false;
+	}
+	if ( null === $cb ) {
+		return true;
+	}
+	foreach ( $GLOBALS['myotp_test']['hooks'][ $hook ] as $entry ) {
+		if ( $entry[0] === $cb ) {
+			return true;
+		}
+	}
+	return false;
+}
+/** Run every callable registered on $hook, in priority order, with $args. */
+function myotp_test_do_action( string $hook, ...$args ) {
+	if ( empty( $GLOBALS['myotp_test']['hooks'][ $hook ] ) ) {
+		throw new RuntimeException( "no callable registered on hook $hook" );
+	}
+	$entries = $GLOBALS['myotp_test']['hooks'][ $hook ];
+	usort( $entries, function ( $a, $b ) { return $a[1] <=> $b[1]; } );
+	foreach ( $entries as $entry ) {
+		call_user_func_array( $entry[0], array_slice( $args, 0, max( 1, (int) $entry[2] ) ) );
+	}
+}
+function apply_filters( $hook, $value, ...$args ) {
+	if ( empty( $GLOBALS['myotp_test']['hooks'][ $hook ] ) ) {
+		return $value;
+	}
+	foreach ( $GLOBALS['myotp_test']['hooks'][ $hook ] as $entry ) {
+		$value = call_user_func_array( $entry[0], array_merge( array( $value ), array_slice( $args, 0, max( 0, (int) $entry[2] - 1 ) ) ) );
+	}
+	return $value;
+}
+function add_shortcode( $tag, $cb ) {
+	$GLOBALS['myotp_test']['hooks'][ 'shortcode:' . $tag ][] = array( $cb, 10, 1 );
+}
+function register_activation_hook( $file, $cb ) {
+	$GLOBALS['myotp_test']['hooks']['activate'][] = array( $cb, 10, 0 );
+}
+function register_deactivation_hook( $file, $cb ) {
+	$GLOBALS['myotp_test']['hooks']['deactivate'][] = array( $cb, 10, 0 );
+}
 function plugin_dir_path( $file ) { return dirname( $file ) . '/'; }
 function plugin_dir_url( $file ) { return 'http://example.test/wp-content/plugins/myotp-phone-verification/'; }
 function plugin_basename( $file ) { return 'myotp-phone-verification/myotp-phone-verification.php'; }
 function load_plugin_textdomain( $d, $a, $b ) {}
 function get_bloginfo( $k ) { return '6.6'; }
+function register_setting( $group, $name, $args = array() ) { $GLOBALS['myotp_test']['settings'][ $name ] = $args; }
+
+// Cron.
+function wp_next_scheduled( $hook ) { return isset( $GLOBALS['myotp_test']['cron'][ $hook ] ) ? $GLOBALS['myotp_test']['cron'][ $hook ] : false; }
+function wp_schedule_event( $ts, $recurrence, $hook ) { $GLOBALS['myotp_test']['cron'][ $hook ] = array( $ts, $recurrence ); return true; }
+function wp_clear_scheduled_hook( $hook ) { unset( $GLOBALS['myotp_test']['cron'][ $hook ] ); return 1; }
 
 // Options, transients, meta.
 function get_option( $name, $default = false ) {
@@ -189,12 +289,12 @@ function is_wp_error( $r ) { return $r instanceof stdClass; }
 function wp_remote_retrieve_response_code( $r ) { return $r['code']; }
 function wp_remote_retrieve_body( $r ) { return $r['body']; }
 
-/** Run an AJAX handler and return the MyOTP_Test_Exit it ended with. */
-function myotp_test_call( callable $fn ) {
+/** Run an AJAX hook through the registry and return the MyOTP_Test_Exit it ended with. */
+function myotp_test_ajax( string $hook ): MyOTP_Test_Exit {
 	try {
-		$fn();
+		myotp_test_do_action( $hook );
 	} catch ( MyOTP_Test_Exit $e ) {
 		return $e;
 	}
-	throw new RuntimeException( 'handler returned without sending JSON' );
+	throw new RuntimeException( "hook $hook returned without sending JSON" );
 }

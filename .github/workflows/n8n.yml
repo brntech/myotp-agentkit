@@ -54,3 +54,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm publish --provenance --access public
+        env:
+          # First publish only: npm allows a trusted publisher only on an existing package.
+          # Remove this env block once the trusted publisher is saved on npmjs.com.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

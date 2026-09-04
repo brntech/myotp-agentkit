@@ -17,10 +17,12 @@
  *
  * Retry policy: every send uses force_send so an Auth0 "resend" always goes
  * out. To avoid duplicate messages and duplicate billing, the Action asks
- * Auth0 to retry only when the request provably never reached MyOTP (DNS or
- * connection failures, or a 429 from the rate limiter). Timeouts, connection
- * resets and 5xx responses are ambiguous, so they are dropped with a logged
- * reason and the user can press resend.
+ * Auth0 to retry only when the request provably never reached MyOTP: DNS or
+ * connection failures raised before any bytes were sent, or a 429, which
+ * MyOTP's nginx limit_req (100 req/min per client IP) answers before the
+ * request reaches the application. Timeouts, connection resets and 5xx
+ * responses are ambiguous, so they are dropped with a logged reason and the
+ * user can press resend.
  *
  * No npm dependencies. Uses the fetch built into the Actions runtime (Node 18+).
  */
@@ -116,6 +118,7 @@ function buildRequest({ secrets, recipient, code }) {
 
   return {
     url: `${API_ORIGIN}/generate_otp`,
+    sensitive: { phone, otp, apiKey },
     init: {
       method: "POST",
       headers: {
@@ -146,16 +149,17 @@ async function deliver({ secrets, recipient, code, fetchImpl, timeoutMs = TIMEOU
     return { ok: false, retryable: false, reason: "MyOTP configuration error: fetch is not available in this runtime" };
   }
 
+  const redact = makeRedactor(req.sensitive);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   let text;
   try {
     response = await doFetch(req.url, { ...req.init, signal: controller.signal });
-    text = await readBounded(response, MAX_BODY_BYTES);
+    text = await readBounded(response, MAX_BODY_BYTES, controller.signal);
   } catch (err) {
     const timedOut = err && err.name === "AbortError";
-    const msg = timedOut ? `timed out after ${timeoutMs}ms` : clean(err && err.message ? err.message : String(err));
+    const msg = timedOut ? `timed out after ${timeoutMs}ms` : clean(redact(err && err.message ? err.message : String(err)));
     const stage = response ? "response body read failed" : "request failed";
     return { ok: false, retryable: !response && neverSent(err), reason: `MyOTP ${stage}: ${msg}` };
   } finally {
@@ -168,8 +172,9 @@ async function deliver({ secrets, recipient, code, fetchImpl, timeoutMs = TIMEOU
   }
 
   if (!response.ok) {
-    const detail = extractMessage(parsed) || clean(response.statusText) || "no error body";
-    // 429 comes from the rate limiter before the send is processed, so a retry cannot duplicate.
+    const detail = clean(redact(extractMessage(parsed) || response.statusText || "no error body"));
+    // 429 is answered by MyOTP's nginx limit_req (100 req/min per client IP) before the
+    // request reaches the application, so nothing was sent or charged. Safe to retry.
     const retryable = response.status === 429;
     return { ok: false, retryable, reason: `MyOTP responded ${response.status}: ${detail}` };
   }
@@ -180,7 +185,7 @@ async function deliver({ secrets, recipient, code, fetchImpl, timeoutMs = TIMEOU
  * Read at most `limit` bytes of the body. Honours the fetch abort signal
  * because the reader is on the same response. Cancels the rest.
  */
-async function readBounded(response, limit) {
+async function readBounded(response, limit, signal) {
   if (!response.body || typeof response.body.getReader !== "function") {
     const t = await response.text();
     return t.slice(0, limit);
@@ -189,17 +194,53 @@ async function readBounded(response, limit) {
   const decoder = new TextDecoder();
   let out = "";
   let bytes = 0;
-  while (bytes < limit) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    out += decoder.decode(value, { stream: true });
-  }
-  if (bytes >= limit) {
-    try { await reader.cancel(); } catch { /* already closed */ }
+  let truncated = false;
+  try {
+    while (bytes < limit) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      // Count bytes before decoding; cut an oversized chunk at the limit.
+      let chunk = value;
+      if (bytes + chunk.byteLength > limit) {
+        chunk = chunk.subarray(0, limit - bytes);
+        truncated = true;
+      }
+      bytes += chunk.byteLength;
+      out += decoder.decode(chunk, { stream: true });
+      if (truncated) break;
+    }
+    if (bytes >= limit) {
+      // A hanging cancel must not outlive the request budget: race it against the abort signal.
+      await Promise.race([
+        reader.cancel().catch(() => {}),
+        new Promise((resolve) => {
+          if (!signal) return resolve();
+          if (signal.aborted) return resolve();
+          signal.addEventListener("abort", () => resolve(), { once: true });
+        }),
+      ]);
+    }
+  } finally {
+    try { reader.releaseLock(); } catch { /* stream already released */ }
   }
   out += decoder.decode();
-  return out.slice(0, limit);
+  return out;
+}
+
+/**
+ * Remove values that must never reach a log: the recipient digits (full and
+ * masked-suffix form), the OTP code, the API key, and any 32-char hex token.
+ */
+function makeRedactor({ phone, otp, apiKey }) {
+  const literals = [apiKey, phone, otp].filter((v) => v && v.length >= 3);
+  const masked = phone ? maskPhone(phone) : null;
+  return (text) => {
+    let s = String(text == null ? "" : text);
+    for (const lit of literals) s = s.split(lit).join("[redacted]");
+    if (masked) s = s.split(masked).join("[redacted]");
+    s = s.replace(/\b[0-9a-f]{32}\b/gi, "[redacted]");
+    return s;
+  };
 }
 
 function neverSent(err) {
@@ -209,12 +250,12 @@ function neverSent(err) {
 
 function extractMessage(parsed) {
   if (!parsed) return null;
-  if (typeof parsed === "string") return clean(parsed);
-  if (parsed.error && typeof parsed.error === "object" && parsed.error.message) return clean(parsed.error.message);
-  if (typeof parsed.error === "string") return clean(parsed.error);
-  if (typeof parsed.message === "string") return clean(parsed.message);
-  if (typeof parsed.detail === "string") return clean(parsed.detail);
-  return clean(JSON.stringify(parsed));
+  if (typeof parsed === "string") return parsed;
+  if (parsed.error && typeof parsed.error === "object" && parsed.error.message) return String(parsed.error.message);
+  if (typeof parsed.error === "string") return parsed.error;
+  if (typeof parsed.message === "string") return parsed.message;
+  if (typeof parsed.detail === "string") return parsed.detail;
+  return JSON.stringify(parsed);
 }
 
 /** Strip control characters and newlines from provider-supplied text, and cap it. */

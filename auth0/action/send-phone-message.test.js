@@ -159,7 +159,7 @@ test("API 4xx is surfaced as drop with status and MyOTP's message", async () => 
   assert.deepEqual(api.log, [["drop", "MyOTP responded 403: Access from this IP not allowed"]]);
 });
 
-test("retry policy: 5xx, timeouts and resets are dropped; DNS/refused and 429 are retried", async () => {
+test("retry policy: 5xx and ECONNRESET are dropped; ENOTFOUND, EAI_AGAIN, ECONNREFUSED, EHOSTUNREACH, ENETUNREACH and 429 are retried", async () => {
   let api = mockApi();
   let event = otpEvent();
   event.fetch = mockFetch(502, "Bad Gateway", []);
@@ -172,11 +172,13 @@ test("retry policy: 5xx, timeouts and resets are dropped; DNS/refused and 429 ar
   await onExecuteCustomPhoneProvider(event, api);
   assert.deepEqual(api.log, [["drop", "MyOTP request failed: fetch failed"]]);
 
-  api = mockApi();
-  event = otpEvent();
-  event.fetch = async () => { const e = new Error("fetch failed"); e.cause = { code: "ENOTFOUND" }; throw e; };
-  await onExecuteCustomPhoneProvider(event, api);
-  assert.deepEqual(api.log, [["retry", "MyOTP request failed: fetch failed"]]);
+  for (const code of ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "EHOSTUNREACH", "ENETUNREACH"]) {
+    api = mockApi();
+    event = otpEvent();
+    event.fetch = async () => { const e = new Error("fetch failed"); e.cause = { code }; throw e; };
+    await onExecuteCustomPhoneProvider(event, api);
+    assert.deepEqual(api.log, [["retry", "MyOTP request failed: fetch failed"]], code);
+  }
 
   api = mockApi();
   event = otpEvent();
@@ -214,9 +216,8 @@ test("timeout covers the response body read and is reported as a drop", async ()
   assert.equal(out2.reason, "MyOTP response body read failed: socket hang up");
 });
 
-test("response body is capped at 8 KB before parsing", async () => {
-  const chunks = [new TextEncoder().encode("x".repeat(6000)), new TextEncoder().encode("y".repeat(6000))];
-  let cancelled = false;
+function streamFetch(chunks, { cancelImpl } = {}) {
+  const state = { reads: 0, cancelled: false, released: false };
   let i = 0;
   const fetchImpl = async () => ({
     ok: false,
@@ -224,14 +225,77 @@ test("response body is capped at 8 KB before parsing", async () => {
     statusText: "",
     body: {
       getReader: () => ({
-        read: async () => (i < chunks.length ? { value: chunks[i++], done: false } : { value: undefined, done: true }),
-        cancel: async () => { cancelled = true; },
+        read: async () => {
+          state.reads += 1;
+          return i < chunks.length ? { value: chunks[i++], done: false } : { value: undefined, done: true };
+        },
+        cancel: cancelImpl || (async () => { state.cancelled = true; }),
+        releaseLock: () => { state.released = true; },
       }),
     },
   });
-  const outcome = await deliver({ secrets: { MYOTP_API_KEY: KEY }, recipient: "+14155550123", code: "123456", fetchImpl });
-  assert.equal(cancelled, true);
+  return { fetchImpl, state };
+}
+
+const enc = (s) => new TextEncoder().encode(s);
+const sensitive = { secrets: { MYOTP_API_KEY: KEY }, recipient: "+14155550123", code: "123456" };
+
+test("body cap: stops reading at 8 KB across chunks, cancels, releases the lock", async () => {
+  const chunks = [enc("x".repeat(6000)), enc("y".repeat(6000)), enc("z".repeat(6000))];
+  const { fetchImpl, state } = streamFetch(chunks);
+  const outcome = await deliver({ ...sensitive, fetchImpl });
+  assert.equal(state.reads, 2, "third chunk must never be read");
+  assert.equal(state.cancelled, true);
+  assert.equal(state.released, true);
   assert.equal(outcome.reason.length <= "MyOTP responded 500: ".length + 300, true);
+});
+
+test("body cap: a single oversized chunk is cut at 8 KB before decoding", async () => {
+  const chunks = [enc("a".repeat(20000)), enc("b".repeat(10))];
+  const { fetchImpl, state } = streamFetch(chunks);
+  const outcome = await deliver({ ...sensitive, fetchImpl });
+  assert.equal(state.reads, 1);
+  assert.equal(state.cancelled, true);
+  assert.equal(state.released, true);
+  assert.equal(/b/.test(outcome.reason), false);
+});
+
+test("body cap: a hanging cancel is bounded by the request budget and the lock is still released", async () => {
+  const chunks = [enc("c".repeat(9000))];
+  const { fetchImpl, state } = streamFetch(chunks, { cancelImpl: () => new Promise(() => {}) });
+  const started = Date.now();
+  const outcome = await deliver({ ...sensitive, fetchImpl, timeoutMs: 30 });
+  assert.equal(Date.now() - started < 2000, true);
+  assert.equal(state.released, true);
+  assert.match(outcome.reason, /^MyOTP responded 500: c+$/);
+});
+
+test("stream completes under the cap: lock released, no cancel", async () => {
+  const { fetchImpl, state } = streamFetch([enc('{"error":{"message":"Low balance"}}')]);
+  const outcome = await deliver({ ...sensitive, fetchImpl });
+  assert.equal(state.reads, 2);
+  assert.equal(state.cancelled, false);
+  assert.equal(state.released, true);
+  assert.equal(outcome.reason, "MyOTP responded 500: Low balance");
+});
+
+test("reflected recipient, code, API key and hex tokens are redacted from reasons", async () => {
+  const api = mockApi();
+  const event = otpEvent();
+  const echo = `phone 14155550123 masked *********23 code 482913 key ${KEY} tok deadbeefdeadbeefdeadbeefdeadbeef ok`;
+  event.fetch = mockFetch(400, { error: { message: echo } }, []);
+  await onExecuteCustomPhoneProvider(event, api);
+  const reason = api.log[0][1];
+  assert.equal(reason.includes("14155550123"), false);
+  assert.equal(reason.includes("*********23"), false);
+  assert.equal(reason.includes("482913"), false);
+  assert.equal(reason.includes(KEY), false);
+  assert.equal(reason.includes("deadbeef"), false);
+  assert.equal(reason, "MyOTP responded 400: phone [redacted] masked [redacted] code [redacted] key [redacted] tok [redacted] ok");
+
+  const thrower = async () => { throw new Error(`connect to 14155550123 with ${KEY}`); };
+  const outcome = await deliver({ ...sensitive, fetchImpl: thrower });
+  assert.equal(outcome.reason, "MyOTP request failed: connect to [redacted] with [redacted]");
 });
 
 test("log reasons mask the phone and strip control characters from provider text", async () => {

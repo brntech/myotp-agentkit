@@ -315,14 +315,17 @@ function myotp_pv_lock_remaining( $store, $key, $now ) {
 }
 
 /**
- * Give back one reserved attempt (the provider was never reached). Floors
- * at zero and leaves a missing record alone.
+ * Give back one reserved attempt (the provider gave no "wrong code"
+ * answer). Refunds only while the row still holds the challenge that was
+ * reserved ($message_id), via CAS from the current raw value, so a stale
+ * request can never decrement a replacement challenge. Floors at zero.
  *
- * @param object $store Store.
- * @param string $key   Pending key.
+ * @param object $store      Store.
+ * @param string $key        Pending key.
+ * @param string $message_id Challenge the attempt was reserved on.
  * @return bool
  */
-function myotp_pv_release_attempt( $store, $key ) {
+function myotp_pv_release_attempt( $store, $key, $message_id ) {
 	for ( $try = 0; $try < 8; $try++ ) {
 		$raw = $store->get( $key );
 		if ( null === $raw ) {
@@ -332,12 +335,40 @@ function myotp_pv_release_attempt( $store, $key ) {
 		if ( ! is_array( $data ) || empty( $data['attempts'] ) ) {
 			return false;
 		}
+		if ( ! isset( $data['message_id'] ) || (string) $data['message_id'] !== (string) $message_id ) {
+			return false;
+		}
 		$data['attempts'] = (int) $data['attempts'] - 1;
 		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), myotp_pv_ttl_left( $data, time() ) ) ) {
 			return true;
 		}
 	}
 	return false;
+}
+
+/**
+ * Retire an exhausted challenge. Succeeds only when the row still holds
+ * exactly $raw (the value the caller last read), that record's attempts
+ * are at or above $max, and its message_id is $message_id; the guarded
+ * delete is the CAS. A stale ordinal from an earlier reservation can
+ * therefore never retire a challenge whose count was refunded meanwhile.
+ *
+ * @param object $store      Store.
+ * @param string $key        Pending key.
+ * @param string $raw        Raw value last read.
+ * @param string $message_id Challenge id.
+ * @param int    $max        Max attempts.
+ * @return bool True when this call retired the challenge.
+ */
+function myotp_pv_exhaust_challenge( $store, $key, $raw, $message_id, $max ) {
+	$data = json_decode( (string) $raw, true );
+	if ( ! is_array( $data ) || ! isset( $data['attempts'], $data['message_id'] ) ) {
+		return false;
+	}
+	if ( (int) $data['attempts'] < (int) $max || (string) $data['message_id'] !== (string) $message_id ) {
+		return false;
+	}
+	return (bool) $store->delete( $key, $raw );
 }
 
 /**

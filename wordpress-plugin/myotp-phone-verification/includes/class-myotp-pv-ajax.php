@@ -76,8 +76,9 @@ class MyOTP_PV_Ajax {
 		$pending      = MyOTP_PV_Session::decode_pending( $pending_raw );
 		$verified_raw = MyOTP_PV_Session::verified_raw();
 
-		if ( MyOTP_PV_Session::verified_is_used( $verified_raw ) ) {
+		if ( MyOTP_PV_Session::verified_is_claiming( $verified_raw ) ) {
 			// A checkout or registration holds a claim on this visitor's verification.
+			// A consumed record is history and is cleared below like an absent one.
 			wp_send_json_error( array( 'message' => __( 'A checkout is using this verification. Finish it first.', 'myotp-phone-verification' ) ), 409 );
 		}
 
@@ -93,6 +94,14 @@ class MyOTP_PV_Ajax {
 				),
 				429
 			);
+		}
+
+		// Clear the old verified record (verified or consumed) BEFORE the provider is
+		// called, so pending and claiming state can never coexist. If a claim landed
+		// since the preflight, give the slots back and say so.
+		if ( null !== $verified_raw && ! MyOTP_PV_Session::clear_verified( $verified_raw ) ) {
+			MyOTP_PV_Session::release_send( $limit['taken'] );
+			wp_send_json_error( array( 'message' => __( 'A checkout is using this verification. Finish it first.', 'myotp-phone-verification' ) ), 409 );
 		}
 
 		// First try without force_send so this visitor's own unexpired code is reused, not re-billed.
@@ -125,12 +134,8 @@ class MyOTP_PV_Ajax {
 		}
 
 		if ( ! MyOTP_PV_Session::install_pending( $phone, (string) $result['body']['message_id'], $pending_raw ) ) {
-			// A parallel send for this visitor won; that challenge is the live one.
-			wp_send_json_error( array( 'message' => __( 'Another code was just requested. Enter the code from the newest message.', 'myotp-phone-verification' ) ), 409 );
-		}
-		if ( null !== $verified_raw && ! MyOTP_PV_Session::clear_verified( $verified_raw ) ) {
-			// The verified record changed while we were sending (a claim is in flight). Do not proceed.
-			wp_send_json_error( array( 'message' => __( 'A checkout is using this verification. Finish it first.', 'myotp-phone-verification' ) ), 409 );
+			// The pending row changed while the provider was called. Touch nothing else, refund nothing.
+			wp_send_json_error( array( 'message' => __( 'State changed. Request a new code.', 'myotp-phone-verification' ) ), 409 );
 		}
 
 		wp_send_json_success(
@@ -182,10 +187,11 @@ class MyOTP_PV_Ajax {
 		$pending     = $reserve['pending'];
 		$pending_raw = $reserve['raw'];
 
-		$result = MyOTP_PV_Api::verify( $pending['phone'], $otp, (string) $pending['message_id'] );
+		$message_id = (string) $pending['message_id'];
+		$result     = MyOTP_PV_Api::verify( $pending['phone'], $otp, $message_id );
 		if ( ! $result['ok'] ) {
 			// Transport failure or any non-2xx: not a wrong code, count nothing.
-			MyOTP_PV_Session::release_attempt();
+			MyOTP_PV_Session::release_attempt( $message_id );
 			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
 		}
 
@@ -203,7 +209,7 @@ class MyOTP_PV_Ajax {
 					self::exhaust( $reserve );
 				}
 			} else {
-				MyOTP_PV_Session::release_attempt();
+				MyOTP_PV_Session::release_attempt( $message_id );
 			}
 			wp_send_json_error(
 				array(
@@ -218,7 +224,7 @@ class MyOTP_PV_Ajax {
 		if ( ! MyOTP_PV_Session::set_verified( $pending['phone'], $verified_raw ) ) {
 			// The verified record changed under us (a claim is in flight, or a parallel
 			// verification won). The code was right, so the attempt is not charged.
-			MyOTP_PV_Session::release_attempt();
+			MyOTP_PV_Session::release_attempt( $message_id );
 			wp_send_json_error( array( 'message' => __( 'Verification state changed. Try again.', 'myotp-phone-verification' ) ), 409 );
 		}
 		MyOTP_PV_Session::clear_pending( $pending_raw );
@@ -232,14 +238,18 @@ class MyOTP_PV_Ajax {
 	}
 
 	/**
-	 * Retire this visitor's challenge (guarded delete) and start their
-	 * cooldown on the number. Nothing is keyed on the phone alone.
+	 * Retire this visitor's challenge and start their cooldown on the
+	 * number. The retirement is a CAS on the raw value last read (attempts
+	 * at the cap, same message id); the cooldown is written only when that
+	 * CAS wins, so a stale ordinal never cools anyone down. Nothing is
+	 * keyed on the phone alone.
 	 *
 	 * @param array $reserve Result of reserve_attempt().
 	 */
 	private static function exhaust( array $reserve ) {
-		MyOTP_PV_Session::start_cooldown( $reserve['pending']['phone'] );
-		MyOTP_PV_Session::clear_pending( $reserve['raw'] );
+		if ( MyOTP_PV_Session::exhaust_challenge( $reserve['raw'], (string) $reserve['pending']['message_id'] ) ) {
+			MyOTP_PV_Session::start_cooldown( $reserve['pending']['phone'] );
+		}
 	}
 
 	/**

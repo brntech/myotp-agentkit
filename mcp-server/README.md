@@ -1,5 +1,7 @@
 # @myotp/mcp — MyOTP.App MCP Server
 
+[![smithery badge](https://smithery.ai/badge/broadnet/myotpapp)](https://smithery.ai/servers/broadnet/myotpapp)
+
 A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes [MyOTP.App](https://myotp.app)'s OTP API to any MCP-compatible AI agent: Claude Desktop, Claude Code, Cursor, Windsurf, Codex, and anything else that speaks MCP.
 
 Send and verify one-time passwords (SMS, WhatsApp, Telegram) directly from a chat with your agent, or from any app it builds.

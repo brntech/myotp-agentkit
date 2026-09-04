@@ -7,38 +7,38 @@
   "response": {
     "error": {
       "type": "RuntimeError",
-      "message": "[{{statusCode}}] {{ifempty(body.error.message, ifempty(body.detail.message, body.message))}}",
+      "message": "[{{statusCode}}] {{ifempty(body.error.message, ifempty(body.detail.message, ifempty(body.detail, body.message)))}}",
       "400": {
         "type": "DataError",
-        "message": "[400] {{ifempty(body.error.message, body.message)}}"
+        "message": "[400] {{ifempty(body.error.message, ifempty(body.detail.message, body.message))}}"
       },
       "401": {
-        "type": "InvalidCredentials",
-        "message": "[401] {{ifempty(body.error.message, 'Missing or invalid API key')}}"
+        "type": "InvalidAccessTokenError",
+        "message": "[401] {{ifempty(body.error.message, ifempty(body.detail.message, 'Missing or invalid API key'))}}"
       },
       "402": {
         "type": "DataError",
-        "message": "[402] {{ifempty(body.error.message, 'Low balance. Top up at https://myotp.app')}}"
+        "message": "[402] {{ifempty(body.detail, ifempty(body.error.message, 'Payment required. Top up at https://myotp.app'))}}"
       },
       "403": {
-        "type": "InvalidCredentials",
-        "message": "[403] {{ifempty(body.error.message, 'The calling IP is not on this API key allowlist')}}"
+        "type": "InvalidConfigurationError",
+        "message": "[403] {{ifempty(body.error.message, ifempty(body.detail.message, 'Forbidden. Check the IP allowlist on this API key and the account status'))}}"
       },
       "404": {
         "type": "DataError",
-        "message": "[404] {{ifempty(body.error.message, 'Not found')}}"
+        "message": "[404] {{ifempty(body.error.message, ifempty(body.detail.message, 'Not found'))}}"
       },
       "409": {
         "type": "DataError",
-        "message": "[409] {{ifempty(body.error.message, 'An OTP is already active for this number')}}"
+        "message": "[409] {{ifempty(body.error.message, ifempty(body.detail.message, 'Conflict'))}}"
       },
       "429": {
         "type": "RateLimitError",
-        "message": "[429] {{ifempty(body.error.message, 'Rate limit exceeded')}}"
+        "message": "[429] {{ifempty(body.error.message, ifempty(body.detail.message, 'Rate limit exceeded'))}}"
       },
       "500": {
         "type": "ConnectionError",
-        "message": "[500] {{ifempty(body.error.message, 'Internal Server Error')}}"
+        "message": "[500] {{ifempty(body.error.message, ifempty(body.detail.message, 'Internal Server Error'))}}"
       }
     }
   },

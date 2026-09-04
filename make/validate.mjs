@@ -4,9 +4,38 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import YAML from "yaml";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const APP_DIR = join(here, "myotp");
+export const SPEC_PATH = join(here, "..", "openapi-reference.yaml");
+
+// Error types Make's Communication schema accepts.
+export const ERROR_TYPES = new Set([
+  "RuntimeError",
+  "DataError",
+  "RateLimitError",
+  "ConnectionError",
+  "InvalidConfigurationError",
+  "InvalidAccessTokenError",
+]);
+
+// Every `type` under a response.error block, at any nesting depth.
+export function errorTypes(errorBlock, out = []) {
+  if (!errorBlock || typeof errorBlock !== "object") return out;
+  if (typeof errorBlock.type === "string") out.push(errorBlock.type);
+  for (const [k, v] of Object.entries(errorBlock)) if (k !== "type" && v && typeof v === "object") errorTypes(v, out);
+  return out;
+}
+
+function specOperation(spec, url, method) {
+  const path = spec?.paths?.[url];
+  return path?.[String(method).toLowerCase()];
+}
+
+function requestSchema(op) {
+  return op?.requestBody?.content?.["application/json"]?.schema;
+}
 
 export function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -23,10 +52,15 @@ export function loadJson(path) {
 
 const MODULE_FILES = ["metadata.json", "api.imljson", "expect.imljson", "interface.imljson", "samples.imljson"];
 
-export function validateApp(appDir = APP_DIR) {
+export function validateApp(appDir = APP_DIR, specPath = SPEC_PATH) {
   const problems = [];
   const check = (ok, msg) => {
     if (!ok) problems.push(msg);
+  };
+  const spec = existsSync(specPath) ? YAML.parse(readFileSync(specPath, "utf8")) : null;
+  check(spec, `spec not found at ${specPath}`);
+  const checkErrorTypes = (block, where) => {
+    for (const t of errorTypes(block)) check(ERROR_TYPES.has(t), `${where}: error type ${t} is not one of ${[...ERROR_TYPES].join(", ")}`);
   };
 
   // 1. Every file parses.
@@ -47,6 +81,7 @@ export function validateApp(appDir = APP_DIR) {
   check(typeof base?.response?.error?.message === "string" && base.response.error.message.includes("body.error.message"),
     "base.imljson: error message must surface body.error.message");
   check(base?.log?.sanitize?.includes("request.headers.x-api-key"), "base.imljson: must sanitize the API key header");
+  checkErrorTypes(base?.response?.error, "base.imljson");
 
   // 3. Connection.
   const connDir = join(appDir, "connections", "myotp");
@@ -58,6 +93,7 @@ export function validateApp(appDir = APP_DIR) {
   check(connApi?.url === "https://api.myotp.app/me" && connApi?.method === "GET", "connection: must validate with GET /me");
   check(connApi?.headers?.["X-API-Key"] === "{{parameters.apiKey}}", "connection: X-API-Key must come from parameters.apiKey");
   check(connApi?.response?.metadata?.value === "{{body.email}}", "connection: metadata should show body.email");
+  checkErrorTypes(connApi?.response?.error, "connection api.imljson");
 
   // 4. Modules.
   const modulesDir = join(appDir, "modules");
@@ -77,6 +113,27 @@ export function validateApp(appDir = APP_DIR) {
     check(["action", "universal"].includes(meta?.type), `module ${name}: type must be action or universal`);
     check(typeof api?.url === "string" && api.url, `module ${name}: api url missing`);
     check(api?.response?.output !== undefined, `module ${name}: response.output missing`);
+    checkErrorTypes(api?.response?.error, `module ${name}`);
+    if (meta?.type === "universal") {
+      // Make's security rule: universal modules must stay relative to baseUrl, and a
+      // programmatic header collection must be merged with the base headers or the
+      // X-API-Key from the base is lost.
+      check(api?.url?.startsWith("/"), `module ${name}: universal url must start with / so baseUrl always applies`);
+      check(/replace\(.*parameters\.url/.test(api?.url ?? ""), `module ${name}: universal url must strip a scheme and host from parameters.url`);
+      check(!/^\{\{parameters\.url\}\}$/.test(api?.url ?? ""), `module ${name}: universal url must not pass parameters.url through unchanged`);
+      check(api?.headers && typeof api.headers === "object" && "{{...}}" in api.headers, `module ${name}: headers must merge with the base via the {{...}} form`);
+      const urlParam = (expect ?? []).find((p) => p.name === "url");
+      check(urlParam?.validate?.pattern === "^/", `module ${name}: url parameter must validate a leading /`);
+    } else if (spec && typeof api?.url === "string") {
+      // Action modules: every field the spec requires must be declared, and required.
+      const op = specOperation(spec, api.url, api.method ?? "GET");
+      check(op, `module ${name}: ${api.method} ${api.url} is not in the spec`);
+      const declared = new Map((expect ?? []).map((p) => [p.name, p]));
+      for (const r of requestSchema(op)?.required ?? []) {
+        check(declared.has(r), `module ${name}: spec requires ${r} but expect.imljson does not declare it`);
+        check(declared.get(r)?.required === true, `module ${name}: ${r} must be marked required`);
+      }
+    }
     check(Array.isArray(expect), `module ${name}: expect must be an array`);
     check(Array.isArray(iface) && iface.length > 0, `module ${name}: interface must be a non-empty array`);
     for (const p of expect ?? []) {

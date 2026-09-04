@@ -3,8 +3,12 @@
     "name": "url",
     "type": "text",
     "label": "URL",
-    "help": "Enter a path relative to `https://api.myotp.app`. For example: `/report`",
-    "required": true
+    "help": "Enter a path relative to `https://api.myotp.app`, starting with `/`. For example: `/report`. A full URL is not accepted: any scheme and host are stripped and the request always goes to api.myotp.app.",
+    "required": true,
+    "validate": {
+      "pattern": "^/",
+      "message": "Enter a path starting with /, relative to https://api.myotp.app"
+    }
   },
   {
     "name": "method",
@@ -21,7 +25,7 @@
     "name": "headers",
     "type": "array",
     "label": "Headers",
-    "help": "You do not have to add the X-API-Key header; the connection adds it for you.",
+    "help": "Merged with the connection headers. You do not have to add X-API-Key; the connection adds it for you.",
     "default": [
       { "key": "Content-Type", "value": "application/json" }
     ],

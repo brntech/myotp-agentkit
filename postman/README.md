@@ -7,7 +7,7 @@ Both JSON files are generated. Do not edit them by hand; edit the spec and rebui
 | File | What it is |
 |---|---|
 | `MyOTP.App.postman_collection.json` | 13 requests, one per operation in the spec |
-| `MyOTP.App.postman_environment.json` | `base_url`, `api_key` (secret), `phone_number`, `message_id`, `otp` |
+| `MyOTP.App.postman_environment.json` | `base_url`, `api_key` (secret), `phone_number` |
 | `build.mjs` | Converter, OpenAPI 3.0 to Collection v2.1 |
 | `validate.mjs` | Structural check of the two JSON files |
 
@@ -22,8 +22,14 @@ The collection sends `X-API-Key: {{api_key}}` on every request that needs it. Th
 
 ## Two-request quickstart
 
-1. Send **Generate OTP**. The test script stores the returned `message_id` in the collection variables. A code arrives on the phone.
-2. Put that code in the `otp` variable and send **Verify OTP**. It already references `{{message_id}}` and `{{otp}}`.
+1. Send **Generate OTP**. The test script stores the returned `message_id` as a collection variable. A code arrives on the phone.
+2. Open the collection's **Variables** tab, put that code in `otp`, and send **Verify OTP**. It already references `{{message_id}}` and `{{otp}}`.
+
+`message_id` and `otp` live only in the collection, never in the environment. Postman resolves environment variables ahead of collection variables, so an empty environment entry would hide the stored value. Do not add them to the environment.
+
+Each request's test asserts the status code the spec documents for success (200, or 201 for agent signup) and the documented content type, so an error answer fails the test rather than passing as "some JSON".
+
+**Buy Credits** is the paid retry flow: the first send answers 402 with payment challenges, and the retry carries an `Authorization` header with the payment credential. That header is in the request, disabled, with a placeholder. Enable it and paste the credential for the retry.
 
 **Extend OTP Expiry** and **Check message_id Status** use the same `{{message_id}}`, so they work right after step 1 too. **Account Identity** (`GET /me`) is the cheapest way to confirm the key and your IP allowlist before you spend a credit.
 

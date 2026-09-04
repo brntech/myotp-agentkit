@@ -9,11 +9,11 @@
     "error": {
       "message": "[{{statusCode}}] {{ifempty(body.error.message, body.message)}}",
       "401": {
-        "type": "InvalidCredentials",
+        "type": "InvalidAccessTokenError",
         "message": "[401] {{ifempty(body.error.message, 'Missing or invalid API key')}}"
       },
       "403": {
-        "type": "InvalidCredentials",
+        "type": "InvalidConfigurationError",
         "message": "[403] {{ifempty(body.error.message, 'The calling IP is not on this API key allowlist')}}"
       }
     },

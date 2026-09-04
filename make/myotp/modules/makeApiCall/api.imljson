@@ -1,7 +1,9 @@
 {
-  "url": "{{parameters.url}}",
+  "url": "/{{replace(replace(trim(parameters.url), '/^[a-z]+:\\/\\/[^\\/]*/i', ''), '/^\\/+/', '')}}",
   "method": "{{parameters.method}}",
-  "headers": "{{toCollection(parameters.headers, 'key', 'value')}}",
+  "headers": {
+    "{{...}}": "{{toCollection(parameters.headers, 'key', 'value')}}"
+  },
   "qs": "{{toCollection(parameters.qs, 'key', 'value')}}",
   "body": "{{parameters.body}}",
   "response": {

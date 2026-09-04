@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-myotp.myOtp",
+	"node": "n8n-nodes-myotp",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Communication", "Development"],

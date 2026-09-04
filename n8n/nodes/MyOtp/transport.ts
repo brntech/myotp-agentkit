@@ -40,9 +40,17 @@ function pickSet(source: IDataObject | undefined, keys: string[]): IDataObject {
 	return out;
 }
 
-/** The API expects force_send and return_otp as the strings "true" / "false". */
+/** The API expects force_send as the strings "true" / "false" (deliberate API design). */
 function boolString(value: unknown): 'true' | 'false' {
 	return value === true || value === 'true' ? 'true' : 'false';
+}
+
+/** Thrown when a required node parameter is missing. Never an API failure. */
+export class ValidationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'ValidationError';
+	}
 }
 
 /**
@@ -55,7 +63,7 @@ export function buildRequest(operation: Operation, params: OperationParams): Bui
 	switch (operation) {
 		case 'sendOtp': {
 			if (!isSet(params.phone_number)) {
-				throw new Error('Phone Number is required');
+				throw new ValidationError('Phone Number is required');
 			}
 			const body: IDataObject = {
 				phone_number: String(params.phone_number),
@@ -63,13 +71,13 @@ export function buildRequest(operation: Operation, params: OperationParams): Bui
 			};
 			if (isSet(params.channel)) body.channel = params.channel;
 			if (extra && isSet(extra.force_send)) body.force_send = boolString(extra.force_send);
-			if (extra && isSet(extra.return_otp)) body.return_otp = boolString(extra.return_otp);
+			if (extra && isSet(extra.return_otp)) body.return_otp = extra.return_otp === true;
 			return { method: 'POST', url: `${BASE_URL}/generate_otp`, body };
 		}
 
 		case 'verifyOtp': {
 			if (!isSet(params.otp)) {
-				throw new Error('OTP is required');
+				throw new ValidationError('OTP is required');
 			}
 			const body: IDataObject = {
 				otp: String(params.otp),
@@ -80,10 +88,10 @@ export function buildRequest(operation: Operation, params: OperationParams): Bui
 
 		case 'extendOtp': {
 			if (!isSet(params.message_id)) {
-				throw new Error('Message ID is required');
+				throw new ValidationError('Message ID is required');
 			}
 			if (!isSet(params.duration)) {
-				throw new Error('Duration is required');
+				throw new ValidationError('Duration is required');
 			}
 			return {
 				method: 'POST',
@@ -94,7 +102,7 @@ export function buildRequest(operation: Operation, params: OperationParams): Bui
 
 		case 'checkOtpStatus': {
 			if (!isSet(params.message_id)) {
-				throw new Error('Message ID is required');
+				throw new ValidationError('Message ID is required');
 			}
 			return {
 				method: 'POST',

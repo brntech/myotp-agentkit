@@ -1,3 +1,4 @@
+import { NodeOperationError } from 'n8n-workflow';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MyOtp } from '../nodes/MyOtp/MyOtp.node';
@@ -5,13 +6,24 @@ import { MyOtpApi } from '../credentials/MyOtpApi.credentials';
 
 type Params = Record<string, unknown>;
 
-/** A minimal stand-in for IExecuteFunctions covering what execute() touches. */
-function makeContext(params: Params, opts: { items?: number; continueOnFail?: boolean } = {}) {
+/**
+ * A minimal stand-in for IExecuteFunctions covering what execute() touches.
+ * `params` is either one parameter map for every item, or one map per item.
+ */
+function makeContext(
+	params: Params | Params[],
+	opts: { items?: number; continueOnFail?: boolean } = {},
+) {
 	const request = vi.fn();
+	const perItem = Array.isArray(params) ? params : undefined;
+	const items = perItem ? perItem.length : (opts.items ?? 1);
 	const ctx = {
-		getInputData: () => Array.from({ length: opts.items ?? 1 }, () => ({ json: {} })),
-		getNodeParameter: (name: string, _i: number, fallback?: unknown) =>
-			name in params ? params[name] : fallback,
+		getInputData: () => Array.from({ length: items }, () => ({ json: {} })),
+		getNodeParameter: (name: string, i: number, fallback?: unknown) => {
+			const map = perItem ? perItem[i] : (params as Params);
+			if (!map) throw new Error('no parameters for item ' + String(i));
+			return name in map ? map[name] : fallback;
+		},
 		continueOnFail: () => opts.continueOnFail ?? false,
 		getNode: () => ({ name: 'MyOTP', type: 'n8n-nodes-myotp.myOtp', typeVersion: 1 }),
 		helpers: { httpRequestWithAuthentication: request },
@@ -74,15 +86,24 @@ describe('MyOtp node', () => {
 		expect(options).not.toHaveProperty('body');
 	});
 
-	it('runs once per input item', async () => {
-		const { ctx, request } = makeContext({ operation: 'checkOtpStatus', messageId: 'm1' }, { items: 3 });
-		request.mockResolvedValue({ DLR: 'DELIVRD', is_active: true });
+	it('runs once per input item with that item\'s own parameters', async () => {
+		const { ctx, request } = makeContext([
+			{ operation: 'checkOtpStatus', messageId: 'm0' },
+			{ operation: 'checkOtpStatus', messageId: 'm1' },
+			{ operation: 'checkOtpStatus', messageId: 'm2' },
+		]);
+		request.mockImplementation(async (_cred: string, options: { body: { message_id: string } }) => ({
+			DLR: 'DELIVRD',
+			echo: options.body.message_id,
+		}));
 
 		const out = await run(ctx);
 
 		expect(request).toHaveBeenCalledTimes(3);
 		expect(out[0]).toHaveLength(3);
-		expect(out[0]?.[2]?.pairedItem).toEqual({ item: 2 });
+		const bodies = request.mock.calls.map((c) => (c[1] as { body: unknown }).body);
+		expect(bodies).toEqual([{ message_id: 'm0' }, { message_id: 'm1' }, { message_id: 'm2' }]);
+		expect(out[0]?.[2]).toEqual({ json: { DLR: 'DELIVRD', echo: 'm2' }, pairedItem: { item: 2 } });
 	});
 
 	it('surfaces the API error envelope as a readable NodeApiError', async () => {
@@ -115,11 +136,29 @@ describe('MyOtp node', () => {
 		]);
 	});
 
-	it('a missing required field is reported before any request is made', async () => {
+	it('a missing required field is a NodeOperationError, raised before any request', async () => {
 		const { ctx, request } = makeContext({ operation: 'sendOtp', phoneNumber: '' });
 
-		await expect(run(ctx)).rejects.toMatchObject({ message: 'Phone Number is required' });
+		await expect(run(ctx)).rejects.toMatchObject({
+			name: 'NodeOperationError',
+			message: 'Phone Number is required',
+		});
+		await expect(run(ctx)).rejects.toBeInstanceOf(NodeOperationError);
 		expect(request).not.toHaveBeenCalled();
+	});
+
+	it('with continueOnFail a missing field becomes an output item without http_code', async () => {
+		const { ctx, request } = makeContext(
+			{ operation: 'checkOtpStatus', messageId: '' },
+			{ continueOnFail: true },
+		);
+
+		const out = await run(ctx);
+
+		expect(request).not.toHaveBeenCalled();
+		expect(out).toEqual([
+			[{ json: { error: 'Message ID is required', http_code: undefined }, pairedItem: { item: 0 } }],
+		]);
 	});
 });
 

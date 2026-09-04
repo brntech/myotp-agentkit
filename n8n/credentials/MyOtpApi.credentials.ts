@@ -1,5 +1,6 @@
 import type {
 	IAuthenticateGeneric,
+	Icon,
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
@@ -9,6 +10,11 @@ export class MyOtpApi implements ICredentialType {
 	name = 'myOtpApi';
 
 	displayName = 'MyOTP API';
+
+	icon: Icon = {
+		light: 'file:../nodes/MyOtp/myotp.svg',
+		dark: 'file:../nodes/MyOtp/myotp.dark.svg',
+	};
 
 	documentationUrl = 'https://github.com/brntech/myotp-agentkit/tree/main/n8n#credentials';
 

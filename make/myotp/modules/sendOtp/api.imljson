@@ -16,8 +16,8 @@
       "message_id": "{{body.message_id}}",
       "status": "{{body.status}}",
       "message": "{{body.message}}",
-      "date_sent": "{{if(body.date_sent, parseDate(body.date_sent, 'YYYY-MM-DDTHH:mm:ssZ'))}}",
-      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ssZ'))}}",
+      "date_sent": "{{if(body.date_sent, parseDate(body.date_sent, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}",
+      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}",
       "cost": "{{body.cost}}",
       "otp": "{{body.otp}}"
     }

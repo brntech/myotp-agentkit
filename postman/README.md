@@ -27,7 +27,7 @@ The collection sends `X-API-Key: {{api_key}}` on every request that needs it. Th
 
 `message_id` and `otp` live only in the collection, never in the environment. Postman resolves environment variables ahead of collection variables, so an empty environment entry would hide the stored value. Do not add them to the environment.
 
-Each request's test asserts the status code the spec documents for success (200, or 201 for agent signup) and the documented content type, so an error answer fails the test rather than passing as "some JSON".
+Each request's test asserts the status code the spec documents for success (200, or 201 for agent signup) and that the Content-Type header carries the documented media type, so an error answer fails the test rather than passing as "some JSON". Generate OTP additionally checks for `message_id`, but only on a success code.
 
 **Buy Credits** is the paid retry flow: the first send answers 402 with payment challenges, and the retry carries an `Authorization` header with the payment credential. That header is in the request, disabled, with a placeholder. Enable it and paste the credential for the retry.
 

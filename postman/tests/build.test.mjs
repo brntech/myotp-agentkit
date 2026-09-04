@@ -96,16 +96,23 @@ test("environment defines no variable that a collection script sets", () => {
 test("test scripts assert the documented success codes and content type", () => {
   const send = byPath("/generate_otp").event[0].script.exec.join("\n");
   assert.match(send, /oneOf\(\[200\]\)/);
-  assert.match(send, /response is JSON/);
+  assert.match(send, /to\.have\.header\("Content-Type"\)/);
+  assert.match(send, /headers\.get\("Content-Type"\)\)\.to\.include\("application\/json"\)/);
+  assert.match(send, /body is JSON/);
+  // message_id is asserted and stored only on a success code.
+  assert.match(send, /if \(\[200, 201\]\.includes\(pm\.response\.code\)\) \{[\s\S]*message_id present[\s\S]*collectionVariables\.set\("message_id"[\s\S]*\n\}/);
   const register = byPath("/v1/agent/register").event[0].script.exec.join("\n");
   assert.match(register, /oneOf\(\[201\]\)/);
   const page = byPath("/v1/agent/verify-email", "GET").event[0].script.exec.join("\n");
   assert.match(page, /oneOf\(\[200\]\)/);
-  assert.match(page, /text\/html/);
-  assert.doesNotMatch(page, /response is JSON/);
+  assert.match(page, /to\.include\("text\/html"\)/);
+  assert.doesNotMatch(page, /is JSON/);
   const confirm = byPath("/v1/agent/verify-email").event[0].script.exec.join("\n");
-  assert.match(confirm, /text\/html/);
-  for (const it of col.item) assert.match(it.event[0].script.exec[0], /pm\.response\.code\)\.to\.be\.oneOf/);
+  assert.match(confirm, /to\.include\("text\/html"\)/);
+  for (const it of col.item) {
+    assert.match(it.event[0].script.exec[0], /pm\.response\.code\)\.to\.be\.oneOf/);
+    assert.match(it.event[0].script.exec.join("\n"), /to\.have\.header\("Content-Type"\)/);
+  }
 });
 
 test("topup carries the documented optional Authorization header, disabled", () => {

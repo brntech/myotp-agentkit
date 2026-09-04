@@ -3,11 +3,11 @@
     "name": "url",
     "type": "text",
     "label": "URL",
-    "help": "Enter a path relative to `https://api.myotp.app`, starting with `/`. For example: `/report`. A full URL is not accepted: any scheme and host are stripped and the request always goes to api.myotp.app.",
+    "help": "Enter a path relative to `https://api.myotp.app`, starting with `/`. For example: `/report`. A full URL, a backslash or a double slash is rejected, and the request always goes to api.myotp.app.",
     "required": true,
     "validate": {
-      "pattern": "^/",
-      "message": "Enter a path starting with /, relative to https://api.myotp.app"
+      "pattern": "^(?!.*\\\\)(?!.*//)/[A-Za-z0-9._~:@!$&'()*+,;=%/-]*(\\?.*)?$",
+      "message": "path must be relative to https://api.myotp.app"
     }
   },
   {

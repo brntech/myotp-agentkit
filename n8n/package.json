@@ -1,0 +1,68 @@
+{
+  "name": "n8n-nodes-myotp",
+  "version": "0.1.0",
+  "description": "n8n community node for MyOTP.App. Send and verify one-time passcodes over SMS, WhatsApp and Telegram.",
+  "license": "MIT",
+  "homepage": "https://myotp.app",
+  "author": {
+    "name": "BroadNet Technologies",
+    "email": "info@myotp.app"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brntech/myotp-agentkit.git",
+    "directory": "n8n"
+  },
+  "bugs": {
+    "url": "https://github.com/brntech/myotp-agentkit/issues"
+  },
+  "keywords": [
+    "n8n-community-node-package",
+    "myotp",
+    "otp",
+    "sms",
+    "whatsapp",
+    "telegram",
+    "2fa",
+    "phone-verification"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && node scripts/copy-assets.mjs",
+    "build:watch": "tsc --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "prepublishOnly": "npm run lint && npm test && npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": true,
+    "credentials": [
+      "dist/credentials/MyOtpApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/MyOtp/MyOtp.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.35.0",
+    "eslint": "^9.29.0",
+    "eslint-plugin-n8n-nodes-base": "^2.0.0",
+    "jsonc-eslint-parser": "^2.4.0",
+    "n8n-workflow": "^2.16.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}

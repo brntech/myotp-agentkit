@@ -1,0 +1,19 @@
+{
+  "name": "@myotp/postman",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Builds the MyOTP.App Postman collection and environment from openapi-reference.yaml.",
+  "license": "MIT",
+  "author": "BroadNet Technologies <info@myotp.app>",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs && node validate.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
+  }
+}

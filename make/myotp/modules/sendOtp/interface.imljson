@@ -1,0 +1,9 @@
+[
+  { "name": "message_id", "type": "text", "label": "Message ID" },
+  { "name": "status", "type": "text", "label": "Status" },
+  { "name": "message", "type": "text", "label": "Message" },
+  { "name": "date_sent", "type": "date", "label": "Date sent" },
+  { "name": "expires_at", "type": "date", "label": "Expires at" },
+  { "name": "cost", "type": "number", "label": "Cost (credits)" },
+  { "name": "otp", "type": "text", "label": "OTP (only when Return the OTP is on)" }
+]

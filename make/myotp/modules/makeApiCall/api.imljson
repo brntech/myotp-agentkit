@@ -1,0 +1,16 @@
+{
+  "url": "/{{replace(replace(replace(replace(trim(parameters.url), '/\\\\/g', '/'), '/^[a-z][a-z0-9+.-]*:\\/\\//i', ''), '/\\/+/g', '/'), '/^\\/+/', '')}}",
+  "method": "{{parameters.method}}",
+  "headers": {
+    "{{...}}": "{{toCollection(parameters.headers, 'key', 'value')}}"
+  },
+  "qs": "{{toCollection(parameters.qs, 'key', 'value')}}",
+  "body": "{{parameters.body}}",
+  "response": {
+    "output": {
+      "body": "{{body}}",
+      "headers": "{{headers}}",
+      "statusCode": "{{statusCode}}"
+    }
+  }
+}

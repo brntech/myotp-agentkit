@@ -1,0 +1,15 @@
+{
+  "url": "/check_otp_status",
+  "method": "POST",
+  "body": {
+    "message_id": "{{parameters.message_id}}"
+  },
+  "response": {
+    "output": {
+      "DLR": "{{body.DLR}}",
+      "is_active": "{{body.is_active}}",
+      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}",
+      "message": "{{body.message}}"
+    }
+  }
+}

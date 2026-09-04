@@ -38,11 +38,11 @@ class MyOTP_PV_Ajax {
 	}
 
 	/**
-	 * Refuse with the lock message.
+	 * Refuse with the cooldown message.
 	 *
-	 * @param int $seconds Seconds left on the lock.
+	 * @param int $seconds Seconds left on the cooldown.
 	 */
-	private static function refuse_locked( $seconds ) {
+	private static function refuse_cooldown( $seconds ) {
 		wp_send_json_error(
 			array(
 				'message' => sprintf(
@@ -66,15 +66,20 @@ class MyOTP_PV_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Enter the number with the country code, digits only, for example 14155551234.', 'myotp-phone-verification' ) ), 400 );
 		}
 
-		$lock = MyOTP_PV_Session::lock_remaining( $phone );
-		if ( $lock > 0 ) {
-			self::refuse_locked( $lock );
+		$cooldown = MyOTP_PV_Session::cooldown_remaining( $phone );
+		if ( $cooldown > 0 ) {
+			self::refuse_cooldown( $cooldown );
 		}
 
 		// Snapshot the rows this request may transition; every write below is guarded by these.
 		$pending_raw  = MyOTP_PV_Session::pending_raw();
 		$pending      = MyOTP_PV_Session::decode_pending( $pending_raw );
 		$verified_raw = MyOTP_PV_Session::verified_raw();
+
+		if ( MyOTP_PV_Session::verified_is_used( $verified_raw ) ) {
+			// A checkout or registration holds a claim on this visitor's verification.
+			wp_send_json_error( array( 'message' => __( 'A checkout is using this verification. Finish it first.', 'myotp-phone-verification' ) ), 409 );
+		}
 
 		$limit = MyOTP_PV_Session::take_send( $phone );
 		if ( ! $limit['allowed'] ) {
@@ -90,13 +95,13 @@ class MyOTP_PV_Ajax {
 			);
 		}
 
-		$result = MyOTP_PV_Api::generate( $phone );
+		// First try without force_send so this visitor's own unexpired code is reused, not re-billed.
+		$result = MyOTP_PV_Api::generate( $phone, false );
 
 		if ( ! $result['ok'] && 409 === (int) $result['http'] ) {
-			// The provider still has an active code for this number; nothing was billed.
-			MyOTP_PV_Session::release_site_slot( $limit['taken'] );
-			if ( null !== $pending && $pending['phone'] === $phone && '' !== (string) $pending['message_id'] ) {
-				// This visitor requested that challenge: let them keep using it, attempts intact.
+			if ( null !== $pending && $pending['phone'] === $phone ) {
+				// This visitor requested that challenge: keep using it, attempts intact. Nothing was billed.
+				MyOTP_PV_Session::release_site_slot( $limit['taken'] );
 				wp_send_json_success(
 					array(
 						'message'  => __( 'A code is already on its way to this number. Enter it below.', 'myotp-phone-verification' ),
@@ -105,14 +110,15 @@ class MyOTP_PV_Ajax {
 					)
 				);
 			}
-			// Someone else's challenge, or none we know: never attach to it.
-			wp_send_json_error( array( 'message' => __( 'A code for this number is still active. Wait for it to expire, then request a new one.', 'myotp-phone-verification' ) ), 409 );
+			// Someone else's challenge is active for this number. Never attach to it:
+			// send this visitor a challenge of their own (the send caps were already taken above).
+			$result = MyOTP_PV_Api::generate( $phone, true );
 		}
 
 		if ( ! $result['ok'] ) {
 			if ( ! empty( $result['transport'] ) ) {
 				MyOTP_PV_Session::release_send( $limit['taken'] );
-			} elseif ( (int) $result['http'] >= 500 ) {
+			} elseif ( (int) $result['http'] >= 500 || 409 === (int) $result['http'] ) {
 				MyOTP_PV_Session::release_site_slot( $limit['taken'] );
 			}
 			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
@@ -122,8 +128,9 @@ class MyOTP_PV_Ajax {
 			// A parallel send for this visitor won; that challenge is the live one.
 			wp_send_json_error( array( 'message' => __( 'Another code was just requested. Enter the code from the newest message.', 'myotp-phone-verification' ) ), 409 );
 		}
-		if ( null !== $verified_raw ) {
-			MyOTP_PV_Session::clear_verified( $verified_raw );
+		if ( null !== $verified_raw && ! MyOTP_PV_Session::clear_verified( $verified_raw ) ) {
+			// The verified record changed while we were sending (a claim is in flight). Do not proceed.
+			wp_send_json_error( array( 'message' => __( 'A checkout is using this verification. Finish it first.', 'myotp-phone-verification' ) ), 409 );
 		}
 
 		wp_send_json_success(
@@ -155,20 +162,19 @@ class MyOTP_PV_Ajax {
 			wp_send_json_error( array( 'message' => __( 'The number changed after the code was sent. Send a new code.', 'myotp-phone-verification' ) ), 400 );
 		}
 
-		$lock = MyOTP_PV_Session::lock_remaining( $pending['phone'] );
-		if ( $lock > 0 ) {
-			self::refuse_locked( $lock );
+		$cooldown = MyOTP_PV_Session::cooldown_remaining( $pending['phone'] );
+		if ( $cooldown > 0 ) {
+			self::refuse_cooldown( $cooldown );
 		}
 
 		$verified_raw = MyOTP_PV_Session::verified_raw();
 
 		// Reserve the attempt atomically before the provider call so parallel
-		// guesses cannot exceed the cap; give it back if the provider was never reached.
+		// guesses cannot exceed the cap; it is given back unless the provider says "wrong code".
 		$reserve = MyOTP_PV_Session::reserve_attempt();
 		if ( $reserve['locked'] ) {
-			MyOTP_PV_Session::lock_phone( $reserve['pending']['phone'] );
-			MyOTP_PV_Session::clear_pending( $reserve['raw'] );
-			self::refuse_locked( MyOTP_PV_Session::LOCK_TTL );
+			self::exhaust( $reserve );
+			self::refuse_cooldown( MyOTP_PV_Session::LOCK_TTL );
 		}
 		if ( ! $reserve['ok'] ) {
 			wp_send_json_error( array( 'message' => __( 'Request a code first.', 'myotp-phone-verification' ) ), 400 );
@@ -178,11 +184,8 @@ class MyOTP_PV_Ajax {
 
 		$result = MyOTP_PV_Api::verify( $pending['phone'], $otp, (string) $pending['message_id'] );
 		if ( ! $result['ok'] ) {
-			if ( ! empty( $result['transport'] ) ) {
-				MyOTP_PV_Session::release_attempt();
-				wp_send_json_error( array( 'message' => $result['message'] ), 200 );
-			}
-			self::after_failed_answer( $reserve );
+			// Transport failure or any non-2xx: not a wrong code, count nothing.
+			MyOTP_PV_Session::release_attempt();
 			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
 		}
 
@@ -192,21 +195,32 @@ class MyOTP_PV_Ajax {
 				? $result['body']['message']
 				: __( 'That code is not correct.', 'myotp-phone-verification' );
 			if ( 'expired' === $status ) {
+				// Challenge is dead; drop it without counting.
 				MyOTP_PV_Session::clear_pending( $pending_raw );
+			} elseif ( 'failed' === $status ) {
+				// The one answer that counts. At the fifth, retire this challenge and start the cooldown.
+				if ( $reserve['attempts'] >= MyOTP_PV_Session::MAX_ATTEMPTS ) {
+					self::exhaust( $reserve );
+				}
 			} else {
-				self::after_failed_answer( $reserve );
+				MyOTP_PV_Session::release_attempt();
 			}
 			wp_send_json_error(
 				array(
 					'message'   => $text,
 					'status'    => $status,
-					'remaining' => max( 0, MyOTP_PV_Session::MAX_ATTEMPTS - $reserve['attempts'] ),
+					'remaining' => 'failed' === $status ? max( 0, MyOTP_PV_Session::MAX_ATTEMPTS - $reserve['attempts'] ) : null,
 				),
 				200
 			);
 		}
 
-		MyOTP_PV_Session::set_verified( $pending['phone'], $verified_raw );
+		if ( ! MyOTP_PV_Session::set_verified( $pending['phone'], $verified_raw ) ) {
+			// The verified record changed under us (a claim is in flight, or a parallel
+			// verification won). The code was right, so the attempt is not charged.
+			MyOTP_PV_Session::release_attempt();
+			wp_send_json_error( array( 'message' => __( 'Verification state changed. Try again.', 'myotp-phone-verification' ) ), 409 );
+		}
 		MyOTP_PV_Session::clear_pending( $pending_raw );
 
 		wp_send_json_success(
@@ -218,16 +232,14 @@ class MyOTP_PV_Ajax {
 	}
 
 	/**
-	 * A provider answer that was not success: when this was the last
-	 * allowed attempt, lock the phone (add only) and drop the challenge.
+	 * Retire this visitor's challenge (guarded delete) and start their
+	 * cooldown on the number. Nothing is keyed on the phone alone.
 	 *
 	 * @param array $reserve Result of reserve_attempt().
 	 */
-	private static function after_failed_answer( array $reserve ) {
-		if ( $reserve['attempts'] >= MyOTP_PV_Session::MAX_ATTEMPTS ) {
-			MyOTP_PV_Session::lock_phone( $reserve['pending']['phone'] );
-			MyOTP_PV_Session::clear_pending( $reserve['raw'] );
-		}
+	private static function exhaust( array $reserve ) {
+		MyOTP_PV_Session::start_cooldown( $reserve['pending']['phone'] );
+		MyOTP_PV_Session::clear_pending( $reserve['raw'] );
 	}
 
 	/**
@@ -244,7 +256,7 @@ class MyOTP_PV_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Enter the number with the country code, digits only, for example 14155551234.', 'myotp-phone-verification' ) ), 400 );
 		}
 
-		$result = MyOTP_PV_Api::generate( $phone );
+		$result = MyOTP_PV_Api::generate( $phone, true );
 		if ( ! $result['ok'] ) {
 			wp_send_json_error(
 				array(

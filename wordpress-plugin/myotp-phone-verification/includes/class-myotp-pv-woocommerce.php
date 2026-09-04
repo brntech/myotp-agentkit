@@ -102,8 +102,8 @@ class MyOTP_PV_WooCommerce {
 			$errors->add( 'myotp_pv_mismatch', __( 'The billing phone number does not match the number you verified. Verify the new number or change it back.', 'myotp-phone-verification' ) );
 			return;
 		}
-		$claimed = MyOTP_PV_Session::claim_verified( $verified );
-		if ( '' === $claimed ) {
+		$claimed = MyOTP_PV_Session::claim_verified( $billing );
+		if ( $claimed !== $billing ) {
 			$errors->add( 'myotp_pv_claimed', __( 'This phone verification was already used by another checkout. Verify your number again.', 'myotp-phone-verification' ) );
 			return;
 		}
@@ -111,9 +111,10 @@ class MyOTP_PV_WooCommerce {
 	}
 
 	/**
-	 * Consume this request's claim once the order exists and stamp the
-	 * order with the phone from the claim. If the consume CAS loses (the
-	 * record changed under us) the order gets a note instead.
+	 * Once the order exists: write the durable stamp first, then consume
+	 * this request's claim. If the consume CAS loses (the record changed
+	 * under us) the stamp is removed again and the order gets a note, so
+	 * an order is never left stamped without a consumed proof.
 	 *
 	 * @param WC_Order $order The created order.
 	 */
@@ -121,13 +122,18 @@ class MyOTP_PV_WooCommerce {
 		if ( ! self::required() || ! is_object( $order ) || '' === self::$claimed ) {
 			return;
 		}
-		$phone         = MyOTP_PV_Session::consume_claim( self::$claimed, 'order:' . $order->get_id() );
+		$phone         = self::$claimed;
 		self::$claimed = '';
-		if ( '' !== $phone ) {
-			$order->update_meta_data( self::ORDER_META, $phone );
-			$order->save();
+
+		$order->update_meta_data( self::ORDER_META, $phone );
+		$order->save();
+
+		$consumed = MyOTP_PV_Session::consume_claim( $phone, 'order:' . $order->get_id() );
+		if ( $consumed === $phone ) {
 			return;
 		}
+		$order->delete_meta_data( self::ORDER_META );
+		$order->save();
 		$order->add_order_note( __( 'MyOTP: the phone verification claimed at checkout could not be consumed for this order (it changed or expired in between). Billing phone is unverified.', 'myotp-phone-verification' ) );
 	}
 }

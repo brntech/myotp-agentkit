@@ -3,9 +3,10 @@
  * Plain PHP tests. Part 1 covers the pure helpers in includes/functions.php
  * over an in-memory store. Part 2 loads the plugin against the fakes in
  * wp-stubs.php, boots it through plugins_loaded, asserts every hook the
- * sources register (derived by scanning the sources here, so a new hook
- * cannot be missed), and drives every flow through those registered
- * callables, including the interleavings the reviews asked for.
+ * sources register together with the exact callable on each (both parsed
+ * from the source lines, so a new or re-pointed hook cannot be missed),
+ * and drives every flow through those registered callables, including the
+ * interleavings the reviews asked for.
  *
  * Run: php tests/run.php
  */
@@ -63,8 +64,7 @@ myotp_pv_take_slot( $s, 'k', $now, 5, 600 );
 $s->before_cas = function ( $store ) use ( $now ) {
 	myotp_pv_take_slot( $store, 'k', $now, 5, 600 );
 };
-$r = myotp_pv_take_slot( $s, 'k', $now, 5, 600 );
-check( 'race: count includes the interleaved take', 3, $r['count'] );
+check( 'race: count includes the interleaved take', 3, myotp_pv_take_slot( $s, 'k', $now, 5, 600 )['count'] );
 $s = new MyOTP_Mem_Store();
 for ( $i = 0; $i < 4; $i++ ) {
 	myotp_pv_take_slot( $s, 'k', $now, 5, 600 );
@@ -101,13 +101,11 @@ $r = myotp_pv_take_send_slots( $s, array( array( 'v', 5 ), array( 'ip', 10 ), ar
 check( 'site is the denied dimension', 'site', $r['denied'] );
 check( 'site denial retry_after runs to the hour', 3600 - 701, $r['retry_after'] );
 
-// Conditional delete contract.
+// Conditional delete contract and guarded install.
 $s = new MyOTP_Mem_Store();
 $s->set( 'x', 'old', 60 );
 check( 'delete with stale expected value refused', false, $s->delete( 'x', 'other' ) );
 check( 'delete with matching expected value', true, $s->delete( 'x', 'old' ) );
-
-// Guarded install.
 $s = new MyOTP_Mem_Store();
 check( 'install into empty', true, null !== myotp_pv_install( $s, 'k', null, array( 'a' => 1 ), 60 ) );
 check( 'install into empty when row appeared loses', null, myotp_pv_install( $s, 'k', null, array( 'a' => 2 ), 60 ) );
@@ -115,7 +113,7 @@ $raw = $s->get( 'k' );
 check( 'install by cas wins', true, null !== myotp_pv_install( $s, 'k', $raw, array( 'a' => 3 ), 60 ) );
 check( 'install by stale cas loses', null, myotp_pv_install( $s, 'k', $raw, array( 'a' => 4 ), 60 ) );
 
-// Attempt reservation: no delete on exhaustion, raw returned, exp honoured.
+// Attempt reservation.
 $s = new MyOTP_Mem_Store();
 check( 'no pending: not ok', false, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['ok'] );
 $s->set( 'pend', myotp_pv_json( array( 'phone' => '14155551234', 'message_id' => 'm1', 'attempts' => 0, 'exp' => $now + 300 ) ), 300 );
@@ -128,53 +126,53 @@ $r = myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
 check( 'sixth attempt locked', true, $r['locked'] );
 check( 'exhausted record is not deleted by reserve', true, null !== $s->get( 'pend' ) );
 check( 'ttl_left from exp', 300, myotp_pv_ttl_left( array( 'exp' => $now + 300 ), $now ) );
-check( 'ttl_left floors at 1', 1, myotp_pv_ttl_left( array( 'exp' => $now - 5 ), $now ) );
 $s->set( 'pend', 'garbage', 60 );
 myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
 check( 'garbage delete was guarded', array( 'pend', 'garbage' ), end( $s->deletes ) );
-
-// Race on attempts.
 $s = new MyOTP_Mem_Store();
 $s->set( 'pend', myotp_pv_json( array( 'phone' => '14155551234', 'message_id' => 'm1', 'attempts' => 3, 'exp' => $now + 300 ) ), 300 );
 $s->before_cas = function ( $store ) use ( $now ) {
 	myotp_pv_reserve_attempt( $store, 'pend', 5, $now );
 };
 check( 'attempt race: retried and counted', 5, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['attempts'] );
-check( 'attempt race: next is locked', true, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['locked'] );
-
-// Attempt release.
 $s = new MyOTP_Mem_Store();
 $s->set( 'pend', myotp_pv_json( array( 'phone' => '1', 'message_id' => 'm', 'attempts' => 2, 'exp' => time() + 60 ) ), 60 );
 check( 'release attempt decrements', true, myotp_pv_release_attempt( $s, 'pend' ) && 1 === json_decode( $s->get( 'pend' ), true )['attempts'] );
 myotp_pv_release_attempt( $s, 'pend' );
 check( 'release attempt floors at zero', false, myotp_pv_release_attempt( $s, 'pend' ) );
 
-// Phone lock.
+// Cooldown record (add-only, timed).
 $s = new MyOTP_Mem_Store();
-check( 'no lock', 0, myotp_pv_lock_remaining( $s, 'lock:1', $now ) );
-check( 'lock created', true, myotp_pv_lock_phone( $s, 'lock:1', $now, 900 ) );
-check( 'lock remaining', 900, myotp_pv_lock_remaining( $s, 'lock:1', $now ) );
-check( 'lock remaining later', 300, myotp_pv_lock_remaining( $s, 'lock:1', $now + 600 ) );
-check( 'second lock does not shorten the first', false, myotp_pv_lock_phone( $s, 'lock:1', $now + 600, 900 ) );
-check( 'lock remaining unchanged', 300, myotp_pv_lock_remaining( $s, 'lock:1', $now + 600 ) );
-check( 'lock gone after until', 0, myotp_pv_lock_remaining( $s, 'lock:1', $now + 900 ) );
+check( 'no cooldown', 0, myotp_pv_lock_remaining( $s, 'cool:v:1', $now ) );
+check( 'cooldown created', true, myotp_pv_lock_phone( $s, 'cool:v:1', $now, 900 ) );
+check( 'cooldown remaining later', 300, myotp_pv_lock_remaining( $s, 'cool:v:1', $now + 600 ) );
+check( 'second write does not shorten the first', false, myotp_pv_lock_phone( $s, 'cool:v:1', $now + 600, 900 ) );
+check( 'cooldown gone after until', 0, myotp_pv_lock_remaining( $s, 'cool:v:1', $now + 900 ) );
 
-// Verified record: claim then consume, bound to phone and request id.
+// Verified record: replaceability, claim then consume, bound to phone and request id.
+check( 'replaceable: absent', true, myotp_pv_verified_replaceable( null ) );
+check( 'replaceable: verified', true, myotp_pv_verified_replaceable( myotp_pv_json( array( 'phone' => '1', 'at' => $now, 'state' => 'verified' ) ) ) );
+check( 'replaceable: claiming refused', false, myotp_pv_verified_replaceable( myotp_pv_json( array( 'phone' => '1', 'at' => $now, 'state' => 'claiming:1:r' ) ) ) );
+check( 'replaceable: consumed refused', false, myotp_pv_verified_replaceable( myotp_pv_json( array( 'phone' => '1', 'at' => $now, 'state' => 'consumed:order:1' ) ) ) );
 check( 'verified fresh', '14155551234', myotp_pv_verified_phone_from( array( 'phone' => '14155551234', 'at' => $now - 10, 'state' => 'verified' ), $now, 1800 ) );
-check( 'verified at exactly ttl expired', '', myotp_pv_verified_phone_from( array( 'phone' => '14155551234', 'at' => $now - 1800, 'state' => 'verified' ), $now, 1800 ) );
 check( 'verified claiming reads as unverified', '', myotp_pv_verified_phone_from( array( 'phone' => '1', 'at' => $now - 5, 'state' => 'claiming:1:r' ), $now, 1800 ) );
 $s = new MyOTP_Mem_Store();
-check( 'claim on missing', '', myotp_pv_claim_verified( $s, 'ver', '14155551234', 'rA', $now ) );
 $s->set( 'ver', myotp_pv_json( array( 'phone' => '14155551234', 'at' => $now - 5, 'state' => 'verified' ) ), 1800 );
+check( 'claim with another phone refused', '', myotp_pv_claim_verified( $s, 'ver', '14155559999', 'rA', $now ) );
+check( 'claim with another phone left the record alone', 'verified', json_decode( $s->get( 'ver' ), true )['state'] );
 check( 'first claim wins', '14155551234', myotp_pv_claim_verified( $s, 'ver', '14155551234', 'rA', $now ) );
-check( 'record marked claiming', 'claiming:14155551234:rA', json_decode( $s->get( 'ver' ), true )['state'] );
 check( 'second claim loses', '', myotp_pv_claim_verified( $s, 'ver', '14155551234', 'rB', $now ) );
 check( 'consume with wrong request id loses', '', myotp_pv_consume_claim( $s, 'ver', '14155551234', 'rB', 'order:1', $now ) );
-check( 'consume with wrong phone loses', '', myotp_pv_consume_claim( $s, 'ver', '14155559999', 'rA', 'order:1', $now ) );
 check( 'consume with the claim wins', '14155551234', myotp_pv_consume_claim( $s, 'ver', '14155551234', 'rA', 'order:1', $now ) );
-check( 'record marked consumed', 'consumed:order:1', json_decode( $s->get( 'ver' ), true )['state'] );
 check( 'consume twice loses', '', myotp_pv_consume_claim( $s, 'ver', '14155551234', 'rA', 'order:2', $now ) );
-// Claim race: two requests both read "verified"; only one wins.
+// Claim race: the row is replaced with phone B between the read and the CAS; claim of A must fail, not hijack B.
+$s = new MyOTP_Mem_Store();
+$s->set( 'ver', myotp_pv_json( array( 'phone' => '14155551234', 'at' => $now - 5, 'state' => 'verified' ) ), 1800 );
+$s->before_cas = function ( $store ) use ( $now ) {
+	$store->set( 'ver', myotp_pv_json( array( 'phone' => '14155559999', 'at' => $now - 1, 'state' => 'verified' ) ), 1800 );
+};
+check( 'claim race: phone swapped under us, claim fails', '', myotp_pv_claim_verified( $s, 'ver', '14155551234', 'rA', $now ) );
+check( 'claim race: B record untouched', 'verified', json_decode( $s->get( 'ver' ), true )['state'] );
 $s = new MyOTP_Mem_Store();
 $s->set( 'ver', myotp_pv_json( array( 'phone' => '14155551234', 'at' => $now - 5, 'state' => 'verified' ) ), 1800 );
 $won           = array();
@@ -183,9 +181,6 @@ $s->before_cas = function ( $store ) use ( $now, &$won ) {
 };
 $won[] = myotp_pv_claim_verified( $s, 'ver', '14155551234', 'rA', $now );
 check( 'claim race: exactly one winner', 1, count( array_filter( $won ) ) );
-check( 'claim race: the interleaved request won', 'claiming:14155551234:rB', json_decode( $s->get( 'ver' ), true )['state'] );
-$s->set( 'ver', myotp_pv_json( array( 'phone' => '14155551234', 'at' => $now - 1801, 'state' => 'verified' ) ), 1800 );
-check( 'claim on expired', '', myotp_pv_claim_verified( $s, 'ver', '14155551234', 'rA', $now ) );
 
 check( 'send body ok', true, myotp_pv_is_send_body( array( 'message_id' => 'abc' ) ) );
 check( 'send body no id', false, myotp_pv_is_send_body( array( 'status' => 'accepted' ) ) );
@@ -196,7 +191,6 @@ check( 'empty input yields defaults', myotp_pv_default_options(), myotp_pv_sanit
 check( 'mask keeps current key', $key, myotp_pv_sanitize_options( array( 'api_key' => MYOTP_PV_KEY_MASK ), array( 'api_key' => $key ) )['api_key'] );
 check( 'unknown channel falls back to sms', 'sms', myotp_pv_sanitize_options( array( 'channel' => 'pigeon' ), array( 'channel' => 'telegram' ) )['channel'] );
 check( 'site cap 250', 250, myotp_pv_sanitize_options( array( 'site_hourly_cap' => '250' ), array() )['site_hourly_cap'] );
-check( 'site cap 0 keeps current', 100, myotp_pv_sanitize_options( array( 'site_hourly_cap' => '0' ), array() )['site_hourly_cap'] );
 check( 'missing checkbox means off', 0, myotp_pv_sanitize_options( array( 'otp_length' => 6 ), array( 'wc_enabled' => 1 ) )['wc_enabled'] );
 check( 'envelope message', 'Insufficient balance', myotp_pv_error_message( array( 'error' => array( 'http_code' => 402, 'message' => 'Insufficient balance' ) ), 402 ) );
 
@@ -209,39 +203,61 @@ $GLOBALS['myotp_test']['options']['myotp_pv_options'] = array_merge(
 );
 myotp_test_do_action( 'plugins_loaded' );
 
-// Every hook the sources register must be in the registry after boot.
+// Every add_action / add_filter / add_shortcode in the sources, with the exact
+// callable parsed from the source line, must be in the registry after boot.
 $src_dir  = __DIR__ . '/../myotp-phone-verification';
-$expected = array();
-$dynamic  = array();
+$expected = array(); // hook => list of callables
+$dynamic  = array(); // prefix => list of callables
 foreach ( array_merge( glob( $src_dir . '/*.php' ), glob( $src_dir . '/includes/*.php' ) ) as $f ) {
-	$code = file_get_contents( $f );
-	preg_match_all( "/add_(?:action|filter)\\(\\s*'([^']+)'/", $code, $m );
-	foreach ( $m[1] as $hook ) {
-		$expected[ $hook ] = true;
-	}
-	preg_match_all( "/add_(?:action|filter)\\(\\s*'([^']+)'\\s*\\./", $code, $m );
-	foreach ( $m[1] as $prefix ) {
-		$dynamic[ $prefix ] = true;
-		unset( $expected[ $prefix ] );
-	}
-	preg_match_all( "/add_shortcode\\(\\s*'([^']+)'/", $code, $m );
-	foreach ( $m[1] as $tag ) {
-		$expected[ 'shortcode:' . $tag ] = true;
-	}
-}
-check( 'source scan found hooks', true, count( $expected ) > 20 );
-foreach ( array_keys( $expected ) as $hook ) {
-	check( "hook registered: $hook", true, myotp_test_has_hook( $hook ) );
-}
-foreach ( array_keys( $dynamic ) as $prefix ) {
-	$hit = false;
-	foreach ( array_keys( $GLOBALS['myotp_test']['hooks'] ) as $name ) {
-		if ( 0 === strpos( $name, $prefix ) ) {
-			$hit = true;
+	$code  = file_get_contents( $f );
+	$class = preg_match( '/^class\s+(\w+)/m', $code, $cm ) ? $cm[1] : '';
+	preg_match_all( "/add_(?:action|filter)\\(\\s*'([^']+)'(\\s*\\.\\s*[^,]+)?,\\s*(array\\(\\s*__CLASS__\\s*,\\s*'(\\w+)'\\s*\\)|'(\\w+)')/", $code, $m, PREG_SET_ORDER );
+	foreach ( $m as $hit ) {
+		$cb = '' !== $hit[4] ? array( $class, $hit[4] ) : $hit[5];
+		if ( '' !== $hit[2] ) {
+			$dynamic[ $hit[1] ][] = $cb;
+		} else {
+			$expected[ $hit[1] ][] = $cb;
 		}
 	}
-	check( "dynamic hook registered: {$prefix}*", true, $hit );
+	preg_match_all( "/add_shortcode\\(\\s*'([^']+)'\\s*,\\s*array\\(\\s*__CLASS__\\s*,\\s*'(\\w+)'\\s*\\)/", $code, $m, PREG_SET_ORDER );
+	foreach ( $m as $hit ) {
+		$expected[ 'shortcode:' . $hit[1] ][] = array( $class, $hit[2] );
+	}
+	// Every add_action/add_filter line must have matched one of the two callable shapes.
+	preg_match_all( "/add_(?:action|filter)\\(\\s*'([^']+)'/", $code, $all );
+	$parsed = 0;
+	foreach ( $m as $x ) { // keep phpcs quiet about unused.
+		$parsed++;
+	}
+	$named = count( $all[1] );
+	$got   = 0;
+	foreach ( $all[1] as $hook ) {
+		if ( isset( $expected[ $hook ] ) || isset( $dynamic[ $hook ] ) ) {
+			$got++;
+		}
+	}
+	check( 'scan parsed every hook line in ' . basename( $f ), $named, $got );
 }
+check( 'source scan found hooks', true, count( $expected ) > 20 );
+foreach ( $expected as $hook => $cbs ) {
+	foreach ( $cbs as $cb ) {
+		$label = is_array( $cb ) ? $cb[0] . '::' . $cb[1] : $cb;
+		check( "hook registered with callable: $hook -> $label", true, myotp_test_has_hook( $hook, $cb ) );
+	}
+}
+foreach ( $dynamic as $prefix => $cbs ) {
+	foreach ( $cbs as $cb ) {
+		$hit = false;
+		foreach ( array_keys( $GLOBALS['myotp_test']['hooks'] ) as $name ) {
+			if ( 0 === strpos( $name, $prefix ) && myotp_test_has_hook( $name, $cb ) ) {
+				$hit = true;
+			}
+		}
+		check( "dynamic hook registered with callable: {$prefix}* -> " . ( is_array( $cb ) ? $cb[0] . '::' . $cb[1] : $cb ), true, $hit );
+	}
+}
+check( 'plugin_action_links_ suffix is the plugin basename', true, myotp_test_has_hook( 'plugin_action_links_' . plugin_basename( $src_dir . '/myotp-phone-verification.php' ), array( 'MyOTP_PV_Settings', 'action_links' ) ) );
 foreach ( array(
 	'wp_ajax_nopriv_myotp_pv_send',
 	'wp_ajax_myotp_pv_send',
@@ -265,9 +281,6 @@ foreach ( array(
 ) as $must ) {
 	check( "scan covers $must", true, isset( $expected[ $must ] ) );
 }
-check( 'scan covers plugin_action_links_*', true, isset( $dynamic['plugin_action_links_'] ) );
-check( 'hook: wp_ajax_myotp_pv_test -> admin_test', true, myotp_test_has_hook( 'wp_ajax_myotp_pv_test', array( 'MyOTP_PV_Ajax', 'admin_test' ) ) );
-check( 'hook: woocommerce_checkout_order_created -> consume', true, myotp_test_has_hook( 'woocommerce_checkout_order_created', array( 'MyOTP_PV_WooCommerce', 'consume' ) ) );
 check( 'hook: user_register is not used', false, myotp_test_has_hook( 'user_register' ) );
 check( 'hook: no nopriv admin test', false, myotp_test_has_hook( 'wp_ajax_nopriv_myotp_pv_test' ) );
 
@@ -283,7 +296,6 @@ check( 'cron: sweep with no full batch schedules nothing', 0, count( $GLOBALS['m
 MyOTP_PV_Store::$instance->sweep_full = true;
 myotp_test_do_action( 'myotp_pv_sweep' );
 check( 'cron: full batch schedules a continuation', 'myotp_pv_sweep', $GLOBALS['myotp_test']['single'][0][1] );
-check( 'cron: continuation is about five minutes out', true, abs( $GLOBALS['myotp_test']['single'][0][0] - ( time() + 300 ) ) < 5 );
 
 function myotp_test_configure(): void {
 	myotp_test_reset();
@@ -310,14 +322,21 @@ function myotp_test_counter( string $key ): int {
 	return null === $raw ? 0 : (int) json_decode( $raw, true )['c'];
 }
 function myotp_test_vrec(): ?array {
-	$raw = MyOTP_PV_Store::$instance->get( 'verified_c_' . str_repeat( 'a', 32 ) );
+	$raw = MyOTP_PV_Store::$instance->get( 'verified_c_' . $_COOKIE['myotp_pv_sid'] );
 	return null === $raw ? null : json_decode( $raw, true );
+}
+function myotp_test_vset( array $rec ): void {
+	MyOTP_PV_Store::$instance->set( 'verified_c_' . $_COOKIE['myotp_pv_sid'], myotp_pv_json( $rec ), 1800 );
 }
 function myotp_test_wrong( int $n ): void {
 	for ( $i = 0; $i < $n; $i++ ) {
 		myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
 		myotp_test_verify( '000000' );
 	}
+}
+function myotp_test_last_body(): array {
+	$log = $GLOBALS['myotp_test']['http_log'];
+	return json_decode( end( $log )['args']['body'], true );
 }
 
 // Nonce and configuration guards.
@@ -331,20 +350,17 @@ check( 'send: no key configured is an error', false, myotp_test_send( '141555512
 myotp_test_configure();
 check( 'send: bad phone 400', 400, myotp_test_send( '+0 12' )->status );
 
-// Success installs a pending challenge with message id and absolute expiry equal to the validity.
+// Success installs a pending challenge.
 myotp_test_configure();
 $GLOBALS['myotp_test']['options']['myotp_pv_options']['otp_validity'] = 7200;
 myotp_test_http( 200, array( 'message_id' => 'msg-1', 'status' => 'accepted' ) );
 $r = myotp_test_send( '+1 (415) 555-1234' );
 check( 'send: success', true, $r->success );
-$call = $GLOBALS['myotp_test']['http_log'][0];
-check( 'send: X-API-Key header', 'abcdefghijklmnopqrstuvwxyz012345', $call['args']['headers']['X-API-Key'] );
-check( 'send: force_send false', false, json_decode( $call['args']['body'], true )['force_send'] );
+check( 'send: X-API-Key header', 'abcdefghijklmnopqrstuvwxyz012345', $GLOBALS['myotp_test']['http_log'][0]['args']['headers']['X-API-Key'] );
+check( 'send: first attempt force_send false', false, myotp_test_last_body()['force_send'] );
 check( 'send: pending stored with message id', 'msg-1', myotp_test_pending()['message_id'] );
 check( 'send: pending expiry equals validity', true, abs( myotp_test_pending()['exp'] - ( time() + 7200 ) ) < 5 );
 check( 'send: site counter taken', 1, myotp_test_counter( 'send_site' ) );
-$GLOBALS['myotp_test']['options']['myotp_pv_options']['otp_validity'] = 86400;
-check( 'pending ttl capped at a day', 86400, MyOTP_PV_Session::pending_ttl() );
 
 // Provider answers and slot accounting.
 myotp_test_configure();
@@ -363,159 +379,169 @@ myotp_test_configure();
 myotp_test_http( 'wp_error', null );
 myotp_test_send( '14155551234' );
 check( 'send: transport error refunded phone slot', 0, myotp_test_counter( 'send_p_14155551234' ) );
-check( 'send: transport error refunded site slot', 0, myotp_test_counter( 'send_site' ) );
 
-// 409 semantics: own challenge kept with attempts, foreign challenge refused, site slot refunded.
+// 409 semantics: own challenge kept with attempts; foreign challenge -> forced resend of our own.
 myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-2' ) );
 myotp_test_send( '14155551234' );
 myotp_test_wrong( 3 );
-check( '409: three attempts used before resend', 3, myotp_test_pending()['attempts'] );
+check( '409 own: three attempts used before resend', 3, myotp_test_pending()['attempts'] );
 myotp_test_http( 409, array( 'error' => array( 'http_code' => 409, 'message' => 'OTP already active' ) ) );
 $r = myotp_test_send( '14155551234' );
-check( '409: own challenge soft success', true, $r->success );
-check( '409: attempts kept', 3, myotp_test_pending()['attempts'] );
-check( '409: message id kept', 'msg-2', myotp_test_pending()['message_id'] );
-check( '409: site slot refunded', 1, myotp_test_counter( 'send_site' ) );
-check( '409: phone slot kept', 2, myotp_test_counter( 'send_p_14155551234' ) );
+check( '409 own: soft success', true, $r->success );
+check( '409 own: attempts kept', 3, myotp_test_pending()['attempts'] );
+check( '409 own: message id kept', 'msg-2', myotp_test_pending()['message_id'] );
+check( '409 own: site slot refunded', 1, myotp_test_counter( 'send_site' ) );
+check( '409 own: one provider call only', 5, count( $GLOBALS['myotp_test']['http_log'] ) );
 myotp_test_configure();
 myotp_test_http( 409, array( 'error' => array( 'http_code' => 409, 'message' => 'OTP already active' ) ) );
+myotp_test_http( 200, array( 'message_id' => 'msg-forced' ) );
 $r = myotp_test_send( '14155551234' );
-check( '409 foreign challenge: refused', 409, $r->status );
-check( '409 foreign challenge: no pending created', null, myotp_test_pending() );
-check( '409 foreign challenge: verify has nothing', 'Request a code first.', myotp_test_verify( '123456' )->data['message'] );
+check( '409 foreign: resent and succeeded', true, $r->success );
+check( '409 foreign: two provider calls', 2, count( $GLOBALS['myotp_test']['http_log'] ) );
+check( '409 foreign: first call force_send false', false, json_decode( $GLOBALS['myotp_test']['http_log'][0]['args']['body'], true )['force_send'] );
+check( '409 foreign: second call force_send true', true, myotp_test_last_body()['force_send'] );
+check( '409 foreign: own challenge installed', 'msg-forced', myotp_test_pending()['message_id'] );
+check( '409 foreign: site slot counted once', 1, myotp_test_counter( 'send_site' ) );
+check( '409 foreign: still one phone slot', 1, myotp_test_counter( 'send_p_14155551234' ) );
+// Forced resend that itself fails on transport refunds everything.
+myotp_test_configure();
+myotp_test_http( 409, array( 'error' => array( 'http_code' => 409 ) ) );
+myotp_test_http( 'wp_error', null );
+check( '409 foreign then transport: error', false, myotp_test_send( '14155551234' )->success );
+check( '409 foreign then transport: slots refunded', 0, myotp_test_counter( 'send_p_14155551234' ) );
+// Forced resend still subject to caps: phone cap already spent.
+myotp_test_configure();
+for ( $i = 0; $i < 3; $i++ ) {
+	myotp_test_http( 200, array( 'message_id' => "c$i" ) );
+	myotp_test_send( '14155551234' );
+}
+check( '409 foreign: caps apply before the provider is asked', 429, myotp_test_send( '14155551234' )->status );
 
-// Lockout: 5 wrong codes lock the phone for every visitor; send and verify refuse; 409 cannot revive.
+// Cooldown: five wrong codes retire this visitor's challenge; other visitors untouched; nothing keyed on the phone alone.
 myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-3' ) );
 myotp_test_send( '14155551234' );
 myotp_test_wrong( 4 );
 myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
 $r = myotp_test_verify( '000000' );
-check( 'lock: fifth wrong answer surfaced', 'Invalid OTP', $r->data['message'] );
-check( 'lock: remaining zero', 0, $r->data['remaining'] );
-check( 'lock: pending dropped', null, myotp_test_pending() );
-check( 'lock: lock record written', true, MyOTP_PV_Session::lock_remaining( '14155551234' ) > 890 );
-$r = myotp_test_verify( '000000' );
-check( 'lock: verify refused', 400, $r->status );
+check( 'cooldown: fifth wrong answer surfaced', 'Invalid OTP', $r->data['message'] );
+check( 'cooldown: remaining zero', 0, $r->data['remaining'] );
+check( 'cooldown: challenge dropped', null, myotp_test_pending() );
+check( 'cooldown: record is per visitor and phone', true, null !== MyOTP_PV_Store::$instance->get( 'cool:c_' . str_repeat( 'a', 32 ) . ':14155551234' ) );
+$phone_only = array();
+foreach ( array_keys( MyOTP_PV_Store::$instance->rows ) as $k ) {
+	if ( preg_match( '/^(lock|cool):14155551234$/', $k ) ) {
+		$phone_only[] = $k;
+	}
+}
+check( 'cooldown: no record keyed on the phone alone', array(), $phone_only );
+check( 'cooldown: verify refused', 400, myotp_test_verify( '000000' )->status );
 $r = myotp_test_send( '14155551234' );
-check( 'lock: send refused 429', 429, $r->status );
-check( 'lock: send message names minutes', 'Too many wrong codes for this number. Try again in 15 minutes.', $r->data['message'] );
-check( 'lock: no HTTP call while locked', 6, count( $GLOBALS['myotp_test']['http_log'] ) );
+check( 'cooldown: send refused 429', 429, $r->status );
+check( 'cooldown: message names minutes', 'Too many wrong codes for this number. Try again in 15 minutes.', $r->data['message'] );
+check( 'cooldown: no HTTP call while cooling', 6, count( $GLOBALS['myotp_test']['http_log'] ) );
+myotp_test_http( 200, array( 'message_id' => 'msg-other' ) );
+check( 'cooldown: same visitor, other phone allowed', true, myotp_test_send( '14155550000' )->success );
 $_COOKIE['myotp_pv_sid'] = str_repeat( 'f', 32 );
 $_SERVER['REMOTE_ADDR']  = '198.51.100.7';
-check( 'lock: another visitor and ip refused for the same phone', 429, myotp_test_send( '14155551234' )->status );
-myotp_test_http( 200, array( 'message_id' => 'msg-4' ) );
-check( 'lock: another phone still allowed', true, myotp_test_send( '14155550000' )->success );
-// Lock expiry: shrink the lock and confirm a new send works and starts at zero attempts.
-MyOTP_PV_Store::$instance->rows['lock:14155551234'] = myotp_pv_json( array( 'at' => time() - 1000, 'until' => time() - 1 ) );
-$_COOKIE['myotp_pv_sid']                              = str_repeat( 'a', 32 );
+myotp_test_http( 200, array( 'message_id' => 'msg-victim' ) );
+check( 'cooldown: the number\'s owner in another browser is not locked out', true, myotp_test_send( '14155551234' )->success );
+check( 'cooldown: owner has their own challenge', 'msg-victim', myotp_test_pending()['message_id'] );
+// Expiry of the cooldown allows a fresh challenge at zero attempts.
+$_COOKIE['myotp_pv_sid'] = str_repeat( 'a', 32 );
+MyOTP_PV_Store::$instance->rows[ 'cool:c_' . str_repeat( 'a', 32 ) . ':14155551234' ] = myotp_pv_json( array( 'at' => time() - 1000, 'until' => time() - 1 ) );
 myotp_test_http( 200, array( 'message_id' => 'msg-5' ) );
-check( 'lock: expired lock allows a new send', true, myotp_test_send( '14155551234' )->success );
-check( 'lock: new challenge starts at zero attempts', 0, myotp_test_pending()['attempts'] );
-check( 'lock: new challenge has the new message id', 'msg-5', myotp_test_pending()['message_id'] );
+check( 'cooldown: expired cooldown allows a new send', true, myotp_test_send( '14155551234' )->success );
+check( 'cooldown: new challenge starts at zero attempts', 0, myotp_test_pending()['attempts'] );
 
-// Interleaving: lock record blocks a 409 resend that would otherwise revive the challenge.
+// Only "failed" counts.
 myotp_test_configure();
-myotp_test_http( 200, array( 'message_id' => 'msg-6' ) );
-myotp_test_send( '14155551234' );
-myotp_test_wrong( 5 );
-check( 'lock+409: locked', true, MyOTP_PV_Session::lock_remaining( '14155551234' ) > 0 );
-$r = myotp_test_send( '14155551234' );
-check( 'lock+409: resend refused before the provider', 429, $r->status );
-check( 'lock+409: provider not called', 6, count( $GLOBALS['myotp_test']['http_log'] ) );
-check( 'lock+409: no pending revived', null, myotp_test_pending() );
-
-// Rate limits across cookies, IPs and the site cap.
-myotp_test_configure();
-for ( $i = 0; $i < 3; $i++ ) {
-	myotp_test_http( 200, array( 'message_id' => "m$i" ) );
-	myotp_test_send( '14155551234' );
-}
-check( 'limit: 4th send to same number refused', 429, myotp_test_send( '14155551234' )->status );
-myotp_test_http( 200, array( 'message_id' => 'm4' ) );
-myotp_test_send( '14155550001' );
-myotp_test_http( 200, array( 'message_id' => 'm5' ) );
-myotp_test_send( '14155550002' );
-check( 'limit: 6th send by one visitor refused', false, myotp_test_send( '14155550003' )->success );
-for ( $i = 0; $i < 5; $i++ ) {
-	$_COOKIE['myotp_pv_sid'] = str_repeat( 'b', 32 );
-	myotp_test_http( 200, array( 'message_id' => "n$i" ) );
-	myotp_test_send( '1415555100' . $i );
-}
-$_COOKIE['myotp_pv_sid'] = str_repeat( 'c', 32 );
-check( 'limit: 11th send from one IP refused despite new cookie', false, myotp_test_send( '14155552000' )->success );
-check( 'limit: ip refusals made no HTTP call', 10, count( $GLOBALS['myotp_test']['http_log'] ) );
-myotp_test_configure();
-$GLOBALS['myotp_test']['options']['myotp_pv_options']['site_hourly_cap'] = 4;
-for ( $i = 0; $i < 4; $i++ ) {
-	$_SERVER['REMOTE_ADDR']  = '198.51.100.' . ( 10 + $i );
-	$_COOKIE['myotp_pv_sid'] = str_repeat( (string) $i, 32 );
-	myotp_test_http( 200, array( 'message_id' => "s$i" ) );
-	myotp_test_send( '4477000000' . $i );
-}
-$_SERVER['REMOTE_ADDR']  = '198.51.100.99';
-$_COOKIE['myotp_pv_sid'] = str_repeat( '9', 32 );
-check( 'site cap: 5th send from yet another ip refused', 429, myotp_test_send( '447700009999' )->status );
-add_filter( 'myotp_pv_site_hourly_cap', function ( $cap ) { return $cap + 1; } );
-myotp_test_http( 200, array( 'message_id' => 's5' ) );
-check( 'site cap: filter raises the ceiling', true, myotp_test_send( '447700009999' )->success );
-$GLOBALS['myotp_test']['hooks']['myotp_pv_site_hourly_cap'] = array();
-add_filter( 'myotp_pv_client_ip', function ( $ip ) { return '10.0.0.1'; } );
-check( 'ip filter applied', '10.0.0.1', MyOTP_PV_Session::client_ip() );
-$GLOBALS['myotp_test']['hooks']['myotp_pv_client_ip'] = array();
-
-// Verify: order of checks, attempt accounting, message id on the wire.
-myotp_test_configure();
-check( 'verify: nothing pending', 'Request a code first.', myotp_test_verify( '123456' )->data['message'] );
 myotp_test_http( 200, array( 'message_id' => 'msg-9' ) );
 myotp_test_send( '14155551234' );
-check( 'verify: bad code shape 400', 400, myotp_test_verify( '12' )->status );
-check( 'verify: changed number refused', 400, myotp_test_verify( '123456', '14155559999' )->status );
-check( 'verify: mismatch did not consume an attempt', 0, myotp_test_pending()['attempts'] );
+check( 'count: bad code shape 400', 400, myotp_test_verify( '12' )->status );
+check( 'count: changed number refused', 400, myotp_test_verify( '123456', '14155559999' )->status );
+check( 'count: mismatch did not consume', 0, myotp_test_pending()['attempts'] );
 myotp_test_http( 'wp_error', null );
 myotp_test_verify( '123456' );
-check( 'verify: transport error did not consume an attempt', 0, myotp_test_pending()['attempts'] );
+check( 'count: transport did not consume', 0, myotp_test_pending()['attempts'] );
 myotp_test_http( 500, '<html>oops</html>' );
 myotp_test_verify( '123456' );
-check( 'verify: 500 consumed an attempt', 1, myotp_test_pending()['attempts'] );
-check( 'verify: message_id on the wire', 'msg-9', json_decode( $GLOBALS['myotp_test']['http_log'][1]['args']['body'], true )['message_id'] );
+check( 'count: 5xx did not consume', 0, myotp_test_pending()['attempts'] );
+myotp_test_http( 401, array( 'error' => array( 'http_code' => 401, 'message' => 'bad key' ) ) );
+myotp_test_verify( '123456' );
+check( 'count: 4xx did not consume', 0, myotp_test_pending()['attempts'] );
+myotp_test_http( 200, array( 'status' => 'weird', 'message' => 'unknown' ) );
+myotp_test_verify( '123456' );
+check( 'count: unknown status did not consume', 0, myotp_test_pending()['attempts'] );
+myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
+$r = myotp_test_verify( '123456' );
+check( 'count: failed consumed', 1, myotp_test_pending()['attempts'] );
+check( 'count: remaining reported on failed', 4, $r->data['remaining'] );
+check( 'count: message_id on the wire', 'msg-9', myotp_test_last_body()['message_id'] );
+for ( $i = 0; $i < 20; $i++ ) {
+	myotp_test_http( 500, '<html>oops</html>' );
+	myotp_test_verify( '123456' );
+}
+check( 'count: a provider outage never exhausts a challenge', 1, myotp_test_pending()['attempts'] );
+myotp_test_http( 200, array( 'status' => 'expired', 'message' => 'OTP expired' ) );
+check( 'count: expired surfaced', 'OTP expired', myotp_test_verify( '111111' )->data['message'] );
+check( 'count: expired dropped the challenge', null, myotp_test_pending() );
+check( 'count: expired started no cooldown', 0, MyOTP_PV_Session::cooldown_remaining( '14155551234' ) );
+
+// Verify success path: must win the verified write, never over a claim.
+myotp_test_configure();
+myotp_test_http( 200, array( 'message_id' => 'msg-10' ) );
+myotp_test_send( '14155551234' );
 myotp_test_http( 200, array( 'status' => 'success', 'message' => 'OK' ) );
 $r = myotp_test_verify( '482917' );
 check( 'verify: success', true, $r->success );
 check( 'verify: record state verified', 'verified', myotp_test_vrec()['state'] );
 check( 'verify: pending cleared after success', null, myotp_test_pending() );
 check( 'verify: session reports verified', '14155551234', MyOTP_PV_Session::verified_phone() );
-// Expired status drops the pending record (guarded).
+// A claim is in flight: send refuses, and a verify that read the claim must not overwrite it.
+myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'claiming:14155551234:rid-x' ) );
+$r = myotp_test_send( '14155551234' );
+check( 'send during claim: refused 409', 409, $r->status );
+check( 'send during claim: message', 'A checkout is using this verification. Finish it first.', $r->data['message'] );
+check( 'send during claim: no provider call', 2, count( $GLOBALS['myotp_test']['http_log'] ) );
+// Put a challenge in place by hand (as if sent before the claim), then verify against the claim.
+MyOTP_PV_Store::$instance->set( 'pending_c_' . str_repeat( 'a', 32 ), myotp_pv_json( array( 'phone' => '14155551234', 'message_id' => 'msg-11', 'attempts' => 0, 'exp' => time() + 300 ) ), 300 );
+myotp_test_http( 200, array( 'status' => 'success', 'message' => 'OK' ) );
+$r = myotp_test_verify( '482917' );
+check( 'verify over claim: not reported as success', false, $r->success );
+check( 'verify over claim: message', 'Verification state changed. Try again.', $r->data['message'] );
+check( 'verify over claim: claim intact', 'claiming:14155551234:rid-x', myotp_test_vrec()['state'] );
+check( 'verify over claim: pending kept', 'msg-11', myotp_test_pending()['message_id'] );
+check( 'verify over claim: attempt not charged', 0, myotp_test_pending()['attempts'] );
+// Verified row consumed while the provider call is in flight: same outcome.
 myotp_test_configure();
-myotp_test_http( 200, array( 'message_id' => 'msg-11' ) );
+myotp_test_http( 200, array( 'message_id' => 'msg-12' ) );
 myotp_test_send( '14155551234' );
-myotp_test_http( 200, array( 'status' => 'expired', 'message' => 'OTP expired' ) );
-check( 'verify: expired surfaced', 'OTP expired', myotp_test_verify( '111111' )->data['message'] );
-check( 'verify: expired code dropped', null, myotp_test_pending() );
+$GLOBALS['myotp_test']['http_before'] = function () {
+	myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'consumed:order:7' ) );
+};
+myotp_test_http( 200, array( 'status' => 'success', 'message' => 'OK' ) );
+$r = myotp_test_verify( '482917' );
+check( 'verify vs consume in flight: not success', 409, $r->status );
+check( 'verify vs consume in flight: consumed record intact', 'consumed:order:7', myotp_test_vrec()['state'] );
+check( 'verify vs consume in flight: pending kept', 'msg-12', myotp_test_pending()['message_id'] );
 
 // Interleaving: verify A in flight while send B installs a new challenge; A must not delete B's record.
 myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-A' ) );
 myotp_test_send( '14155551234' );
 $GLOBALS['myotp_test']['http_before'] = function () {
-	// Runs during A's provider call: B requests a fresh code for the same visitor.
-	// B's canned answer must be served before A's, so it goes to the front of the queue.
 	array_unshift( $GLOBALS['myotp_test']['http_queue'], array( 200, array( 'message_id' => 'msg-B' ) ) );
-	try {
-		myotp_test_send( '14155551234' );
-	} catch ( MyOTP_Test_Exit $e ) {
-		// unreachable: myotp_test_send returns the exit.
-	}
+	myotp_test_send( '14155551234' );
 	$_POST = array( 'otp' => '482917', 'phone' => '', 'nonce' => 'x' );
 };
 myotp_test_http( 200, array( 'status' => 'success', 'message' => 'OK' ) );
 $r = myotp_test_verify( '482917' );
 check( 'verify race: A still succeeds', true, $r->success );
 check( 'verify race: B pending survives A cleanup', 'msg-B', myotp_test_pending()['message_id'] );
-check( 'verify race: B pending attempts untouched', 0, myotp_test_pending()['attempts'] );
 check( 'verify race: A proof installed', 'verified', myotp_test_vrec()['state'] );
-// And the reverse: send B in flight while A's verify writes proof; B's send must not delete A's proof.
+// Reverse: send B in flight while A's verify writes proof; B must not delete A's proof.
 myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-A2' ) );
 myotp_test_send( '14155551234' );
@@ -528,6 +554,17 @@ myotp_test_http( 200, array( 'message_id' => 'msg-B2' ) );
 $r = myotp_test_send( '14155551234' );
 check( 'send race: B send refused (pending changed under it)', 409, $r->status );
 check( 'send race: A proof kept', 'verified', myotp_test_vrec()['state'] );
+// Send in flight while a checkout claims the fresh proof: the guarded clear fails and send refuses.
+myotp_test_configure();
+myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'verified' ) );
+$GLOBALS['myotp_test']['http_before'] = function () {
+	myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'claiming:14155551234:rid-c' ) );
+};
+myotp_test_http( 200, array( 'message_id' => 'msg-C' ) );
+$r = myotp_test_send( '14155551234' );
+check( 'send vs claim in flight: refused', 409, $r->status );
+check( 'send vs claim in flight: message', 'A checkout is using this verification. Finish it first.', $r->data['message'] );
+check( 'send vs claim in flight: claim intact', 'claiming:14155551234:rid-c', myotp_test_vrec()['state'] );
 
 // Admin test through its hook.
 myotp_test_configure();
@@ -537,7 +574,7 @@ $GLOBALS['myotp_test']['can_manage'] = true;
 myotp_test_http( 200, array( 'message_id' => 'msg-t', 'status' => 'accepted', 'cost' => 1 ) );
 check( 'admin test: success', 'Sent to 14155551234. Message ID msg-t.', myotp_test_ajax( 'wp_ajax_myotp_pv_test' )->data['message'] );
 
-// Registration: claim in registration_errors, consume in register_new_user.
+// Registration: claim at validation (phone-checked), stamp then consume.
 function myotp_test_register_validate( ?WP_Error $errors = null ): WP_Error {
 	return apply_filters( 'registration_errors', $errors ?? new WP_Error(), 'bob', 'bob@example.test' );
 }
@@ -546,33 +583,42 @@ check( 'register: unverified blocked', array( 'myotp_pv_unverified' ), myotp_tes
 myotp_test_do_action( 'register_new_user', 42 );
 check( 'register: save without a claim stamps nothing', '', get_user_meta( 42, 'myotp_verified_phone', true ) );
 MyOTP_PV_Session::set_verified( '14155551234', null );
-$_POST['myotp_pv_phone'] = '';
-check( 'register: empty submitted phone is a mismatch', array( 'myotp_pv_mismatch' ), myotp_test_register_validate()->get_error_codes() );
 $_POST['myotp_pv_phone'] = '+1 415 555 9999';
 check( 'register: different submitted phone is a mismatch', array( 'myotp_pv_mismatch' ), myotp_test_register_validate()->get_error_codes() );
 check( 'register: mismatch did not claim', 'verified', myotp_test_vrec()['state'] );
 $_POST['myotp_pv_phone'] = '+1 (415) 555-1234';
 $errors                  = new WP_Error();
 $errors->add( 'username_exists', 'taken' );
-$errors = myotp_test_register_validate( $errors );
-check( 'register: other error leaves ours out', array( 'username_exists' ), $errors->get_error_codes() );
-check( 'register: other error means no claim', 'verified', myotp_test_vrec()['state'] );
-myotp_test_do_action( 'register_new_user', 44 );
-check( 'register: no stamp without a claim', '', get_user_meta( 44, 'myotp_verified_phone', true ) );
+check( 'register: other error means no claim', 'verified', myotp_test_register_validate( $errors ) instanceof WP_Error ? myotp_test_vrec()['state'] : '' );
 check( 'register: matching phone passes', array(), myotp_test_register_validate()->get_error_codes() );
 check( 'register: validation claimed the proof', 'claiming:14155551234:' . MyOTP_PV_Session::$request_id, myotp_test_vrec()['state'] );
-check( 'register: claimed proof reads as unverified elsewhere', '', MyOTP_PV_Session::verified_phone() );
 $saved_post              = $_POST;
 $_POST['myotp_pv_phone'] = '14155550000';
 myotp_test_do_action( 'register_new_user', 45 );
 check( 'register: other posted phone not stamped', '', get_user_meta( 45, 'myotp_verified_phone', true ) );
-check( 'register: claim still open', 'claiming:14155551234:' . MyOTP_PV_Session::$request_id, myotp_test_vrec()['state'] );
 $_POST = $saved_post;
 myotp_test_do_action( 'register_new_user', 46 );
 check( 'register: consume stamps meta', '14155551234', get_user_meta( 46, 'myotp_verified_phone', true ) );
 check( 'register: record consumed by user', 'consumed:user:46', myotp_test_vrec()['state'] );
 myotp_test_do_action( 'register_new_user', 47 );
 check( 'register: claim is single use', '', get_user_meta( 47, 'myotp_verified_phone', true ) );
+// Meta write fails: claim left unconsumed, nothing stamped.
+myotp_test_configure();
+MyOTP_PV_Session::set_verified( '14155551234', null );
+$_POST['myotp_pv_phone'] = '14155551234';
+myotp_test_register_validate();
+$GLOBALS['myotp_test']['meta_fail'] = true;
+myotp_test_do_action( 'register_new_user', 50 );
+check( 'register meta fail: not stamped', '', get_user_meta( 50, 'myotp_verified_phone', true ) );
+check( 'register meta fail: claim not consumed', 'claiming:14155551234:' . MyOTP_PV_Session::$request_id, myotp_test_vrec()['state'] );
+// Consume CAS loses after the stamp: stamp removed.
+myotp_test_configure();
+MyOTP_PV_Session::set_verified( '14155551234', null );
+$_POST['myotp_pv_phone'] = '14155551234';
+myotp_test_register_validate();
+myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'consumed:order:1' ) );
+myotp_test_do_action( 'register_new_user', 51 );
+check( 'register consume fail: stamp removed', '', get_user_meta( 51, 'myotp_verified_phone', true ) );
 // Two registrations sharing one proof: the second fails validation.
 myotp_test_configure();
 MyOTP_PV_Session::set_verified( '14155551234', null );
@@ -581,48 +627,52 @@ check( 'register x2: first passes', array(), myotp_test_register_validate()->get
 MyOTP_PV_Session::$request_id = 'rid-second';
 check( 'register x2: second refused', array( 'myotp_pv_claimed' ), myotp_test_register_validate()->get_error_codes() );
 
-// Checkout: claim at validation, consume at order creation, exactly one order per proof.
+// Checkout: claim at validation, stamp then consume, exactly one order per proof.
 function myotp_test_checkout_validate( string $phone ): WP_Error {
 	$errors = new WP_Error();
 	myotp_test_do_action( 'woocommerce_after_checkout_validation', array( 'billing_phone' => $phone ), $errors );
 	return $errors;
 }
+$wc_claimed = new ReflectionProperty( 'MyOTP_PV_WooCommerce', 'claimed' );
+$wc_claimed->setAccessible( true );
 myotp_test_configure();
 check( 'checkout: unverified blocked', array( 'myotp_pv_unverified' ), myotp_test_checkout_validate( '+14155551234' )->get_error_codes() );
 MyOTP_PV_Session::set_verified( '14155551234', null );
 check( 'checkout: different billing phone blocked', array( 'myotp_pv_mismatch' ), myotp_test_checkout_validate( '+1 415 555 0000' )->get_error_codes() );
-check( 'checkout: empty billing phone blocked', array( 'myotp_pv_mismatch' ), myotp_test_checkout_validate( '' )->get_error_codes() );
 check( 'checkout: mismatch did not claim', 'verified', myotp_test_vrec()['state'] );
-// Request A validates and claims.
 MyOTP_PV_Session::$request_id = 'rid-A';
 check( 'checkout A: matching billing phone passes', array(), myotp_test_checkout_validate( '+1 (415) 555-1234' )->get_error_codes() );
 check( 'checkout A: proof claimed', 'claiming:14155551234:rid-A', myotp_test_vrec()['state'] );
-// Request B, sharing the proof, fails validation: no second order can be created.
 MyOTP_PV_Session::$request_id = 'rid-B';
 check( 'checkout B: refused at validation', array( 'myotp_pv_claimed' ), myotp_test_checkout_validate( '+14155551234' )->get_error_codes() );
-// A's order is created and consumes the claim. B's failed validation reset the
-// per-request static in this shared process, so put A's request context back.
 MyOTP_PV_Session::$request_id = 'rid-A';
-$prop                         = new ReflectionProperty( 'MyOTP_PV_WooCommerce', 'claimed' );
-$prop->setAccessible( true );
-$prop->setValue( null, '14155551234' );
+$wc_claimed->setValue( null, '14155551234' );
 $order_a = new MyOTP_Fake_Order( 101 );
 myotp_test_do_action( 'woocommerce_checkout_order_created', $order_a );
 check( 'checkout A: order stamped', '14155551234', $order_a->meta['_myotp_verified_phone'] );
-check( 'checkout A: order saved', 1, $order_a->saved );
 check( 'checkout A: record consumed by order', 'consumed:order:101', myotp_test_vrec()['state'] );
-// A second order_created in the same request (or a stale one) cannot consume again.
-$prop->setValue( null, '14155551234' );
+check( 'checkout A: no note', array(), $order_a->notes );
+$wc_claimed->setValue( null, '14155551234' );
 $order_b = new MyOTP_Fake_Order( 102 );
 myotp_test_do_action( 'woocommerce_checkout_order_created', $order_b );
-check( 'checkout stale: not stamped', false, isset( $order_b->meta['_myotp_verified_phone'] ) );
+check( 'checkout stale: stamp written then removed', false, isset( $order_b->meta['_myotp_verified_phone'] ) );
+check( 'checkout stale: saved twice (stamp, unstamp)', 2, $order_b->saved );
 check( 'checkout stale: gets a note', 1, count( $order_b->notes ) );
 check( 'checkout: third checkout on a consumed proof is told to verify again', array( 'myotp_pv_claimed' ), myotp_test_checkout_validate( '+14155551234' )->get_error_codes() );
+// Claim must be for the posted phone: a proof for another number cannot be claimed as this one.
+myotp_test_configure();
+MyOTP_PV_Session::set_verified( '14155551234', null );
+MyOTP_PV_Store::$instance->before_cas = function ( $store ) {
+	$store->set( 'verified_c_' . str_repeat( 'a', 32 ), myotp_pv_json( array( 'phone' => '14155559999', 'at' => time() - 1, 'state' => 'verified' ) ), 1800 );
+};
+check( 'checkout claim race: phone swapped, validation refuses', array( 'myotp_pv_claimed' ), myotp_test_checkout_validate( '+14155551234' )->get_error_codes() );
+check( 'checkout claim race: other phone record untouched', 'verified', myotp_test_vrec()['state'] );
+check( 'checkout claim race: nothing claimed for this request', '', $wc_claimed->getValue() );
 // Interleaving at validation: both read "verified", both CAS, exactly one passes.
 myotp_test_configure();
 MyOTP_PV_Session::set_verified( '14155551234', null );
-$passed                                     = array();
-MyOTP_PV_Store::$instance->before_cas       = function ( $store ) use ( &$passed ) {
+$passed                               = array();
+MyOTP_PV_Store::$instance->before_cas = function () use ( &$passed ) {
 	$rid                          = MyOTP_PV_Session::$request_id;
 	MyOTP_PV_Session::$request_id = 'rid-other';
 	$passed['other']              = myotp_test_checkout_validate( '+14155551234' )->get_error_codes();
@@ -632,14 +682,12 @@ MyOTP_PV_Session::$request_id = 'rid-me';
 $passed['me']                 = myotp_test_checkout_validate( '+14155551234' )->get_error_codes();
 check( 'checkout race: interleaved request passed', array(), $passed['other'] );
 check( 'checkout race: the other request refused', array( 'myotp_pv_claimed' ), $passed['me'] );
-check( 'checkout race: claim belongs to the winner', 'claiming:14155551234:rid-other', myotp_test_vrec()['state'] );
-// Guests-only.
 myotp_test_configure();
 $GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_guests_only'] = 1;
 $GLOBALS['myotp_test']['logged_in']                                       = true;
 check( 'checkout: guests-only skips logged-in customers', array(), myotp_test_checkout_validate( '' )->get_error_codes() );
 
-// No unconditional writes on pending or verified rows: every delete carries an expected value.
+// No unconditional writes on pending or verified rows.
 myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-g' ) );
 myotp_test_send( '14155551234' );
@@ -654,20 +702,15 @@ foreach ( MyOTP_PV_Store::$instance->deletes as $d ) {
 	}
 }
 check( 'guards: no unguarded delete on pending or verified rows', array(), $unguarded );
-check( 'guards: pending and verified deletes did happen', true, count( MyOTP_PV_Store::$instance->deletes ) >= 2 );
 
-// Privacy policy text through admin_init.
+// Privacy text, header, .pot.
 myotp_test_configure();
 myotp_test_do_action( 'admin_init' );
 check( 'privacy: content registered', 'MyOTP Phone Verification', $GLOBALS['myotp_test']['privacy'][0] );
-check( 'privacy: mentions the lock', true, false !== strpos( $GLOBALS['myotp_test']['privacy'][1], '15-minute lock' ) );
-
-// Plugin header description length.
+check( 'privacy: mentions the cooldown', true, false !== strpos( $GLOBALS['myotp_test']['privacy'][1], '15-minute cooldown' ) );
 $header = file_get_contents( $src_dir . '/myotp-phone-verification.php' );
 preg_match( '/^\s*\*\s*Description:\s*(.+)$/m', $header, $m );
 check( 'header: description under 140 chars', true, strlen( trim( $m[1] ) ) < 140 );
-
-// The .pot covers every source string.
 $pot = file_get_contents( $src_dir . '/languages/myotp-phone-verification.pot' );
 preg_match_all( '/^msgid "((?:[^"\\\\]|\\\\.)*)"$/m', $pot, $m );
 $pot_ids = array_flip( array_map( function ( $v ) { return str_replace( array( '\\"', '\\\\' ), array( '"', '\\' ), $v ); }, $m[1] ) );

@@ -1,0 +1,56 @@
+name: n8n
+
+on:
+  push:
+    branches: [main]
+    tags: ['n8n@*']
+  pull_request:
+    paths:
+      - "n8n/**"
+      - ".github/workflows/n8n.yml"
+
+defaults:
+  run:
+    working-directory: n8n
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: n8n/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Smoke test
+        run: node -e "require('./dist/nodes/MyOtp/MyOtp.node.js'); require('./dist/credentials/MyOtpApi.credentials.js')"
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/n8n@')
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: n8n/package-lock.json
+      - name: Verify npm supports OIDC Trusted Publishing (>=11.5.1)
+        run: npm --version
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish --provenance --access public

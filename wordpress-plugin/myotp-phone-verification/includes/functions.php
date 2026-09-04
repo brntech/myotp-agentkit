@@ -342,9 +342,10 @@ function myotp_pv_release_attempt( $store, $key ) {
 
 /**
  * Atomically move a verified record from one state to another. The record
- * must be unexpired and in exactly $from. Returns the phone when this
- * caller won the CAS, empty when missing, expired, in another state, or
- * lost the race.
+ * must be unexpired, in exactly $from, and (when $phone is given) hold
+ * exactly that phone as re-read at CAS time. Returns the phone when this
+ * caller won the CAS, empty when missing, expired, in another state, for
+ * another phone, or lost the race.
  *
  * @param object $store Store.
  * @param string $key   Verified key.
@@ -352,9 +353,10 @@ function myotp_pv_release_attempt( $store, $key ) {
  * @param string $to    New state, e.g. claiming:<phone>:<rid> or consumed:order:<id>.
  * @param int    $now   Unix time.
  * @param int    $ttl   Seconds a verification stays valid from its timestamp.
+ * @param string $phone Phone the record must hold, or empty to skip the check.
  * @return string
  */
-function myotp_pv_transition_verified( $store, $key, $from, $to, $now, $ttl = 1800 ) {
+function myotp_pv_transition_verified( $store, $key, $from, $to, $now, $ttl = 1800, $phone = '' ) {
 	for ( $try = 0; $try < 8; $try++ ) {
 		$raw = $store->get( $key );
 		if ( null === $raw ) {
@@ -366,6 +368,9 @@ function myotp_pv_transition_verified( $store, $key, $from, $to, $now, $ttl = 18
 		}
 		$state = isset( $data['state'] ) ? (string) $data['state'] : 'verified';
 		if ( $state !== $from || (int) $data['at'] + $ttl <= $now || (int) $data['at'] > $now ) {
+			return '';
+		}
+		if ( '' !== $phone && (string) $data['phone'] !== (string) $phone ) {
 			return '';
 		}
 		$data['state'] = $to;
@@ -388,8 +393,7 @@ function myotp_pv_transition_verified( $store, $key, $from, $to, $now, $ttl = 18
  * @return string Phone when won, empty otherwise.
  */
 function myotp_pv_claim_verified( $store, $key, $phone, $rid, $now, $ttl = 1800 ) {
-	$phone = myotp_pv_transition_verified( $store, $key, 'verified', 'claiming:' . $phone . ':' . $rid, $now, $ttl );
-	return $phone;
+	return myotp_pv_transition_verified( $store, $key, 'verified', 'claiming:' . $phone . ':' . $rid, $now, $ttl, $phone );
 }
 
 /**
@@ -405,7 +409,7 @@ function myotp_pv_claim_verified( $store, $key, $phone, $rid, $now, $ttl = 1800 
  * @return string Phone when won, empty otherwise.
  */
 function myotp_pv_consume_claim( $store, $key, $phone, $rid, $tag, $now, $ttl = 1800 ) {
-	return myotp_pv_transition_verified( $store, $key, 'claiming:' . $phone . ':' . $rid, 'consumed:' . $tag, $now, $ttl );
+	return myotp_pv_transition_verified( $store, $key, 'claiming:' . $phone . ':' . $rid, 'consumed:' . $tag, $now, $ttl, $phone );
 }
 
 /**
@@ -427,6 +431,26 @@ function myotp_pv_verified_phone_from( $record, $now, $ttl = 1800 ) {
 		return '';
 	}
 	return (string) $record['phone'];
+}
+
+/**
+ * True when a raw verified record may be replaced by a fresh verification:
+ * absent, or in state "verified" (fresh or stale). A record that a checkout
+ * or registration has claimed or consumed must never be overwritten.
+ *
+ * @param string|null $raw Raw verified value read earlier.
+ * @return bool
+ */
+function myotp_pv_verified_replaceable( $raw ) {
+	if ( null === $raw ) {
+		return true;
+	}
+	$data = json_decode( $raw, true );
+	if ( ! is_array( $data ) ) {
+		return true;
+	}
+	$state = isset( $data['state'] ) ? (string) $data['state'] : 'verified';
+	return 'verified' === $state;
 }
 
 /**

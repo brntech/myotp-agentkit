@@ -101,8 +101,8 @@ class MyOTP_PV_Registration {
 		if ( ! $clean ) {
 			return $errors;
 		}
-		$claimed = MyOTP_PV_Session::claim_verified( $verified );
-		if ( '' === $claimed ) {
+		$claimed = MyOTP_PV_Session::claim_verified( $phone );
+		if ( $claimed !== $phone ) {
 			$errors->add( 'myotp_pv_claimed', __( 'This phone verification was already used. Verify your number again.', 'myotp-phone-verification' ) );
 			return $errors;
 		}
@@ -111,11 +111,12 @@ class MyOTP_PV_Registration {
 	}
 
 	/**
-	 * Consume this request's claim for the new account and stamp user
-	 * meta. Runs on register_new_user (successful public registration
-	 * only). If the meta write fails the claim stays consumed and the
-	 * failure is logged; the user can verify again from their profile
-	 * flow in a later version.
+	 * Runs on register_new_user (successful public registration only).
+	 * Writes the durable user meta first, then consumes this request's
+	 * claim. If the meta write fails the claim is left as it is (it
+	 * expires; the visitor verifies again) and the failure is logged. If
+	 * the consume CAS loses, the meta is removed again so an account is
+	 * never left stamped without a consumed proof.
 	 *
 	 * @param int $user_id New user id.
 	 */
@@ -123,14 +124,19 @@ class MyOTP_PV_Registration {
 		if ( '' === self::$claimed || self::posted_phone() !== self::$claimed ) {
 			return;
 		}
-		$phone         = MyOTP_PV_Session::consume_claim( self::$claimed, 'user:' . (int) $user_id );
+		$phone         = self::$claimed;
 		self::$claimed = '';
-		if ( '' === $phone ) {
+
+		if ( false === update_user_meta( $user_id, self::META, $phone ) ) {
+			error_log( 'myotp-phone-verification: update_user_meta failed for user ' . (int) $user_id . '; verification left unconsumed.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			return;
 		}
-		if ( false === update_user_meta( $user_id, self::META, $phone ) ) {
-			error_log( 'myotp-phone-verification: update_user_meta failed for user ' . (int) $user_id . '; verification consumed but not stamped.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		$consumed = MyOTP_PV_Session::consume_claim( $phone, 'user:' . (int) $user_id );
+		if ( $consumed === $phone ) {
+			return;
 		}
+		delete_user_meta( $user_id, self::META );
+		error_log( 'myotp-phone-verification: verification claim could not be consumed for user ' . (int) $user_id . '; stamp removed.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 
 	/**

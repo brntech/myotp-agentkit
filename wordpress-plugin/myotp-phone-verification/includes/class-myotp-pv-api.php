@@ -74,20 +74,22 @@ class MyOTP_PV_Api {
 	}
 
 	/**
-	 * Send a code. force_send stays false so an unexpired code for the same
-	 * number is not re-billed; the API answers 409 in that case.
+	 * Send a code. With $force false an unexpired code for the same number
+	 * is not re-billed and the API answers 409; the caller then decides
+	 * whether to resend with $force true (a challenge of its own).
 	 *
 	 * @param string $phone Digits only.
+	 * @param bool   $force Pass force_send true.
 	 * @return array
 	 */
-	public static function generate( $phone ) {
+	public static function generate( $phone, $force = false ) {
 		$options = myotp_pv_get_options();
 		$payload = array(
 			'phone_number' => $phone,
 			'otp_length'   => (int) $options['otp_length'],
 			'otp_validity' => (int) $options['otp_validity'],
 			'channel'      => $options['channel'],
-			'force_send'   => false,
+			'force_send'   => (bool) $force,
 		);
 		if ( '' !== $options['brand'] ) {
 			$payload['brand'] = $options['brand'];

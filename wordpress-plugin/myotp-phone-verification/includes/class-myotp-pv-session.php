@@ -183,13 +183,14 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Key for a phone lock.
+	 * Key for this visitor's cooldown on a phone (never keyed on the phone
+	 * alone, so nobody can lock a number's owner out).
 	 *
 	 * @param string $phone Digits.
 	 * @return string
 	 */
-	private static function lock_key( $phone ) {
-		return 'lock:' . $phone;
+	private static function cooldown_key( $phone ) {
+		return 'cool:' . self::visitor_key() . ':' . $phone;
 	}
 
 	/**
@@ -212,7 +213,7 @@ class MyOTP_PV_Session {
 			return null;
 		}
 		$data = json_decode( $raw, true );
-		return ( is_array( $data ) && ! empty( $data['phone'] ) ) ? $data : null;
+		return ( is_array( $data ) && ! empty( $data['phone'] ) && ! empty( $data['message_id'] ) ) ? $data : null;
 	}
 
 	/**
@@ -267,23 +268,23 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Lock a phone after too many wrong codes. add() only.
+	 * Start this visitor's cooldown on a phone after five wrong codes. add() only.
 	 *
 	 * @param string $phone Digits.
 	 * @return bool
 	 */
-	public static function lock_phone( $phone ) {
-		return myotp_pv_lock_phone( MyOTP_PV_Store::instance(), self::lock_key( $phone ), time(), self::LOCK_TTL );
+	public static function start_cooldown( $phone ) {
+		return myotp_pv_lock_phone( MyOTP_PV_Store::instance(), self::cooldown_key( $phone ), time(), self::LOCK_TTL );
 	}
 
 	/**
-	 * Seconds left on a phone lock, 0 when none.
+	 * Seconds left on this visitor's cooldown for a phone, 0 when none.
 	 *
 	 * @param string $phone Digits.
 	 * @return int
 	 */
-	public static function lock_remaining( $phone ) {
-		return myotp_pv_lock_remaining( MyOTP_PV_Store::instance(), self::lock_key( $phone ), time() );
+	public static function cooldown_remaining( $phone ) {
+		return myotp_pv_lock_remaining( MyOTP_PV_Store::instance(), self::cooldown_key( $phone ), time() );
 	}
 
 	/**
@@ -297,13 +298,17 @@ class MyOTP_PV_Session {
 
 	/**
 	 * Mark the phone verified now (state "verified"), guarded by the raw
-	 * verified value read earlier (null when there was none).
+	 * verified value read earlier (null when there was none). Refuses to
+	 * replace a record a checkout or registration has claimed or consumed.
 	 *
 	 * @param string      $phone    Digits.
 	 * @param string|null $expected Raw verified value read earlier.
 	 * @return bool
 	 */
 	public static function set_verified( $phone, $expected ) {
+		if ( ! myotp_pv_verified_replaceable( $expected ) ) {
+			return false;
+		}
 		return null !== myotp_pv_install(
 			MyOTP_PV_Store::instance(),
 			self::verified_key(),
@@ -331,10 +336,13 @@ class MyOTP_PV_Session {
 	 * True when this visitor's verification exists, is unexpired, and has
 	 * already been claimed or consumed by a checkout or registration.
 	 *
+	 * @param string|null $raw Raw value to inspect, or null to read it.
 	 * @return bool
 	 */
-	public static function verified_is_used() {
-		$raw = self::verified_raw();
+	public static function verified_is_used( $raw = null ) {
+		if ( null === $raw ) {
+			$raw = self::verified_raw();
+		}
 		if ( null === $raw ) {
 			return false;
 		}

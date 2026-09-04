@@ -135,8 +135,14 @@ class MyOTP_PV_Registration {
 		if ( $consumed === $phone ) {
 			return;
 		}
-		delete_user_meta( $user_id, self::META );
-		error_log( 'myotp-phone-verification: verification claim could not be consumed for user ' . (int) $user_id . '; stamp removed.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		if ( false !== delete_user_meta( $user_id, self::META ) ) {
+			error_log( 'myotp-phone-verification: verification claim could not be consumed for user ' . (int) $user_id . '; stamp removed.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			return;
+		}
+		// Rollback failed: blank the value as a second attempt and leave a note on the account.
+		update_user_meta( $user_id, self::META, '' );
+		update_user_meta( $user_id, self::META . '_note', 'verification stamp could not be rolled back after a lost claim; treat as unverified' );
+		error_log( 'myotp-phone-verification: verification stamp could not be rolled back after a lost claim for user ' . (int) $user_id . '; treat as unverified.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 
 	/**

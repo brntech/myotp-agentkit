@@ -251,10 +251,24 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Give back one reserved attempt (provider never reached).
+	 * Give back one reserved attempt on a specific challenge.
+	 *
+	 * @param string $message_id Challenge the attempt was reserved on.
+	 * @return bool
 	 */
-	public static function release_attempt() {
-		myotp_pv_release_attempt( MyOTP_PV_Store::instance(), self::pending_key() );
+	public static function release_attempt( $message_id ) {
+		return myotp_pv_release_attempt( MyOTP_PV_Store::instance(), self::pending_key(), (string) $message_id );
+	}
+
+	/**
+	 * Retire an exhausted challenge by CAS on the raw value last read.
+	 *
+	 * @param string $raw        Raw pending value last read.
+	 * @param string $message_id Challenge id.
+	 * @return bool
+	 */
+	public static function exhaust_challenge( $raw, $message_id ) {
+		return myotp_pv_exhaust_challenge( MyOTP_PV_Store::instance(), self::pending_key(), (string) $raw, (string) $message_id, self::MAX_ATTEMPTS );
 	}
 
 	/**
@@ -330,6 +344,31 @@ class MyOTP_PV_Session {
 	public static function verified_phone() {
 		$raw = self::verified_raw();
 		return myotp_pv_verified_phone_from( null === $raw ? null : json_decode( $raw, true ), time(), self::VERIFIED_TTL );
+	}
+
+	/**
+	 * True when a checkout or registration currently holds a claim on this
+	 * visitor's verification (state claiming:*). A consumed record is
+	 * history, not in flight.
+	 *
+	 * @param string|null $raw Raw value to inspect, or null to read it.
+	 * @return bool
+	 */
+	public static function verified_is_claiming( $raw = null ) {
+		if ( null === $raw ) {
+			$raw = self::verified_raw();
+		}
+		if ( null === $raw ) {
+			return false;
+		}
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || ! isset( $data['state'], $data['at'] ) ) {
+			return false;
+		}
+		if ( (int) $data['at'] + self::VERIFIED_TTL <= time() ) {
+			return false;
+		}
+		return 0 === strpos( (string) $data['state'], 'claiming:' );
 	}
 
 	/**

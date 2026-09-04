@@ -132,8 +132,34 @@ class MyOTP_PV_WooCommerce {
 		if ( $consumed === $phone ) {
 			return;
 		}
-		$order->delete_meta_data( self::ORDER_META );
-		$order->save();
 		$order->add_order_note( __( 'MyOTP: the phone verification claimed at checkout could not be consumed for this order (it changed or expired in between). Billing phone is unverified.', 'myotp-phone-verification' ) );
+		if ( self::rollback_stamp( $order ) ) {
+			return;
+		}
+		// Second attempt: blank the value so nothing downstream reads it as a verified number.
+		$blanked = false;
+		try {
+			$order->update_meta_data( self::ORDER_META, '' );
+			$blanked = false !== $order->save();
+		} catch ( \Throwable $e ) {
+			$blanked = false;
+		}
+		error_log( 'myotp-phone-verification: verification stamp could not be rolled back after a lost claim on order ' . (int) $order->get_id() . ( $blanked ? ' (blanked instead)' : ' (blanking failed too)' ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		$order->add_order_note( __( 'MyOTP: verification stamp could not be rolled back after a lost claim; treat as unverified.', 'myotp-phone-verification' ) );
+	}
+
+	/**
+	 * Remove the stamp and persist; true only when both steps succeeded.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return bool
+	 */
+	private static function rollback_stamp( $order ) {
+		try {
+			$order->delete_meta_data( self::ORDER_META );
+			return false !== $order->save();
+		} catch ( \Throwable $e ) {
+			return false;
+		}
 	}
 }

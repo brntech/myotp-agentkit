@@ -62,8 +62,14 @@ class MyOTP_Mem_Store {
 	public function set( $key, $raw, $ttl ) {
 		$this->rows[ $key ] = $raw;
 	}
+	public $before_delete = null;
 	public function delete( $key, $expected_raw = null ) {
 		$this->deletes[] = array( $key, $expected_raw );
+		if ( $this->before_delete ) {
+			$hook                = $this->before_delete;
+			$this->before_delete = null;
+			$hook( $this );
+		}
 		if ( ! isset( $this->rows[ $key ] ) ) {
 			return false;
 		}
@@ -126,8 +132,13 @@ class MyOTP_Fake_Order {
 	public function delete_meta_data( $k ) {
 		unset( $this->meta[ $k ] );
 	}
+	public $fail_saves_after = PHP_INT_MAX; // save() throws once this many saves have happened.
 	public function save() {
+		if ( $this->saved >= $this->fail_saves_after ) {
+			throw new RuntimeException( 'save failed' );
+		}
 		$this->saved++;
+		return $this->id;
 	}
 	public function add_order_note( $note ) {
 		$this->notes[] = $note;
@@ -163,6 +174,7 @@ function myotp_test_reset() {
 	$GLOBALS['myotp_test']['http_before'] = null;
 	$GLOBALS['myotp_test']['single']      = array();
 	$GLOBALS['myotp_test']['meta_fail']   = false;
+	$GLOBALS['myotp_test']['delete_meta_fail'] = false;
 	MyOTP_PV_Store::$instance             = new MyOTP_Mem_Store();
 	MyOTP_PV_Session::$request_id         = 'rid-' . bin2hex( random_bytes( 4 ) );
 }
@@ -253,7 +265,13 @@ function update_user_meta( $uid, $key, $value ) {
 	$GLOBALS['myotp_test']['user_meta'][ $uid ][ $key ] = $value;
 	return true;
 }
-function delete_user_meta( $uid, $key ) { unset( $GLOBALS['myotp_test']['user_meta'][ $uid ][ $key ] ); return true; }
+function delete_user_meta( $uid, $key ) {
+	if ( ! empty( $GLOBALS['myotp_test']['delete_meta_fail'] ) ) {
+		return false;
+	}
+	unset( $GLOBALS['myotp_test']['user_meta'][ $uid ][ $key ] );
+	return true;
+}
 function get_user_meta( $uid, $key, $single = false ) {
 	return isset( $GLOBALS['myotp_test']['user_meta'][ $uid ][ $key ] ) ? $GLOBALS['myotp_test']['user_meta'][ $uid ][ $key ] : '';
 }

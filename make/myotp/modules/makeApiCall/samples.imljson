@@ -1,0 +1,5 @@
+{
+  "body": { "email": "dev@example.com" },
+  "headers": { "content-type": "application/json" },
+  "statusCode": 200
+}

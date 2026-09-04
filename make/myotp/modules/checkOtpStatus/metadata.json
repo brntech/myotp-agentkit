@@ -1,0 +1,9 @@
+{
+  "name": "checkOtpStatus",
+  "label": "Check OTP Status",
+  "description": "Returns the delivery report for a sent OTP and whether the code is still active. Data is kept for 24 hours after the OTP expires.",
+  "type": "action",
+  "actionType": "read",
+  "connection": "myotp",
+  "operation": "check_otp_status"
+}

@@ -1,0 +1,127 @@
+#!/usr/bin/env node
+// Parses every .imljson and .json under make/myotp and checks the app shape.
+// Exit 1 on any problem. Usage: node validate.mjs
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+export const APP_DIR = join(here, "myotp");
+
+export function walk(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (/\.(imljson|json)$/.test(name)) out.push(p);
+  }
+  return out;
+}
+
+export function loadJson(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+const MODULE_FILES = ["metadata.json", "api.imljson", "expect.imljson", "interface.imljson", "samples.imljson"];
+
+export function validateApp(appDir = APP_DIR) {
+  const problems = [];
+  const check = (ok, msg) => {
+    if (!ok) problems.push(msg);
+  };
+
+  // 1. Every file parses.
+  const parsed = new Map();
+  for (const file of walk(appDir)) {
+    try {
+      parsed.set(file, loadJson(file));
+    } catch (e) {
+      problems.push(`${relative(appDir, file)}: ${e.message}`);
+    }
+  }
+  if (problems.length) return problems;
+
+  // 2. Base.
+  const base = parsed.get(join(appDir, "base.imljson"));
+  check(base?.baseUrl === "https://api.myotp.app", "base.imljson: baseUrl must be https://api.myotp.app");
+  check(base?.headers?.["X-API-Key"] === "{{connection.apiKey}}", "base.imljson: X-API-Key must come from connection.apiKey");
+  check(typeof base?.response?.error?.message === "string" && base.response.error.message.includes("body.error.message"),
+    "base.imljson: error message must surface body.error.message");
+  check(base?.log?.sanitize?.includes("request.headers.x-api-key"), "base.imljson: must sanitize the API key header");
+
+  // 3. Connection.
+  const connDir = join(appDir, "connections", "myotp");
+  const connMeta = parsed.get(join(connDir, "metadata.json"));
+  const connParams = parsed.get(join(connDir, "parameters.imljson"));
+  const connApi = parsed.get(join(connDir, "api.imljson"));
+  check(connMeta?.type === "apikey", "connection: type must be apikey");
+  check(connParams?.some((p) => p.name === "apiKey" && p.type === "password" && p.required), "connection: apiKey password parameter missing");
+  check(connApi?.url === "https://api.myotp.app/me" && connApi?.method === "GET", "connection: must validate with GET /me");
+  check(connApi?.headers?.["X-API-Key"] === "{{parameters.apiKey}}", "connection: X-API-Key must come from parameters.apiKey");
+  check(connApi?.response?.metadata?.value === "{{body.email}}", "connection: metadata should show body.email");
+
+  // 4. Modules.
+  const modulesDir = join(appDir, "modules");
+  const moduleNames = readdirSync(modulesDir);
+  for (const name of moduleNames) {
+    const dir = join(modulesDir, name);
+    for (const f of MODULE_FILES) check(existsSync(join(dir, f)), `module ${name}: missing ${f}`);
+    const meta = parsed.get(join(dir, "metadata.json"));
+    const api = parsed.get(join(dir, "api.imljson"));
+    const expect = parsed.get(join(dir, "expect.imljson"));
+    const iface = parsed.get(join(dir, "interface.imljson"));
+    const samples = parsed.get(join(dir, "samples.imljson"));
+    check(meta?.name === name, `module ${name}: metadata name must match folder`);
+    check(typeof meta?.label === "string" && meta.label, `module ${name}: label missing`);
+    check(typeof meta?.description === "string" && meta.description, `module ${name}: description missing`);
+    check(meta?.connection === "myotp", `module ${name}: must use the myotp connection`);
+    check(["action", "universal"].includes(meta?.type), `module ${name}: type must be action or universal`);
+    check(typeof api?.url === "string" && api.url, `module ${name}: api url missing`);
+    check(api?.response?.output !== undefined, `module ${name}: response.output missing`);
+    check(Array.isArray(expect), `module ${name}: expect must be an array`);
+    check(Array.isArray(iface) && iface.length > 0, `module ${name}: interface must be a non-empty array`);
+    for (const p of expect ?? []) {
+      check(p.name && p.type && p.label, `module ${name}: parameter without name/type/label`);
+    }
+    for (const f of iface ?? []) {
+      check(f.name && f.type && f.label, `module ${name}: interface field without name/type/label`);
+    }
+    // Every mapped body/qs parameter must be declared in expect.
+    const declared = new Set((expect ?? []).map((p) => p.name));
+    const used = JSON.stringify(api).match(/parameters\.([A-Za-z_]+)/g) ?? [];
+    for (const u of used) {
+      const p = u.slice("parameters.".length);
+      check(declared.has(p), `module ${name}: api references undeclared parameter ${p}`);
+    }
+    // Every output key must be described in the interface.
+    if (api?.response?.output && typeof api.response.output === "object") {
+      const ifaceNames = new Set((iface ?? []).map((f) => f.name));
+      for (const k of Object.keys(api.response.output)) {
+        check(ifaceNames.has(k), `module ${name}: output ${k} not in interface`);
+      }
+      // Samples only carry keys the interface knows.
+      for (const k of Object.keys(samples ?? {})) check(ifaceNames.has(k), `module ${name}: sample key ${k} not in interface`);
+    }
+  }
+
+  // 5. Groups reference real modules.
+  const groups = parsed.get(join(appDir, "groups.imljson"));
+  for (const g of groups ?? []) {
+    for (const m of g.modules) check(moduleNames.includes(m), `groups: unknown module ${m}`);
+  }
+
+  // 6. App metadata for listing.
+  const app = parsed.get(join(appDir, "app.json"));
+  check(typeof app?.description === "string" && app.description.length <= 200, "app.json: description must be 200 chars or fewer");
+  check(/^#[0-9a-fA-F]{6}$/.test(app?.theme ?? ""), "app.json: theme must be a hex colour");
+
+  return problems;
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const problems = validateApp();
+  if (problems.length) {
+    console.error(problems.join("\n"));
+    process.exit(1);
+  }
+  console.log(`ok: ${walk(APP_DIR).length} files parsed, ${readdirSync(join(APP_DIR, "modules")).length} modules`);
+}

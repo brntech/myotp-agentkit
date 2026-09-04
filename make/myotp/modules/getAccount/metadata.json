@@ -1,0 +1,9 @@
+{
+  "name": "getAccount",
+  "label": "Get Account",
+  "description": "Returns the account the API key belongs to. Use it as a smoke test: it exercises both the key and the IP allowlist.",
+  "type": "action",
+  "actionType": "read",
+  "connection": "myotp",
+  "operation": "me_endpoint"
+}

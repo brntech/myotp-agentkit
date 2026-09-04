@@ -1,0 +1,9 @@
+{
+  "name": "verifyOtp",
+  "label": "Verify OTP",
+  "description": "Checks a code the user typed against the OTP that was sent.",
+  "type": "action",
+  "actionType": "read",
+  "connection": "myotp",
+  "operation": "verify_otp_endpoint"
+}

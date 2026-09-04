@@ -1,0 +1,11 @@
+[
+  {
+    "name": "DLR",
+    "type": "text",
+    "label": "Delivery state",
+    "help": "Carrier status for SMS (ATES, DELIVRD, UNDELIV, EXPIRED, REJECTD), transaction status for WhatsApp and Telegram (sent, delivered, read, pending, failed.<reason>), a value starting \"Pending:\" meaning ask again in a few seconds, or a \"Not available ...\" statement about your plan or the route."
+  },
+  { "name": "is_active", "type": "boolean", "label": "OTP still active" },
+  { "name": "expires_at", "type": "date", "label": "Expires at" },
+  { "name": "message", "type": "text", "label": "Message", "help": "Present instead of Delivery state when the message_id is not found." }
+]

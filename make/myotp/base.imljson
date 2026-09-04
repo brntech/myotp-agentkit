@@ -1,0 +1,51 @@
+{
+  "baseUrl": "https://api.myotp.app",
+  "headers": {
+    "X-API-Key": "{{connection.apiKey}}",
+    "Content-Type": "application/json"
+  },
+  "response": {
+    "error": {
+      "type": "RuntimeError",
+      "message": "[{{statusCode}}] {{ifempty(body.error.message, ifempty(body.detail.message, body.message))}}",
+      "400": {
+        "type": "DataError",
+        "message": "[400] {{ifempty(body.error.message, body.message)}}"
+      },
+      "401": {
+        "type": "InvalidCredentials",
+        "message": "[401] {{ifempty(body.error.message, 'Missing or invalid API key')}}"
+      },
+      "402": {
+        "type": "DataError",
+        "message": "[402] {{ifempty(body.error.message, 'Low balance. Top up at https://myotp.app')}}"
+      },
+      "403": {
+        "type": "InvalidCredentials",
+        "message": "[403] {{ifempty(body.error.message, 'The calling IP is not on this API key allowlist')}}"
+      },
+      "404": {
+        "type": "DataError",
+        "message": "[404] {{ifempty(body.error.message, 'Not found')}}"
+      },
+      "409": {
+        "type": "DataError",
+        "message": "[409] {{ifempty(body.error.message, 'An OTP is already active for this number')}}"
+      },
+      "429": {
+        "type": "RateLimitError",
+        "message": "[429] {{ifempty(body.error.message, 'Rate limit exceeded')}}"
+      },
+      "500": {
+        "type": "ConnectionError",
+        "message": "[500] {{ifempty(body.error.message, 'Internal Server Error')}}"
+      }
+    }
+  },
+  "log": {
+    "sanitize": [
+      "request.headers.x-api-key",
+      "response.body.otp"
+    ]
+  }
+}

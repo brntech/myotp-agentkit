@@ -1,0 +1,9 @@
+{
+  "url": "/me",
+  "method": "GET",
+  "response": {
+    "output": {
+      "email": "{{body.email}}"
+    }
+  }
+}

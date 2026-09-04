@@ -1,0 +1,9 @@
+{
+  "name": "sendOtp",
+  "label": "Send OTP",
+  "description": "Generates a one-time passcode and sends it to a phone number over SMS, WhatsApp or Telegram.",
+  "type": "action",
+  "actionType": "create",
+  "connection": "myotp",
+  "operation": "generate_otp_endpoint"
+}

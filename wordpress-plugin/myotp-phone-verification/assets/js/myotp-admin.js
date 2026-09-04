@@ -32,7 +32,7 @@
 		show(myotpPvAdmin.i18n.sending, true);
 
 		var body = new FormData();
-		body.append('action', 'myotp_pv_admin_test');
+		body.append('action', 'myotp_pv_test');
 		body.append('nonce', myotpPvAdmin.nonce);
 		body.append('phone', digits);
 

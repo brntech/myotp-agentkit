@@ -27,8 +27,7 @@ class MyOTP_PV_WooCommerce {
 		}
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'widget' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
-		add_action( 'woocommerce_checkout_create_order', array( __CLASS__, 'stamp_order' ), 10, 2 );
-		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'consume' ) );
+		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'claim' ) );
 	}
 
 	/**
@@ -84,27 +83,24 @@ class MyOTP_PV_WooCommerce {
 	}
 
 	/**
-	 * Record the verified number on the order.
+	 * Atomically claim the verification for this order once it exists.
+	 * The CAS moves the record from "verified" to "consumed:order:<id>";
+	 * only the winner stamps the order. A loser (a parallel checkout that
+	 * passed validation on the same proof) gets an order note instead.
 	 *
-	 * @param WC_Order $order Order being created.
-	 * @param array    $data  Posted data.
+	 * @param WC_Order $order The created order.
 	 */
-	public static function stamp_order( $order, $data ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
-		if ( ! self::required() ) {
+	public static function claim( $order ) {
+		if ( ! self::required() || ! is_object( $order ) ) {
 			return;
 		}
-		$verified = MyOTP_PV_Session::verified_phone();
-		if ( '' !== $verified ) {
-			$order->update_meta_data( self::ORDER_META, $verified );
+		$phone = MyOTP_PV_Session::claim_verified( 'order:' . $order->get_id() );
+		if ( '' !== $phone ) {
+			$order->update_meta_data( self::ORDER_META, $phone );
+			$order->save();
+		} else {
+			$order->add_order_note( __( 'MyOTP: phone verification could not be claimed for this order (already used by another order or expired). Billing phone is unverified.', 'myotp-phone-verification' ) );
 		}
-	}
-
-	/**
-	 * Consume the verification once the order exists, so the next order on
-	 * the same session verifies again.
-	 */
-	public static function consume() {
-		MyOTP_PV_Session::clear_verified();
 		MyOTP_PV_Session::clear_pending();
 	}
 }

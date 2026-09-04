@@ -194,6 +194,14 @@ class MyOTP_PV_Settings {
 						</td>
 					</tr>
 					<tr>
+						<th scope="row"><label for="myotp_pv_site_hourly_cap"><?php esc_html_e( 'Site-wide sends per hour', 'myotp-phone-verification' ); ?></label></th>
+						<td>
+							<input type="number" id="myotp_pv_site_hourly_cap" min="1" max="100000" step="1" class="small-text"
+								name="<?php echo esc_attr( $name ); ?>[site_hourly_cap]" value="<?php echo esc_attr( $o['site_hourly_cap'] ); ?>" />
+							<p class="description"><?php esc_html_e( 'Ceiling on codes sent by the whole site in any hour, on top of the per-visitor, per-IP and per-number limits. Behind a reverse proxy the per-IP limit may see only the proxy address, so this is the real backstop. Filter: myotp_pv_site_hourly_cap.', 'myotp-phone-verification' ); ?></p>
+						</td>
+					</tr>
+					<tr>
 						<th scope="row"><?php esc_html_e( 'WooCommerce checkout', 'myotp-phone-verification' ); ?></th>
 						<td>
 							<fieldset>

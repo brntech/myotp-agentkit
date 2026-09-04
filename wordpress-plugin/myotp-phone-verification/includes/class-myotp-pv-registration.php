@@ -17,11 +17,12 @@ class MyOTP_PV_Registration {
 	const META = 'myotp_verified_phone';
 
 	/**
-	 * Set by validate() when this request passed; save() stamps meta only then.
+	 * Phones that passed validate() in this request with no other errors,
+	 * keyed by normalised number. save() stamps only a matching phone.
 	 *
-	 * @var string
+	 * @var array<string, bool>
 	 */
-	private static $passed_phone = '';
+	private static $passed = array();
 
 	/**
 	 * Hook registration.
@@ -33,7 +34,7 @@ class MyOTP_PV_Registration {
 		}
 		add_action( 'register_form', array( __CLASS__, 'field' ) );
 		add_filter( 'registration_errors', array( __CLASS__, 'validate' ), 10, 3 );
-		add_action( 'user_register', array( __CLASS__, 'save' ) );
+		add_action( 'register_new_user', array( __CLASS__, 'save' ) );
 		add_action( 'show_user_profile', array( __CLASS__, 'profile' ) );
 		add_action( 'edit_user_profile', array( __CLASS__, 'profile' ) );
 	}
@@ -73,32 +74,39 @@ class MyOTP_PV_Registration {
 	 * @return WP_Error
 	 */
 	public static function validate( $errors, $login, $user_email ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
-		self::$passed_phone = '';
-		$phone              = self::posted_phone();
-		$verified           = MyOTP_PV_Session::verified_phone();
+		$phone    = self::posted_phone();
+		$verified = MyOTP_PV_Session::verified_phone();
+		$clean    = ! ( $errors instanceof WP_Error ) || empty( $errors->get_error_codes() );
 
 		if ( '' === $verified ) {
 			$errors->add( 'myotp_pv_unverified', __( 'Verify your phone number before registering.', 'myotp-phone-verification' ) );
 		} elseif ( $phone !== $verified ) {
 			$errors->add( 'myotp_pv_mismatch', __( 'The phone number changed after verification. Verify it again.', 'myotp-phone-verification' ) );
-		} else {
-			self::$passed_phone = $verified;
+		} elseif ( $clean ) {
+			self::$passed[ $verified ] = true;
 		}
 		return $errors;
 	}
 
 	/**
-	 * Store the verified number as user meta, only for a request that passed validate().
+	 * Store the verified number as user meta. Runs on register_new_user
+	 * (successful public registration only), requires the posted phone to
+	 * be one validate() passed in this request, and atomically claims the
+	 * verification for this user id.
 	 *
 	 * @param int $user_id New user id.
 	 */
 	public static function save( $user_id ) {
-		if ( '' === self::$passed_phone ) {
+		$phone = self::posted_phone();
+		if ( '' === $phone || empty( self::$passed[ $phone ] ) ) {
 			return;
 		}
-		update_user_meta( $user_id, self::META, self::$passed_phone );
-		self::$passed_phone = '';
-		MyOTP_PV_Session::clear_verified();
+		unset( self::$passed[ $phone ] );
+		$claimed = MyOTP_PV_Session::claim_verified( 'user:' . (int) $user_id );
+		if ( $claimed !== $phone ) {
+			return;
+		}
+		update_user_meta( $user_id, self::META, $phone );
 	}
 
 	/**

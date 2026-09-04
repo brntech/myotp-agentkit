@@ -9,7 +9,11 @@ A WordPress plugin that verifies phone numbers with a one-time code over SMS, Wh
 - **Shortcode.** `[myotp_verify]` renders the widget anywhere. On success it fires `myotp:verified` on `document` with `event.detail.phone`.
 - **Settings page.** Settings > MyOTP: API key (masked), channel, code length (4 to 8), validity in seconds, optional brand, and a Send test code button.
 
-The API key stays on the server. The browser only calls `admin-ajax.php` and every call carries a nonce. Sends are capped with atomic counters on three dimensions at once: 5 per visitor, 10 per client IP, 3 per destination number, each per 10 minutes. Five wrong codes discard the pending code. A verification lasts 30 minutes and is consumed when the order or account is created.
+The API key stays on the server. The browser only calls `admin-ajax.php` and every call carries a nonce. Sends are capped with atomic counters on four dimensions at once: 5 per visitor, 10 per client IP, 3 per destination number, each per 10 minutes, and 100 per site per hour (setting, or the `myotp_pv_site_hourly_cap` filter). Five wrong codes discard the pending code, and reusing an active code does not reset that count. A verification lasts 30 minutes and is claimed atomically by exactly one order or one account.
+
+The per-IP counter reads `REMOTE_ADDR` only. Behind a reverse proxy or CDN that may be the proxy's address, so the site-wide hourly cap is the real backstop there. If your host guarantees a trusted forwarding header, return the real address from the `myotp_pv_client_ip` filter.
+
+Expired counter, pending and verified rows are removed on the next read and by a daily WP-Cron sweep (`myotp_pv_sweep`).
 
 ## Get a key
 
@@ -40,7 +44,7 @@ Country code first, digits only, no plus sign: `14155551234`. The plugin strips 
 myotp-phone-verification/
   myotp-phone-verification.php   plugin header, constants, boot
   includes/functions.php         pure helpers (normalisation, atomic counters, attempt lockout, sanitisation)
-  includes/class-myotp-pv-store.php        options-table store with INSERT IGNORE add() and guarded UPDATE cas()
+  includes/class-myotp-pv-store.php        options-table store: INSERT IGNORE add(), BINARY-guarded UPDATE cas() and DELETE, daily sweep
   includes/class-myotp-pv-api.php          wp_remote_post to /generate_otp and /verify_otp
   includes/class-myotp-pv-session.php      per-visitor state (counters and pending in the store, verified in WC session or transient)
   includes/class-myotp-pv-widget.php       widget markup and assets

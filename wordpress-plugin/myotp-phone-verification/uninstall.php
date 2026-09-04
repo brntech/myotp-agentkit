@@ -11,6 +11,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 
 delete_option( 'myotp_pv_options' );
+wp_clear_scheduled_hook( 'myotp_pv_sweep' );
 
 // Per-visitor state: verified-number transients and the atomic store rows
 // (rate-limit counters and pending codes).

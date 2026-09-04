@@ -23,7 +23,7 @@ class MyOTP_PV_Ajax {
 		add_action( 'wp_ajax_nopriv_myotp_pv_send', array( __CLASS__, 'send' ) );
 		add_action( 'wp_ajax_myotp_pv_verify', array( __CLASS__, 'verify' ) );
 		add_action( 'wp_ajax_nopriv_myotp_pv_verify', array( __CLASS__, 'verify' ) );
-		add_action( 'wp_ajax_myotp_pv_admin_test', array( __CLASS__, 'admin_test' ) );
+		add_action( 'wp_ajax_myotp_pv_test', array( __CLASS__, 'admin_test' ) );
 	}
 
 	/**
@@ -65,8 +65,13 @@ class MyOTP_PV_Ajax {
 		$result = MyOTP_PV_Api::generate( $phone );
 
 		if ( ! $result['ok'] && 409 === (int) $result['http'] ) {
-			// An unexpired code for this number already exists; let the visitor use it.
-			MyOTP_PV_Session::set_pending( $phone, '' );
+			// An unexpired code for this number already exists. Keep the pending
+			// record (and its attempt count) when it is for this number; only
+			// create one when the visitor has none for it.
+			$pending = MyOTP_PV_Session::get_pending();
+			if ( null === $pending || $pending['phone'] !== $phone ) {
+				MyOTP_PV_Session::set_pending( $phone, '' );
+			}
 			MyOTP_PV_Session::clear_verified();
 			wp_send_json_success(
 				array(
@@ -108,6 +113,16 @@ class MyOTP_PV_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Enter the code you received.', 'myotp-phone-verification' ) ), 400 );
 		}
 
+		$pending = MyOTP_PV_Session::get_pending();
+		if ( null === $pending ) {
+			wp_send_json_error( array( 'message' => __( 'Request a code first.', 'myotp-phone-verification' ) ), 400 );
+		}
+		if ( '' !== $phone && $phone !== $pending['phone'] ) {
+			wp_send_json_error( array( 'message' => __( 'The number changed after the code was sent. Send a new code.', 'myotp-phone-verification' ) ), 400 );
+		}
+
+		// Reserve the attempt atomically before the provider call so parallel
+		// guesses cannot exceed the cap; give it back if the provider was never reached.
 		$reserve = MyOTP_PV_Session::reserve_attempt();
 		if ( $reserve['locked'] ) {
 			wp_send_json_error( array( 'message' => __( 'Too many wrong codes. Send a new code and try again.', 'myotp-phone-verification' ) ), 429 );
@@ -116,12 +131,12 @@ class MyOTP_PV_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Request a code first.', 'myotp-phone-verification' ) ), 400 );
 		}
 		$pending = $reserve['pending'];
-		if ( '' !== $phone && $phone !== $pending['phone'] ) {
-			wp_send_json_error( array( 'message' => __( 'The number changed after the code was sent. Send a new code.', 'myotp-phone-verification' ) ), 400 );
-		}
 
 		$result = MyOTP_PV_Api::verify( $pending['phone'], $otp, isset( $pending['message_id'] ) ? (string) $pending['message_id'] : '' );
 		if ( ! $result['ok'] ) {
+			if ( ! empty( $result['transport'] ) ) {
+				MyOTP_PV_Session::release_attempt();
+			}
 			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
 		}
 

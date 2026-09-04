@@ -65,7 +65,7 @@ After deploy, copy the production deployment's outbound IP from the Vercel dashb
 
 - **Persistent verification state** — replace the redirect with a session cookie or your own auth system. The `message_id` returned by `generateOtp` is the canonical handle for that OTP attempt.
 - **Custom OTP length / brand / template** — `generate_otp` accepts `otp_length`, `brand`, `template_order`, and others. See https://api.myotp.app docs.
-- **Resend / cooldown** — the MyOTP API returns 409 if an OTP is already active for that phone. Either wait for it to expire or pass `force_send: "true"` (not available in all markets).
+- **Resend / cooldown** — the MyOTP API returns 409 if an OTP is already active for that phone. Either wait for it to expire or pass `force_send: "true"`.
 
 ## License
 

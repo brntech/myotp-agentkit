@@ -21,7 +21,7 @@ Exposes 10 tools:
 | `get_topup_quote` | Quote a credit purchase and return USDC and card payment commands. |
 | `top_up_credits` | Return an MPP payment challenge and retry details, or the credited result. |
 
-All tools call the public MyOTP REST API at `https://api.myotp.app`. Override with the `MYOTP_BASE_URL` env var for staging.
+All tools call the public MyOTP REST API at `https://api.myotp.app`. Override with the `MYOTP_BASE_URL` env var for a mock server.
 
 ## Install
 
@@ -192,7 +192,7 @@ URL and send `X-API-Key: <your-key>` on authenticated tool requests.
 | Env var | Default | Description |
 |---|---|---|
 | `MYOTP_API_KEY` | — | Your MyOTP.App API key. Required for authenticated tools; `create_account` and `get_topup_quote` work without it. |
-| `MYOTP_BASE_URL` | `https://api.myotp.app` | API base URL. Override for staging. |
+| `MYOTP_BASE_URL` | `https://api.myotp.app` | API base URL. Override for a mock server. |
 | `MYOTP_MCP_TRANSPORT` | `stdio` | Set to `http` to start in HTTP mode. |
 | `PORT` | `3000` | HTTP listen port. |
 | `HOST` | `0.0.0.0` | HTTP bind address. |
@@ -268,8 +268,8 @@ OTP.
 ## Develop
 
 ```bash
-git clone https://github.com/broadnet/myotp-app
-cd myotp-app/MyOTP.AgentKit/mcp-server
+git clone https://github.com/brntech/myotp-agentkit
+cd myotp-agentkit/mcp-server
 npm install
 npm run build
 npm run start:stdio   # or start:http

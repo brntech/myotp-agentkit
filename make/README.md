@@ -97,8 +97,7 @@ docker run --rm -v "$PWD:/w" -w /w/make node:22-alpine \
 | Support contact | support@myotp.app |
 | Categories | Communication, Security |
 
-Logo: Make asks for the app logo in the review form. Supply a square PNG on a transparent background at 512 x 512 pixels or larger, plus an SVG if you have one. Make renders the icon on the theme colour, so the mark should be single colour white. The source files are in the MyOTP.Website social assets folder.
-
+Logo: Make asks for the app logo in the review form. Supply a square PNG on a transparent background at 512 x 512 pixels or larger, plus an SVG if you have one. Make renders the icon on the theme colour, so the mark should be single colour white.
 Review prerequisites Make checks: every module hits the real API, the base and connection have error handling, sensitive data is sanitized from logs, the connection URL validates the credential, a universal module exists, and each module was run in a test scenario shortly before submission. All of these are covered by this definition; the scenario runs are done in your Make account.
 
 ## Example

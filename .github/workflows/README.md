@@ -21,10 +21,7 @@ Each `publish` job already declares `environment: production` and `permissions: 
 
 ## First publish (bootstrap)
 
-Trusted Publishing requires a one-time bootstrap because the package must exist on npm before its trusted-publisher config can be saved. Two options:
-
-1. **Recommended**: I publish locally with a short-lived granular token (7-day, scoped to `@myotp`, write access). Token gets deleted immediately after the 3 packages are live. Then we configure trusted publishers per package and all subsequent versions go through CI.
-2. **Alternative**: configure trusted publishing at the org level (if npm UI exposes it for the `@myotp` org) and skip the token entirely. UI varies — try this first if it's available.
+Trusted Publishing is configured for all three packages. A new package needs one manual `npm publish` before its trusted publisher can be saved.
 
 ## Releasing (after Trusted Publishing is configured)
 

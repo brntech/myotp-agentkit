@@ -1,6 +1,6 @@
 {
   "$schema": "https://clawhub.ai/schemas/skill-manifest-v1.json",
-  "name": "myotp-otp",
+  "name": "myotp",
   "display_name": "MyOTP.App",
   "description": "Add SMS, WhatsApp, or Telegram OTP / 2FA / MFA / phone verification to any app using MyOTP.App. Two-endpoint REST API with a single X-API-Key header. Use when the user asks for SMS OTP, 2FA, signup phone verification, password reset codes, transaction step-up auth, or wants a Twilio Verify, Vonage Verify, or Firebase Phone Auth alternative. Agents can create an account (POST /v1/agent/register) and buy credits over a 402 (USDC or card, MPP).",
   "version": "1.0.4",
@@ -55,6 +55,6 @@
     "external_network_calls": ["https://api.myotp.app"],
     "installer_hooks": false,
     "binary_dependencies": ["curl"],
-    "audit_url": "https://github.com/BroadNet-Technologies/MyOTP.App/tree/main/MyOTP.AgentKit/clawhub-skill"
+    "audit_url": "https://github.com/brntech/myotp-agentkit/tree/main/clawhub-skill"
   }
 }

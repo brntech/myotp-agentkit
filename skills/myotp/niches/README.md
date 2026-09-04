@@ -1,12 +1,10 @@
 # Niche-targeted skill variants
 
-Implements strategy 8.4 (high-intent verticals where SMS OTP is mandatory or strongly expected): fintech, marketplace, emerging markets, healthcare. Each variant tunes the skill's trigger description, sample patterns, and recommended defaults to a specific vertical.
+Vertical variants for four niches where SMS OTP is mandatory or strongly expected: fintech, marketplace, emerging markets, healthcare. Each variant tunes the skill's trigger description, sample patterns, and recommended defaults to a specific vertical.
 
 ## Why bother with variants?
 
 The base [`SKILL.md`](../SKILL.md) describes MyOTP generically. An agent helping a fintech founder doesn't care about Telegram delivery — they care about SCA compliance and audit trails. An agent helping a marketplace founder doesn't care about cost optimization — they care about preventing seller fraud. The variant SKILL.md files are tuned for those decision contexts.
-
-Practically, this also lets us bid for vertical-specific search keywords ("fintech 2FA", "marketplace seller verification", "India SMS OTP DLT") with content that resonates inside each ecosystem.
 
 ## How to use
 
@@ -33,4 +31,4 @@ Each variant must:
 - Add vertical-specific patterns (e.g., fintech adds "step-up auth before high-value transactions")
 - Add vertical-specific defaults (e.g., fintech defaults to 4-digit OTP for compliance, emerging markets defaults to WhatsApp)
 - Cite vertical-specific compliance / regulation where relevant
-- Avoid making MyOTP claim certifications it doesn't have. Stick to facts: "MyOTP is built on Broadnet's ISO 27001-certified infrastructure" — true. "MyOTP is HIPAA-certified" — NOT true (BAA isn't standard yet); say "patient identity verification needs MyOTP plus your own BAA-covered storage layer."
+- MyOTP runs on BroadNet's ISO 27001-certified infrastructure. MyOTP does not offer a standard BAA; healthcare integrations need their own BAA-covered storage layer.

@@ -80,10 +80,10 @@ describe("myotpSendOtp", () => {
 
   it("uses custom baseUrl and strips trailing slash", async () => {
     fetchMock.mockResolvedValueOnce(okResponse());
-    const send = myotpSendOtp({ apiKey: "k", baseUrl: "https://staging.myotp.app/", fetch: fetchMock });
+    const send = myotpSendOtp({ apiKey: "k", baseUrl: "https://staging.example.com/", fetch: fetchMock });
     await send({ phoneNumber: "14155551234", code: "111111" });
 
-    expect(fetchMock.mock.calls[0]![0]).toBe("https://staging.myotp.app/generate_otp");
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://staging.example.com/generate_otp");
   });
 
   it("throws MyotpDeliveryError with status on 403", async () => {

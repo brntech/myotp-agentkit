@@ -69,7 +69,7 @@ The Make CLI has `sdk-apps create`, `sdk-apps set-section`, `sdk-connections cre
 
 Errors come back as `[<http status>] <message>` using the `error.message` field every rejected MyOTP request carries, with fallbacks to the `detail.message` envelope of the agent endpoints and the RFC 9457 `detail` string of a 402. A 401 is typed `InvalidAccessTokenError` so Make prompts to fix the connection, a 403 is `InvalidConfigurationError` (the IP allowlist), a 429 is `RateLimitError` so Make retries. The API key is stripped from Make's logs by the `log.sanitize` rule, and so is the `otp` field of the Send OTP response.
 
-**Make an API Call** only reaches `https://api.myotp.app`. The path must start with `/`; a full URL is stripped to its path before the request is sent, and the headers you add are merged with the connection's `X-API-Key` rather than replacing it. This is Make's security rule for universal modules.
+**Make an API Call** only reaches `https://api.myotp.app`. The path parameter is validated against an allowlist (a leading `/`, then URL path characters and an optional query; no backslash, no `//`, no scheme) and a value that fails it stops the module with "path must be relative to https://api.myotp.app". Before the request is built the value is also sanitised: backslashes become `/`, any scheme is removed, repeated slashes collapse to one, and a single `/` is prefixed, so the result can only ever be a path on the base host. The headers you add are merged with the connection's `X-API-Key` rather than replacing it. This is Make's security rule for universal modules.
 
 Date-time outputs (`date_sent`, `expires_at`) are parsed with `parseDate` so they map as real dates in later modules.
 

@@ -22,13 +22,17 @@ const VARIABLE_FIELDS = {
 // empty environment value would shadow what the script stored.
 export const SCRIPT_SET_VARIABLES = ["message_id", "otp"];
 
+// Runs only on a documented success code, so an error answer fails the status
+// test above without also throwing on a missing body field.
 const SEND_OTP_TEST = [
-  "const json = pm.response.json();",
-  'pm.test("message_id present", () => pm.expect(json.message_id).to.be.a("string"));',
-  "// Verify OTP, Extend OTP and Check OTP Status read this collection variable.",
-  'pm.collectionVariables.set("message_id", json.message_id);',
-  "// Only present when the request asked for return_otp: true.",
-  'if (json.otp) pm.collectionVariables.set("otp", json.otp);',
+  "if ([200, 201].includes(pm.response.code)) {",
+  "  const json = pm.response.json();",
+  '  pm.test("message_id present", () => pm.expect(json.message_id).to.be.a("string"));',
+  "  // Verify OTP, Extend OTP and Check OTP Status read this collection variable.",
+  '  pm.collectionVariables.set("message_id", json.message_id);',
+  "  // Only present when the request asked for return_otp: true.",
+  '  if (json.otp) pm.collectionVariables.set("otp", json.otp);',
+  "}",
 ];
 
 // Documented success codes and the content type the spec attaches to them.
@@ -52,10 +56,14 @@ export function testScript(path, op) {
   const types = new Set(ok.map((r) => r.contentType).filter(Boolean));
   if (types.size === 1) {
     const t = [...types][0];
-    if (t === "application/json") lines.push('pm.test("response is JSON", () => pm.response.to.be.json);');
-    else if (t === "text/html") {
-      lines.push('pm.test("response is HTML", () => pm.expect(pm.response.headers.get("Content-Type")).to.include("text/html"));');
-    } else lines.push(`pm.test("content type is ${t}", () => pm.expect(pm.response.headers.get("Content-Type")).to.include("${t}"));`);
+    // Check the header, not only whether the body happens to parse.
+    lines.push(
+      `pm.test("Content-Type is ${t}", () => {`,
+      '  pm.response.to.have.header("Content-Type");',
+      `  pm.expect(pm.response.headers.get("Content-Type")).to.include("${t}");`,
+      "});",
+    );
+    if (t === "application/json") lines.push('pm.test("body is JSON", () => pm.response.to.be.json);');
   }
   if (path === "/generate_otp") lines.push(...SEND_OTP_TEST);
   return lines;

@@ -10,15 +10,63 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const APP_DIR = join(here, "myotp");
 export const SPEC_PATH = join(here, "..", "openapi-reference.yaml");
 
-// Error types Make's Communication schema accepts.
+// Error types Make's Communication schema accepts. Complete enum from
+// https://developers.make.com/custom-apps-documentation/component-blocks/api
+// ("type": Enum[...] under response.error).
 export const ERROR_TYPES = new Set([
   "RuntimeError",
   "DataError",
   "RateLimitError",
+  "OutOfSpaceError",
   "ConnectionError",
   "InvalidConfigurationError",
   "InvalidAccessTokenError",
+  "IncompleteDataError",
+  "DuplicateDataError",
 ]);
+
+// Allowlist for the universal module's path parameter. A leading slash, then
+// unreserved and sub-delimiter characters, percent escapes and single slashes,
+// with an optional query; no backslash and no "//" anywhere.
+export const RELATIVE_PATH_PATTERN = "^(?!.*\\\\)(?!.*//)/[A-Za-z0-9._~:@!$&'()*+,;=%/-]*(\\?.*)?$";
+
+// JS mirror of the IML sanitiser in makeApiCall/api.imljson, used by the tests.
+export function sanitisePath(input) {
+  let s = String(input).trim();
+  s = s.replace(/\\/g, "/");
+  s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  s = s.replace(/\/+/g, "/");
+  s = s.replace(/^\/+/, "");
+  return "/" + s;
+}
+
+// Every if( call in an IML string must have exactly three arguments: Make
+// documents if(expression, value1, value2) and nothing else.
+export function ifArities(text) {
+  const out = [];
+  const re = /\bif\(/g;
+  let m;
+  while ((m = re.exec(text))) {
+    let depth = 0;
+    let commas = 0;
+    let quote = null;
+    for (let i = m.index + 3; i < text.length; i++) {
+      const c = text[i];
+      if (quote) {
+        if (c === quote) quote = null;
+        continue;
+      }
+      if (c === "'" || c === '"') quote = c;
+      else if (c === "(") depth++;
+      else if (c === ")") {
+        if (depth === 0) break;
+        depth--;
+      } else if (c === "," && depth === 0) commas++;
+    }
+    out.push(commas + 1);
+  }
+  return out;
+}
 
 // Every `type` under a response.error block, at any nesting depth.
 export function errorTypes(errorBlock, out = []) {
@@ -73,6 +121,11 @@ export function validateApp(appDir = APP_DIR, specPath = SPEC_PATH) {
     }
   }
   if (problems.length) return problems;
+  for (const [file, json] of parsed) {
+    for (const n of ifArities(JSON.stringify(json))) {
+      check(n === 3, `${relative(appDir, file)}: if() has ${n} argument(s), Make documents exactly three`);
+    }
+  }
 
   // 2. Base.
   const base = parsed.get(join(appDir, "base.imljson"));
@@ -118,12 +171,19 @@ export function validateApp(appDir = APP_DIR, specPath = SPEC_PATH) {
       // Make's security rule: universal modules must stay relative to baseUrl, and a
       // programmatic header collection must be merged with the base headers or the
       // X-API-Key from the base is lost.
-      check(api?.url?.startsWith("/"), `module ${name}: universal url must start with / so baseUrl always applies`);
-      check(/replace\(.*parameters\.url/.test(api?.url ?? ""), `module ${name}: universal url must strip a scheme and host from parameters.url`);
-      check(!/^\{\{parameters\.url\}\}$/.test(api?.url ?? ""), `module ${name}: universal url must not pass parameters.url through unchanged`);
+      const u = api?.url ?? "";
+      check(u.startsWith("/"), `module ${name}: universal url must start with / so baseUrl always applies`);
+      check(/replace\(.*parameters\.url/.test(u), `module ${name}: universal url must sanitise parameters.url`);
+      // The parsed IML string (JSON escapes already resolved) must contain these
+      // exact replace() steps. String.raw keeps the backslashes readable.
+      check(u.includes(String.raw`'/\\/g', '/'`), `module ${name}: universal url must turn every backslash into /`);
+      check(u.includes(String.raw`'/\/+/g', '/'`), `module ${name}: universal url must collapse repeated slashes`);
+      check(u.includes(String.raw`'/^[a-z][a-z0-9+.-]*:\/\//i', ''`), `module ${name}: universal url must strip a scheme`);
+      check(u.includes(String.raw`'/^\/+/', ''`), `module ${name}: universal url must strip leading slashes before the fixed /`);
       check(api?.headers && typeof api.headers === "object" && "{{...}}" in api.headers, `module ${name}: headers must merge with the base via the {{...}} form`);
       const urlParam = (expect ?? []).find((p) => p.name === "url");
-      check(urlParam?.validate?.pattern === "^/", `module ${name}: url parameter must validate a leading /`);
+      check(urlParam?.validate?.pattern === RELATIVE_PATH_PATTERN, `module ${name}: url parameter must validate the relative-path allowlist`);
+      check(urlParam?.validate?.message === "path must be relative to https://api.myotp.app", `module ${name}: url validation message`);
     } else if (spec && typeof api?.url === "string") {
       // Action modules: every field the spec requires must be declared, and required.
       const op = specOperation(spec, api.url, api.method ?? "GET");

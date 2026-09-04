@@ -33,6 +33,12 @@ const inputSchema = {
     ),
 };
 
+const outputSchema = {
+  status: z.string().describe("'success' when the code matched and the OTP was consumed, otherwise 'failed' (or 'expired')."),
+  message: z.string().describe("Message describing the verification result."),
+  reason: z.string().optional().describe("Why verification failed: 'invalid', 'expired' or 'not found'. Absent on success."),
+};
+
 export const verifyOtpTool: ToolDefinition<typeof inputSchema> = {
   name: "verify_otp",
   title: "Verify OTP",
@@ -43,6 +49,7 @@ export const verifyOtpTool: ToolDefinition<typeof inputSchema> = {
     "You MUST pass either `phone_number` or `message_id` to identify which OTP you're verifying against. " +
     "Call this after collecting the code from the user (login form, signup screen, etc.).",
   inputSchema,
+  outputSchema,
   annotations: {
     // Verification consumes the OTP on success — not idempotent.
     readOnlyHint: false,

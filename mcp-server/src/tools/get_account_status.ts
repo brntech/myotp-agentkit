@@ -20,6 +20,14 @@ const inputSchema = {
     .describe("Send another confirmation email before returning account status."),
 };
 
+const outputSchema = {
+  email_verified: z.boolean().describe("True once the human has confirmed the emailed link. Unlocks card top-ups."),
+  balance: z.number().describe("Credits on the balance."),
+  plan_id: z.number().int(),
+  status: z.string().describe("Account status, 'active' when the key can be used."),
+  hint: z.string().describe("What to do next: verify the email, top up, or start sending."),
+};
+
 export const getAccountStatusTool: ToolDefinition<typeof inputSchema> = {
   name: "get_account_status",
   title: "Get agent account status",
@@ -27,6 +35,7 @@ export const getAccountStatusTool: ToolDefinition<typeof inputSchema> = {
     "Return email verification, balance, plan, and status for the configured MyOTP agent account. " +
     "Set resend_verification to request another confirmation email first. Unverified accounts can top up with USDC, but cards stay locked.",
   inputSchema,
+  outputSchema,
   annotations: {
     readOnlyHint: false,
     idempotentHint: false,

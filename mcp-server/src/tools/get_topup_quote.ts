@@ -42,6 +42,29 @@ const inputSchema = {
     .describe("Number of credits to quote. Integer from 25 to 50,000; defaults to 100."),
 };
 
+export const topUpQuoteShape = {
+  credits: z.number().int().describe("The number of credits priced."),
+  amount_usd: z.string().describe("Total price in US dollars, as a decimal string."),
+  price_per_credit_usd: z.number().describe("Unit price. Currently 0.02."),
+  min_credits: z.number().int(),
+  max_credits: z.number().int(),
+  currency: z.string().describe("Always 'usd'."),
+  methods: z.array(z.string()).describe("Human-readable list of the accepted payment methods."),
+};
+
+export const topUpQuoteSchema = z.object(topUpQuoteShape).passthrough();
+
+export const howToPayShape = {
+  usdc: z.string().describe("mppx command that pays the challenge in USDC on Tempo."),
+  card: z.string().describe("Stripe Link CLI command that pays the challenge by card."),
+};
+
+const outputSchema = {
+  ...topUpQuoteShape,
+  rules: z.string().describe("Top-up limits: unit price, minimum, maximum and the card cap."),
+  how_to_pay: z.object(howToPayShape).passthrough().describe("Ready-to-run client commands for this amount."),
+};
+
 export const getTopUpQuoteTool: ToolDefinition<typeof inputSchema> = {
   name: "get_topup_quote",
   title: "Get a MyOTP credit top-up quote",
@@ -50,6 +73,7 @@ export const getTopUpQuoteTool: ToolDefinition<typeof inputSchema> = {
     "Use this when generate_otp or another send fails with HTTP 403 insufficient balance / NoBalance, " +
     "or before calling `top_up_credits` to show the cost. Returns USDC and card client commands and never exposes the configured API key.",
   inputSchema,
+  outputSchema,
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,

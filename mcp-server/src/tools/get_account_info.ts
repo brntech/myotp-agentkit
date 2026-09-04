@@ -6,11 +6,16 @@
  * case the platform extends it (balance/credits/plan are good candidates).
  */
 
+import { z } from "zod";
 import type { AccountInfoResponse } from "../types.js";
 import { ok, toToolError } from "./helpers.js";
 import type { ToolDefinition } from "./types.js";
 
 const inputSchema = {} as const;
+
+const outputSchema = {
+  email: z.string().describe("Email address of the account the API key belongs to."),
+};
 
 export const getAccountInfoTool: ToolDefinition<typeof inputSchema> = {
   name: "get_account_info",
@@ -19,6 +24,7 @@ export const getAccountInfoTool: ToolDefinition<typeof inputSchema> = {
     "Return account details for the API key in use. Always returns at least the account `email`; depending on plan and platform version may also return balance/credit/plan info. " +
     "Use this as a sanity check when wiring up MyOTP for the first time — if this call succeeds, your API key and IP whitelist are configured correctly.",
   inputSchema,
+  outputSchema,
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,

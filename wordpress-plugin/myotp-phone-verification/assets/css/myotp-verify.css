@@ -1,0 +1,54 @@
+.myotp-pv {
+	margin: 0.75em 0;
+	clear: both;
+}
+
+.myotp-pv-row {
+	margin: 0 0 0.5em;
+}
+
+.myotp-pv-row label {
+	display: block;
+	margin-bottom: 0.25em;
+}
+
+.myotp-pv-phone,
+.myotp-pv-code {
+	max-width: 16em;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.myotp-pv-code-row .myotp-pv-code {
+	max-width: 9em;
+	display: inline-block;
+	vertical-align: middle;
+	margin-right: 0.5em;
+	letter-spacing: 0.15em;
+}
+
+.myotp-pv-code-row .button {
+	vertical-align: middle;
+}
+
+.myotp-pv-status {
+	min-height: 1.4em;
+	margin: 0;
+	font-size: 0.95em;
+}
+
+.myotp-pv-ok {
+	color: #1a7f37;
+}
+
+.myotp-pv-err {
+	color: #b3261e;
+}
+
+.myotp-pv[data-verified="1"] .myotp-pv-actions {
+	display: none;
+}
+
+.myotp-pv-admin .myotp-pv-status {
+	margin-top: 0.5em;
+}

@@ -1,0 +1,1079 @@
+openapi: 3.0.0
+info:
+  title: MyOTPApp API
+  version: 1.4.0
+  description: >
+    Send and verify one-time passcodes over SMS, WhatsApp and Telegram from a
+    single API key. Phone numbers are digits only, in E.164 order, with no
+    leading '+' and no trailing national prefix.
+
+
+    Delivery webhooks: register a callback URL against an API key in your
+    dashboard and MyOTP will POST to it when a message reaches a terminal state,
+    so you do not have to poll /check_otp_status. Events are otp.delivered,
+    otp.sent, otp.read and otp.failed, on all three channels. The body is the
+    DeliveryEvent schema below. Every request is signed with Standard Webhooks
+    v1 (standardwebhooks.com), so you can verify it with any off-the-shelf
+    library: the signed content is "{webhook-id}.{webhook-timestamp}.{body}",
+    HMAC-SHA256 with your base64-decoded signing secret, sent in the
+    webhook-signature header as "v1,<base64>". Non-2xx responses are retried
+    5 times at 5, 10, 20, 40 and 60 seconds. Endpoints must be https.
+servers:
+  - url: https://api.myotp.app
+    description: Production
+paths:
+  /generate_otp:
+    post:
+      summary: Generate OTP
+      description: Generate a One Time Password (OTP) and send it to the specified phone number, with optional branding.
+      operationId: generate_otp_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone_number:
+                  type: string
+                  default: 19876543210
+                  pattern: "^[1-9][0-9]{6,14}$"
+                  description: Phone number to send the OTP to. E.164 format. Include country code without any prefixes.
+                otp_length:
+                  type: integer
+                  default: 6
+                  minimum: 4
+                  maximum: 8
+                  description: Length of the OTP, defaults to 6.
+                otp_validity:
+                  type: integer
+                  default: 300
+                  minimum: 60
+                  maximum: 86400
+                  description: Validity of the OTP in seconds, defaults to 300. SMS only.
+                channel:
+                  type: string
+                  enum:
+                    - sms
+                    - whatsapp
+                    - telegram
+                  default: sms
+                  description: >
+                    Delivery channel for the OTP. Defaults to 'sms'.
+                    For WhatsApp, ensure the destination supports WhatsApp Business messaging.
+                    Telegram is delivered through the Telegram Gateway API and is charged
+                    at a flat rate in every country.
+                template_order:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                  maximum: 5
+                  description: Order of the template to be used for the OTP message, defaults to 1 (12 for WhatsApp).
+                force_send:
+                  type: boolean
+                  default: false
+                  description: If true, forces the sending of OTP even if there is an existing, unexpired OTP for the given phone number.
+                return_otp:
+                  type: boolean
+                  default: false
+                  description: >
+                    If true, includes the OTP value in the response.
+                    CAUTION: this is not compliant with regulations in many markets.
+                brand:
+                  type: string
+                  default: MyOTP.App
+                  pattern: "^[a-zA-Z0-9.]{3,16}$"
+                  description: >
+                    Optional brand name for personalizing the OTP message. 3 to 16 characters,
+                    letters, digits and dots. Brand names are screened against a denylist to
+                    prevent impersonation.
+                    CAUTION: This overrides the account and app defaults.
+              required:
+                - phone_number
+      responses:
+        '200':
+          description: OTP successfully generated and sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id:
+                    type: string
+                    description: ID of the message sent.
+                  status:
+                    type: string
+                    description: Status of the request.
+                  message:
+                    type: string
+                    description: Message describing the status of the request.
+                  date_sent:
+                    type: string
+                    format: date-time
+                    description: Date and time the OTP was sent.
+                  expires_at:
+                    type: string
+                    format: date-time
+                    description: Date and time the OTP expires.
+                  cost:
+                    type: number
+                    format: float
+                    description: Cost of sending the OTP.
+                  otp:
+                    type: string
+                    description: The OTP value, included if return_otp is true.
+        '400':
+          description: Bad request due to invalid input parameters.
+        '401':
+          description: Unauthorized due to missing or invalid API key.
+        '402':
+          description: Low balance or payment is required.
+        '409':
+          description: Conflict, OTP already active.
+        '500':
+          description: Internal Server Error
+
+  /verify_otp:
+    post:
+      summary: Verify OTP
+      description: Validate the OTP for successful verification
+      operationId: verify_otp_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone_number:
+                  type: string
+                  pattern: "^[1-9][0-9]{6,14}$"
+                  description: Phone number to verify the OTP
+                message_id:
+                  type: string
+                  description: ID of the message to verify
+                otp:
+                  type: string
+                  pattern: "^[0-9]{3,8}$"
+                  description: OTP to verify
+              required:
+                - otp
+      responses:
+        '200':
+          description: OTP verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - success
+                      - failed
+                      - expired
+                    description: Status of the OTP verification
+                  message:
+                    type: string
+                    description: Message describing the status of the OTP verification
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  /extend_otp:
+    post:
+      summary: Extend OTP Expiry
+      description: Extend an existing OTP expiry time
+      operationId: extend_otp_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message_id:
+                  type: string
+                  description: Message ID of the OTP to be extended
+                duration:
+                  type: integer
+                  minimum: 60
+                  maximum: 14400
+                  default: 300
+                  description: Duration to extend the OTP expiry, in seconds
+              required:
+                - message_id
+                - duration
+      responses:
+        '200':
+          description: OTP expiry successfully extended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Status of the request
+                  message:
+                    type: string
+                    description: Message describing the status of the request
+                  expires_at:
+                    type: string
+                    format: date-time
+                    description: New expiry time of the OTP
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: OTP message_id not found
+  /report:
+    post:
+      summary: Get Transactions Report
+      description: Returns transactions within a specified date range. If `start_date` and `end_date` are omitted, the report will include the last 7 days of history. Supports pagination.
+      operationId: report_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  description: Start date of the report in YYYY-MM-DD format (optional)
+                  default: "7 days ago"
+                end_date:
+                  type: string
+                  format: date
+                  description: End date of the report in YYYY-MM-DD format (optional)
+                  default: "current day"
+                page:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  description: The page number to fetch (optional)
+                  default: 1
+                per_page:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  maximum: 100
+                  description: The number of items per page (optional)
+                  default: 10
+      responses:
+        '200':
+          description: Transactions report successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        message_id:
+                          type: string
+                        phone_number:
+                          type: string
+                        cost:
+                          type: number
+                        timestamp:
+                          type: string
+                          format: date-time
+                        message_type:
+                          type: integer
+                          description: Indicates whether this was to send an OTP or to Validate one
+                        description:
+                          type: string
+                        force_send:
+                          type: boolean
+                          description: Indicates whether the transaction was force sent or not
+                        client_ip:
+                          type: string
+                        application:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+  /check_otp_status:
+    post:
+      summary: Check message_id Status
+      description: >
+        Delivery report for a sent OTP, plus whether the code is still active.
+
+
+        Delivery receipts arrive a few seconds after the send, so the first
+        call after /generate_otp normally reports a pending state rather than a
+        carrier status. Poll every few seconds, and treat any DLR value
+        beginning "Pending:" as "ask again shortly". If you would rather not
+        poll at all, register a delivery webhook in the dashboard and we will
+        POST each status change to you instead.
+
+
+        Data is retained for 24 hours after an OTP expires.
+      parameters:
+        - in: header
+          name: X-API-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message_id
+              properties:
+                message_id:
+                  type: string
+                  description: The message ID returned by /generate_otp.
+      responses:
+        200:
+          description: >
+            The delivery report, or an explanation of why one is not available.
+            Note that an unknown message_id is also a 200, carrying "message"
+            instead of "DLR".
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  DLR:
+                    type: string
+                    description: >
+                      The delivery state. Values fall into four groups.
+
+
+                      Carrier status, passed through verbatim, for SMS: ATES
+                      (accepted by the carrier), DELIVRD (delivered), UNDELIV,
+                      EXPIRED, REJECTD. For WhatsApp and Telegram this is our own
+                      transaction status instead: sent, delivered, read, pending,
+                      or a failed.<reason> code.
+
+
+                      Pending, meaning try again in a few seconds: "Pending: not
+                      yet accepted by the carrier" (the send has not been
+                      acknowledged yet) and "Pending: the carrier has not
+                      reported yet" (accepted, no receipt yet).
+
+
+                      Permanent failures are reported as failed.<reason>, for
+                      example failed.NoBalance or failed.SMPP.
+
+
+                      Unavailable, which are statements about your plan or the
+                      route rather than this message: "Not available with your
+                      plan" (your plan has no DLR_ACCESS entitlement), "Not
+                      available for this market" (the route reports nothing back)
+                      and "Not available from the carrier" (the carrier declined
+                      to answer).
+                    example: DELIVRD
+                  is_active:
+                    type: boolean
+                    description: Whether the OTP can still be verified, i.e. it has not expired.
+                  expires_at:
+                    type: string
+                    format: date-time
+                    description: When the OTP expires. Absent when the message_id is unknown.
+                  message:
+                    type: string
+                    description: >
+                      Present instead of DLR when the message_id is not found.
+                      Data is available for 24 hours after an OTP expires.
+                  "DLR:":
+                    type: string
+                    deprecated: true
+                    description: >
+                      Deprecated alias of DLR, kept so existing integrations keep
+                      working. Read DLR instead; this key will be removed.
+                  "Message:":
+                    type: string
+                    deprecated: true
+                    description: Deprecated alias of message. Read message instead.
+        400:
+          description: message_id is required
+        401:
+          description: Unauthorized
+        403:
+          description: The calling IP is not on this key's allowlist
+
+  /me:
+    get:
+      summary: Account Identity
+      description: Returns the account the supplied API key belongs to. Useful as an integration smoke test, since it exercises both key validation and the IP allowlist.
+      operationId: me_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication
+      responses:
+        '200':
+          description: The account owning this API key.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email:
+                    type: string
+                    format: email
+        '401':
+          description: Unauthorized due to missing or invalid API key.
+        '403':
+          description: Calling IP address is not on this key's allowlist.
+
+  /v1/topup/quote:
+    get:
+      summary: Top-up Quote
+      description: >
+        Price a credit top-up before paying for it. No authentication. Credits
+        cost $0.02 each; the minimum is 25 credits ($0.50, the card minimum)
+        and the maximum is 50,000 per call.
+      operationId: topup_quote_endpoint
+      parameters:
+        - name: credits
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 25
+            maximum: 50000
+          description: Number of credits to price.
+          example: 100
+      responses:
+        '200':
+          description: The quote.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopupQuote'
+              example:
+                credits: 100
+                amount_usd: "2.00"
+                price_per_credit_usd: 0.02
+                min_credits: 25
+                max_credits: 50000
+                currency: usd
+                methods:
+                  - card via Stripe shared payment token
+                  - usdc on tempo
+        '400':
+          description: credits is missing, not an integer, or outside 25 to 50000.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  http_code: 400
+                  message: credits must be an integer between 25 and 50000
+
+  /v1/topup:
+    post:
+      summary: Buy Credits (machine payment)
+      description: >
+        Buy credits for the account owning the API key, paid by the caller
+        itself over the Machine Payments Protocol (MPP, https://mpp.dev). No
+        checkout page and no card form.
+
+
+        The first call answers 402 Payment Required with a WWW-Authenticate
+        header carrying two Payment challenges, one for USDC on Tempo (method
+        "tempo") and one for card or Link via a Stripe shared payment token
+        (method "stripe"). The client pays one of them and repeats the same
+        request with the payment credential; any MPP client (mppx, the Stripe
+        Link CLI) does this automatically. The repeated request answers 200 and
+        the credits are on the balance at once.
+
+
+        Rules: $0.02 per credit, minimum 25 credits, maximum 50,000 per call.
+        Card top-ups are capped at $100 per account per rolling 24 hours; over
+        the cap the 402 offers USDC only, which is uncapped. A trial account
+        moves to the Starter pay-as-you-go price table on its first top-up and
+        no subscription is created. A payment credential never credits twice:
+        a replay answers 200 with status "already_credited".
+
+
+        Pay from the command line with a USDC wallet
+        (npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: KEY"
+        -H "content-type: application/json" -d '{"credits":100}') or with a Link
+        agent wallet (npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup
+        -X POST -d '{"credits":100}' -H "x-api-key: KEY" --context "MyOTP credits").
+      operationId: topup_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication. Credits go to the account owning this key.
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: >
+            The payment credential, sent by the MPP client on the retried
+            request after paying one of the challenges from the 402. Absent on
+            the first request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                credits:
+                  type: integer
+                  minimum: 25
+                  maximum: 50000
+                  description: Number of credits to buy.
+              required:
+                - credits
+            example:
+              credits: 100
+      responses:
+        '200':
+          description: >
+            Payment accepted and credits applied. status is "credited" on the
+            first settlement of a credential and "already_credited" when the
+            same credential is replayed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopupResult'
+              example:
+                status: credited
+                credits: 100
+                amount_usd: "2.00"
+                currency: usd
+                payment:
+                  method: tempo
+                  reference: "0x9c1f3a4e5b6d7c8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60"
+                balance: 115
+                plan_id: 6452
+        '400':
+          description: credits is missing, not an integer, or outside 25 to 50000.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  http_code: 400
+                  message: credits must be an integer between 25 and 50000
+        '401':
+          description: Missing or invalid X-API-Key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  http_code: 401
+                  message: invalid or missing X-API-Key
+        '402':
+          description: >
+            Payment Required. No valid payment credential was presented, so the
+            response carries the payment challenges to satisfy. Pay one and
+            repeat the identical request with the credential.
+          headers:
+            WWW-Authenticate:
+              description: >
+                One or more MPP "Payment" challenges, comma separated, each with
+                the parameters id, realm ("api.myotp.app"), method ("tempo" or
+                "stripe"), intent ("charge"), request (base64url JSON),
+                description, expires (ISO 8601) and opaque (base64url). The
+                decoded request for tempo is
+                {"amount":"2000000","currency":"0x20c0...","recipient":"0x...","methodDetails":{"chainId":...}}
+                with the amount in USDC atomic units (6 decimals). For stripe
+                it is
+                {"amount":"200","currency":"usd","methodDetails":{"networkId":"profile_...","paymentMethodTypes":["card","link"]}}
+                with the amount in cents. When the account is over its 24 hour
+                card cap only the tempo challenge is offered.
+              schema:
+                type: string
+              example: >-
+                Payment id="ch_01J...", realm="api.myotp.app", method="tempo", intent="charge", request="eyJhbW91bnQiOi...", description="MyOTP.App 100 credits", expires="2026-09-03T17:05:00Z", opaque="b3BhcXVl...", Payment id="ch_01J...", realm="api.myotp.app", method="stripe", intent="charge", request="eyJhbW91bnQiOi...", description="MyOTP.App 100 credits", expires="2026-09-03T17:05:00Z", opaque="b3BhcXVl..."
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC 9457 problem details.
+                properties:
+                  type:
+                    type: string
+                  title:
+                    type: string
+                  status:
+                    type: integer
+                  detail:
+                    type: string
+                  challengeId:
+                    type: string
+                    description: Identifier of the challenge set in WWW-Authenticate.
+              example:
+                type: about:blank
+                title: Payment Required
+                status: 402
+                detail: Pay one of the challenges in WWW-Authenticate and repeat the request.
+                challengeId: ch_01J9X2K4M6P8R0T2V4W6Y8Z0AB
+        '403':
+          description: The account is not active.
+        '500':
+          description: >
+            The payment settled but crediting failed. Nothing is lost: write to
+            support@myotp.app and the credits are applied from the payment
+            ledger.
+
+  /v1/agent/register:
+    post:
+      summary: Create an account (agent signup)
+      description: >
+        Create a MyOTP.App account without a browser. No authentication. The
+        201 body carries the API key exactly once; store it and send it as
+        X-API-Key on every later request.
+
+
+        Rules: no trial credits and no phone verification. The balance starts
+        at zero, so the account can send nothing until it is topped up with
+        POST /v1/topup. USDC top-ups work immediately; card top-ups are offered
+        only after the account email is confirmed. The IP allowlist is open
+        ("*") for agent accounts. Five registrations per IP address per 24
+        hours. The human signup at https://myotp.app/sign-up is unchanged: 15
+        free credits, email and phone verification.
+
+
+        Email confirmation: the address receives "Confirm your MyOTP.App
+        account email" from raya@myotp.app with a link to
+        /v1/agent/verify-email. A human has to open it and press Confirm; the
+        agent cannot confirm on the user's behalf. The link is single use and
+        valid for 24 hours.
+
+
+        Agent flow: register, save the api_key, tell the human to click the
+        email link (optional, only needed for cards), GET /v1/topup/quote,
+        POST /v1/topup and pay the 402 (USDC works without the email step),
+        then POST /generate_otp as usual. A 403 "Insufficient balance" on any
+        send means: top up again.
+      operationId: agent_register_endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Account email. Receives the confirmation link.
+                name:
+                  type: string
+                  maxLength: 64
+                  description: Optional account or company name.
+              required:
+                - email
+            example:
+              email: dev@example.com
+              name: Acme
+      responses:
+        '201':
+          description: Account created. The api_key is shown once.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRegistration'
+              example:
+                account_id: a1b2c3d4e5f60
+                api_key: REPLACE_WITH_YOUR_32_CHAR_API_KEY
+                api_key_note: Shown once. Send it as the X-API-Key header.
+                email: dev@example.com
+                email_verified: false
+                balance: 0.0
+                plan_id: 6452
+                status: active
+                topup:
+                  quote: https://api.myotp.app/v1/topup/quote?credits=100
+                  endpoint: https://api.myotp.app/v1/topup
+                  note: Balance is zero until you top up. USDC works now; card top-ups unlock once the email is confirmed.
+                docs: https://myotp.app/developer-api/
+                verification_email_sent: true
+        '400':
+          description: The email is missing or invalid, or name is longer than 64 characters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentError'
+              example:
+                detail:
+                  http_code: 400
+                  message: invalid email
+        '409':
+          description: An account with this email already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentError'
+              example:
+                detail:
+                  http_code: 409
+                  message: an account with this email already exists
+        '429':
+          description: Too many registrations from this IP address (5 per IP per 24 hours).
+        '503':
+          description: Account creation is temporarily unavailable. Retry later.
+
+  /v1/agent/account:
+    get:
+      summary: Agent account status
+      description: >
+        The account behind the API key, in the same shape as the registration
+        body minus the api_key. Poll email_verified to learn when the human has
+        confirmed the email and card top-ups are unlocked.
+      operationId: agent_account_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication.
+      responses:
+        '200':
+          description: The account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentAccount'
+              example:
+                account_id: a1b2c3d4e5f60
+                email: dev@example.com
+                email_verified: true
+                balance: 115.0
+                plan_id: 6452
+                status: active
+                topup:
+                  quote: https://api.myotp.app/v1/topup/quote?credits=100
+                  endpoint: https://api.myotp.app/v1/topup
+                  note: Balance is zero until you top up. USDC works now; card top-ups unlock once the email is confirmed.
+                docs: https://myotp.app/developer-api/
+        '401':
+          description: Missing or invalid X-API-Key.
+
+  /v1/agent/resend-verification:
+    post:
+      summary: Resend the email confirmation link
+      description: >
+        Send the "Confirm your MyOTP.App account email" message again. Use it
+        when the first link expired (24 hours) or was lost.
+      operationId: agent_resend_verification_endpoint
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{32}$"
+          description: API key for authentication.
+      responses:
+        '200':
+          description: Confirmation mail queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email_verified:
+                    type: boolean
+                  verification_email_sent:
+                    type: boolean
+              example:
+                email_verified: false
+                verification_email_sent: true
+        '401':
+          description: Missing or invalid X-API-Key.
+
+  /v1/agent/verify-email:
+    get:
+      summary: Email confirmation page (browser-facing)
+      description: >
+        Browser-facing, not for agents. This is the link in the confirmation
+        email. It renders an HTML page with a Confirm button; the human
+        presses it and the page POSTs the token back. The token is single use
+        and valid for 24 hours. An agent cannot complete this step; it should
+        tell the human to open the email and poll GET /v1/agent/account for
+        email_verified instead.
+      operationId: agent_verify_email_page
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Single-use confirmation token from the email link.
+      responses:
+        '200':
+          description: The confirmation page.
+          content:
+            text/html:
+              schema:
+                type: string
+              example: "<!doctype html><html>... <form method=\"post\"><button>Confirm</button></form> ...</html>"
+    post:
+      summary: Confirm the email (browser-facing)
+      description: >
+        Browser-facing, not for agents. Submitted by the Confirm button on the
+        GET page. Marks the account email as verified, which unlocks card
+        top-ups. Answers an HTML page in every case; an expired or already
+        used token shows an error page.
+      operationId: agent_verify_email_confirm
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: The token from the GET page.
+              required:
+                - token
+            example:
+              token: TOKEN_FROM_THE_CONFIRMATION_EMAIL
+      responses:
+        '200':
+          description: HTML page saying the email is confirmed, or why it could not be.
+          content:
+            text/html:
+              schema:
+                type: string
+              example: "<!doctype html><html>... Email confirmed. Card top-ups are now available. ...</html>"
+
+components:
+  schemas:
+    Error:
+      type: object
+      description: The JSON body every rejected request carries.
+      properties:
+        error:
+          type: object
+          properties:
+            http_code:
+              type: integer
+            message:
+              type: string
+    TopupQuote:
+      type: object
+      properties:
+        credits:
+          type: integer
+          description: The number of credits priced.
+        amount_usd:
+          type: string
+          description: Total price in US dollars, as a decimal string.
+        price_per_credit_usd:
+          type: number
+          description: Unit price. Currently 0.02.
+        min_credits:
+          type: integer
+        max_credits:
+          type: integer
+        currency:
+          type: string
+          example: usd
+        methods:
+          type: array
+          items:
+            type: string
+          description: Human-readable list of the accepted payment methods.
+    TopupResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [credited, already_credited]
+          description: already_credited means the credential was replayed and nothing was charged again.
+        credits:
+          type: integer
+          description: Credits bought in this call.
+        amount_usd:
+          type: string
+          description: Amount paid, in US dollars.
+        currency:
+          type: string
+        payment:
+          type: object
+          properties:
+            method:
+              type: string
+              enum: [tempo, stripe]
+            reference:
+              type: string
+              description: Chain transaction hash for tempo, Stripe payment reference for stripe.
+        balance:
+          type: number
+          description: Account balance in credits after this top-up.
+        plan_id:
+          type: integer
+          description: The account's plan after this top-up. Trial accounts move to Starter pay-as-you-go on their first top-up.
+    DeliveryEvent:
+      type: object
+      description: >
+        The JSON body POSTed to your registered webhook URL when a message reaches
+        a terminal state. Sent with headers webhook-id, webhook-timestamp and
+        webhook-signature.
+      properties:
+        event:
+          type: string
+          enum: [otp.delivered, otp.sent, otp.read, otp.failed]
+          description: >
+            All failures collapse to otp.failed; the specific cause is in `reason`,
+            so subscribing to otp.failed keeps working as new failure codes appear.
+        message_id:
+          type: string
+          description: The message_id returned by /generate_otp.
+        status:
+          type: string
+          description: The underlying transaction status, e.g. delivered, read, failed.NoBalance.
+        channel:
+          type: string
+          enum: [sms, whatsapp, telegram]
+        phone_number:
+          type: string
+        country:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          description: Present only on otp.failed, e.g. NoBalance, SMPP, mWebAPI.
+      required: [event, message_id, status, occurred_at]
+      example:
+        event: otp.delivered
+        message_id: 8f14e45f-ea0d-4d1b-9c6a-2b7c1f0a9e33
+        status: delivered
+        channel: sms
+        phone_number: "19876543210"
+        country: USA
+        occurred_at: "2026-09-02T03:02:01Z"
+    AgentError:
+      type: object
+      description: >
+        The JSON body a rejected /v1/agent request carries. The key is
+        "detail" here, not "error" as on the OTP endpoints.
+      properties:
+        detail:
+          type: object
+          properties:
+            http_code:
+              type: integer
+            message:
+              type: string
+    AgentAccount:
+      type: object
+      description: An agent-created account, as returned by GET /v1/agent/account.
+      properties:
+        account_id:
+          type: string
+          description: Account identifier, "a" followed by 12 hex characters.
+          pattern: "^a[0-9a-f]{12}$"
+        email:
+          type: string
+          format: email
+        email_verified:
+          type: boolean
+          description: True once the human has pressed Confirm on the emailed link. Unlocks card top-ups.
+        balance:
+          type: number
+          description: Credits on the balance. Zero at registration.
+        plan_id:
+          type: integer
+          description: The Starter pay-as-you-go pricing table (per-country credits).
+        status:
+          type: string
+          description: Account status, "active" when the key can be used.
+        topup:
+          type: object
+          description: Where to buy credits.
+          properties:
+            quote:
+              type: string
+              format: uri
+            endpoint:
+              type: string
+              format: uri
+            note:
+              type: string
+        docs:
+          type: string
+          format: uri
+      required: [account_id, email, email_verified, balance, plan_id, status]
+    AgentRegistration:
+      allOf:
+        - $ref: '#/components/schemas/AgentAccount'
+        - type: object
+          properties:
+            api_key:
+              type: string
+              pattern: "^[a-zA-Z0-9_-]{32}$"
+              description: Shown once, in this response only. Send it as the X-API-Key header.
+            api_key_note:
+              type: string
+            verification_email_sent:
+              type: boolean
+              description: Whether the confirmation email was queued.
+          required: [api_key]

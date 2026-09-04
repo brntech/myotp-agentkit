@@ -28,7 +28,7 @@ class MyOTP_PV_WooCommerce {
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'widget' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order', array( __CLASS__, 'stamp_order' ), 10, 2 );
-		add_action( 'woocommerce_thankyou', array( __CLASS__, 'clear' ) );
+		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'consume' ) );
 	}
 
 	/**
@@ -90,6 +90,9 @@ class MyOTP_PV_WooCommerce {
 	 * @param array    $data  Posted data.
 	 */
 	public static function stamp_order( $order, $data ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		if ( ! self::required() ) {
+			return;
+		}
 		$verified = MyOTP_PV_Session::verified_phone();
 		if ( '' !== $verified ) {
 			$order->update_meta_data( self::ORDER_META, $verified );
@@ -97,11 +100,11 @@ class MyOTP_PV_WooCommerce {
 	}
 
 	/**
-	 * Forget the verified number once an order went through, so the next
-	 * order on the same session verifies again.
+	 * Consume the verification once the order exists, so the next order on
+	 * the same session verifies again.
 	 */
-	public static function clear() {
-		MyOTP_PV_Session::delete( 'verified' );
-		MyOTP_PV_Session::delete( 'pending' );
+	public static function consume() {
+		MyOTP_PV_Session::clear_verified();
+		MyOTP_PV_Session::clear_pending();
 	}
 }

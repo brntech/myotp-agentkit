@@ -17,6 +17,13 @@ class MyOTP_PV_Registration {
 	const META = 'myotp_verified_phone';
 
 	/**
+	 * Set by validate() when this request passed; save() stamps meta only then.
+	 *
+	 * @var string
+	 */
+	private static $passed_phone = '';
+
+	/**
 	 * Hook registration.
 	 */
 	public static function init() {
@@ -32,19 +39,23 @@ class MyOTP_PV_Registration {
 	}
 
 	/**
+	 * Submitted phone from the hidden field, digits only.
+	 *
+	 * @return string
+	 */
+	private static function posted_phone() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- core registration form has no nonce; verification state is server-side.
+		return isset( $_POST['myotp_pv_phone'] ) ? myotp_pv_normalize_phone( sanitize_text_field( wp_unslash( $_POST['myotp_pv_phone'] ) ) ) : '';
+	}
+
+	/**
 	 * Output the widget inside the registration form.
 	 */
 	public static function field() {
-		$prefill = '';
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- prefill only, validated in validate().
-		if ( isset( $_POST['myotp_pv_phone'] ) ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$prefill = myotp_pv_normalize_phone( sanitize_text_field( wp_unslash( $_POST['myotp_pv_phone'] ) ) );
-		}
 		$html = MyOTP_PV_Widget::render(
 			array(
 				'context'     => 'register',
-				'phone_value' => $prefill,
+				'phone_value' => self::posted_phone(),
 				'verified'    => MyOTP_PV_Session::verified_phone(),
 				'label'       => __( 'Phone number (with country code)', 'myotp-phone-verification' ),
 			)
@@ -53,7 +64,8 @@ class MyOTP_PV_Registration {
 	}
 
 	/**
-	 * Block registration until the submitted number matches the verified one.
+	 * Block registration until the submitted number equals the verified one.
+	 * The comparison always runs; an empty submission fails.
 	 *
 	 * @param WP_Error $errors     Errors so far.
 	 * @param string   $login      Username.
@@ -61,29 +73,32 @@ class MyOTP_PV_Registration {
 	 * @return WP_Error
 	 */
 	public static function validate( $errors, $login, $user_email ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- core registration form has no nonce; verification state is server-side.
-		$phone    = isset( $_POST['myotp_pv_phone'] ) ? myotp_pv_normalize_phone( sanitize_text_field( wp_unslash( $_POST['myotp_pv_phone'] ) ) ) : '';
-		$verified = MyOTP_PV_Session::verified_phone();
+		self::$passed_phone = '';
+		$phone              = self::posted_phone();
+		$verified           = MyOTP_PV_Session::verified_phone();
 
 		if ( '' === $verified ) {
 			$errors->add( 'myotp_pv_unverified', __( 'Verify your phone number before registering.', 'myotp-phone-verification' ) );
-		} elseif ( '' !== $phone && $phone !== $verified ) {
+		} elseif ( $phone !== $verified ) {
 			$errors->add( 'myotp_pv_mismatch', __( 'The phone number changed after verification. Verify it again.', 'myotp-phone-verification' ) );
+		} else {
+			self::$passed_phone = $verified;
 		}
 		return $errors;
 	}
 
 	/**
-	 * Store the verified number as user meta.
+	 * Store the verified number as user meta, only for a request that passed validate().
 	 *
 	 * @param int $user_id New user id.
 	 */
 	public static function save( $user_id ) {
-		$verified = MyOTP_PV_Session::verified_phone();
-		if ( '' !== $verified ) {
-			update_user_meta( $user_id, self::META, $verified );
-			MyOTP_PV_Session::delete( 'verified' );
+		if ( '' === self::$passed_phone ) {
+			return;
 		}
+		update_user_meta( $user_id, self::META, self::$passed_phone );
+		self::$passed_phone = '';
+		MyOTP_PV_Session::clear_verified();
 	}
 
 	/**

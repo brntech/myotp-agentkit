@@ -64,6 +64,10 @@
 		sendBtn.addEventListener('click', function () {
 			var input = phoneInput(root);
 			var phone = digits(input ? input.value : '');
+			var hiddenPhone = root.querySelector('.myotp-pv-phone-hidden');
+			if (hiddenPhone) {
+				hiddenPhone.value = phone;
+			}
 			if (!phone) {
 				setStatus(root, myotpPv.i18n.needPhone, false);
 				if (input) {
@@ -110,7 +114,12 @@
 					codeRow.hidden = true;
 					lock(sendBtn, true);
 					if (input && !root.getAttribute('data-phone-selector')) {
+						input.value = res.data.phone || phone;
 						input.disabled = true;
+					}
+					var hidden = root.querySelector('.myotp-pv-phone-hidden');
+					if (hidden) {
+						hidden.value = res.data.phone || phone;
 					}
 					setStatus(root, res.data.message || myotpPv.i18n.verified, true);
 					document.dispatchEvent(new CustomEvent('myotp:verified', {
@@ -133,6 +142,17 @@
 				verify();
 			}
 		});
+
+		// Keep the hidden posted field in step with the inline input.
+		var inline = root.getAttribute('data-phone-selector') ? null : phoneInput(root);
+		if (inline) {
+			inline.addEventListener('input', function () {
+				var h = root.querySelector('.myotp-pv-phone-hidden');
+				if (h) {
+					h.value = digits(inline.value);
+				}
+			});
+		}
 
 		// If the bound external phone field changes after verification, re-arm the widget.
 		var ext = root.getAttribute('data-phone-selector') ? phoneInput(root) : null;

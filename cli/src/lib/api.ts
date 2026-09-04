@@ -4,7 +4,7 @@
  * This is intentionally not shared with @myotp/mcp-server. Each package can
  * evolve independently and ship its own dependency surface.
  *
- * API spec: https://api.myotp.app (see MyOTP.Website/new-pages/llms-full.txt)
+ * API spec: https://api.myotp.app (see https://myotp.app/llms-full.txt)
  */
 
 export type Channel = 'sms' | 'whatsapp' | 'telegram';

@@ -111,7 +111,7 @@ Signup is human-driven and takes ~60 seconds at [myotp.app/sign-up](https://myot
 Non-interactive (CI / scripted setup):
 
 ```bash
-npx @myotp/cli init --key sk_live_xxxxxxxxxxxxxxxx --json
+npx @myotp/cli init --key YOUR_32_CHAR_KEY --json
 ```
 
 Already have a key in your environment? Skip `init` entirely — every subcommand reads `MYOTP_API_KEY` directly. `init` exists for convenience, not as a requirement.
@@ -187,7 +187,7 @@ The CLI looks for an API key in this order:
 The first one that is set wins. This makes it easy to override the saved key for a single call:
 
 ```bash
-MYOTP_API_KEY=sk_test_xxx npx @myotp/cli test +14155551234
+MYOTP_API_KEY=YOUR_32_CHAR_KEY npx @myotp/cli test +14155551234
 ```
 
 ## JSON mode for agents
@@ -258,10 +258,10 @@ In `--json` mode, `init` requires `--email`, `--phone`, and `--company` as flags
 
 - The config file is created with mode `0600` on POSIX systems so other users on the same machine cannot read your API key.
 - The CLI prints a full API key exactly once, when `init` or `register` saves it. Every other command (`config`, `status`) shows a masked version (first 4 and last 4 characters).
-- The CLI only talks to `https://api.myotp.app` by default. Override with `--base-url` or `MYOTP_BASE_URL` for self-hosted or staging environments.
+- The CLI only talks to `https://api.myotp.app` by default. Override with `--base-url` or `MYOTP_BASE_URL` for a mock server.
 
 ## Source and license
 
 MIT licensed. Source: [`brntech/myotp-agentkit/cli`](https://github.com/brntech/myotp-agentkit/tree/main/cli).
 
-Built and maintained by [BroadNet Technologies](https://broadnet.com), the team behind MyOTP.App.
+Built and maintained by [BroadNet Technologies](https://broadnet.me), the team behind MyOTP.App.

@@ -70,7 +70,7 @@ const sendByChannel = (apiKey: string) => async ({ phoneNumber, code }, request)
 | Option | Type | Default | Notes |
 |--------|------|---------|-------|
 | `apiKey` | `string` | (required) | From the MyOTP dashboard or `/v1/agent/register` |
-| `baseUrl` | `string` | `https://api.myotp.app` | Override for staging/test |
+| `baseUrl` | `string` | `https://api.myotp.app` | Override for a mock server in tests |
 | `channel` | `"sms" \| "whatsapp" \| "telegram"` | `"sms"` | |
 | `brand` | `string` | API key's default | 3-16 alphanumeric, dots allowed |
 | `validitySeconds` | `number` | `300` | 30-14400 (30-3600 for Telegram) |
@@ -139,7 +139,7 @@ node --input-type=module -e '
 
 ## Submitting upstream
 
-We're working with the Better Auth team to list this in their official docs. Track [issue #4702](https://github.com/better-auth/better-auth/issues/4702).
+Upstream listing is tracked in [issue #4702](https://github.com/better-auth/better-auth/issues/4702).
 
 ## License
 

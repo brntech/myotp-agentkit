@@ -21,7 +21,7 @@ If the use case is generic SaaS auth, use the base `myotp` skill.
 **MyOTP brings:**
 - Reliable, ISO 27001-certified SMS / WhatsApp / Telegram OTP delivery
 - Direct carrier connections so codes arrive even on rural / cellular-tower-limited connections (rural patient populations)
-- Multi-channel — voice, WhatsApp, SMS — for accessibility (elderly patients on landlines, etc.)
+- Multi-channel — SMS, WhatsApp, Telegram — so each patient cohort gets the channel it actually reads
 
 **MyOTP does NOT bring:**
 - HIPAA Business Associate Agreement (BAA) coverage. **The platform does not have a BAA available as a standard product**. Talk to BroadNet sales for enterprise BAA options if PHI ever flows through MyOTP messages. (For most use cases, OTP codes alone don't constitute PHI — they're authenticators, not health information.)
@@ -79,7 +79,7 @@ Don't gate appointment confirmation behind OTP — that's friction patients hate
 ## Privacy guidance
 
 - **Never include diagnostic info, medication names, or test results in OTP messages.** "Your ClinicName login code is 123456" is fine. "Your code to view your HIV test results is 123456" is a HIPAA breach waiting to happen.
-- **Consider voice channel for accessibility.** Some elderly patients struggle with SMS but can hear a code over a phone call. (Voice channel is on the MyOTP roadmap; for now, SMS is the only option.)
+- **Consider voice channel for accessibility.** Some elderly patients struggle with SMS but can hear a code over a phone call. (MyOTP has no voice channel.)
 - **Test in the patient's preferred language.** OTP messages should be in the language the patient registered with. Use the brand's default template via the `template_order` parameter (requires ACCESS_TO_TEMPLATES entitlement) or pre-register localized templates.
 
 ## Channel selection for healthcare

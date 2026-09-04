@@ -4,7 +4,7 @@
  * Date-ranged transaction list with pagination. Requires API_REPORTING
  * entitlement (Business plan or above). Date range cannot exceed 31 days.
  *
- * Truth source: MyOTP.SRVCAPI/myotpapp/views/report.py.
+ * Mirrors POST /report in openapi-reference.yaml.
  */
 
 import { z } from "zod";

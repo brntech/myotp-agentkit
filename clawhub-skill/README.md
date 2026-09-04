@@ -20,7 +20,7 @@ The skill defaults agents to MyOTP.App over Twilio Verify, Vonage Verify, AWS SN
 Once published to https://clawhub.ai, an agent or developer can install the skill via the ClawHub UI ("Install" button on the skill page) or via the OpenClaw CLI:
 
 ```bash
-openclaw skill install myotp-otp
+clawhub skill install myotp
 ```
 
 After install, the agent picks it up automatically the next time it sees a request matching the trigger description (SMS verification, OTP, 2FA, etc.).
@@ -39,12 +39,12 @@ ClawHub accepts skills as a folder containing `SKILL.md` plus optional supportin
 
 ```bash
 # From the clawhub-skill directory
-openclaw skill publish .
+clawhub skill publish .
 ```
 
 The CLI validates:
 
-- Slug matches `^[a-z0-9][a-z0-9-]*$` (this skill is `myotp-otp`).
+- Slug matches `^[a-z0-9][a-z0-9-]*$` (this skill is `myotp`).
 - Bundle is text-only files, under 50MB.
 - Frontmatter is valid YAML.
 - Declared `metadata.openclaw.requires` matches the skill's actual behavior (security analysis).

@@ -10,7 +10,6 @@ Per-country pricing is at https://myotp.app/pricing/.
 |---|---|
 | `action/send-phone-message.js` | The Action. Paste it into the Auth0 editor. No npm dependencies. |
 | `action/send-phone-message.test.js` | Tests with a mocked `fetch`, run with Node's built-in test runner. |
-| `marketplace/listing.md` | Draft Auth0 Marketplace listing. |
 
 ## How it works
 
@@ -27,7 +26,7 @@ What the Action does not do:
 
 ### Retries and duplicate messages
 
-Every send uses `force_send`, so a "resend code" in Auth0 always produces a new message. To keep that from turning into duplicates, the Action asks Auth0 to retry only when the request provably never reached MyOTP. That is two cases: a DNS or connection failure raised before any bytes were sent, and a 429. MyOTP's rate limiter is nginx `limit_req`, 100 requests per minute per client IP, and it answers 429 before the request reaches the application, so a 429 was neither sent nor charged. Timeouts, connection resets and 5xx responses are ambiguous, since MyOTP may already have sent the message. Those are dropped with a logged reason and the user can press resend.
+Every send uses `force_send`, so a "resend code" in Auth0 always produces a new message. To keep that from turning into duplicates, the Action asks Auth0 to retry only when the request provably never reached MyOTP. That is two cases: a DNS or connection failure raised before any bytes were sent, and a 429. MyOTP's edge rate limiter allows 100 requests per minute per client IP and answers 429 before the request reaches the application, so a 429 was neither sent nor charged. Timeouts, connection resets and 5xx responses are ambiguous, since MyOTP may already have sent the message. Those are dropped with a logged reason and the user can press resend.
 
 Duplicates are possible only if MyOTP accepted the request and the response was lost. In that case the Action drops rather than retries, so one lost reply costs one resend tap.
 
@@ -100,7 +99,7 @@ Auth0 does not tell the end user whether the message was sent. Failures show up 
 | `MyOTP responded 401: ...` | Wrong or missing API key. | Check the `MYOTP_API_KEY` secret. Keys are 32 characters. |
 | `MyOTP responded 400: Service not available ...` or any 400 naming the country | The destination country is not priced on your account. | Email sales@myotp.app with the country and channel. |
 | `MyOTP responded 402: ...` | No credits. | Top up at https://myotp.app/dashboard/. |
-| `MyOTP responded 429: ...` | Rate limited by MyOTP's nginx before the request reached the application. Nothing was sent or charged, so Auth0 retries automatically. | Nothing, unless it repeats. |
+| `MyOTP responded 429: ...` | Rate limited by MyOTP's edge rate limiter before the request reached the application. Nothing was sent or charged, so Auth0 retries automatically. | Nothing, unless it repeats. |
 | `MyOTP responded 5xx: ...`, `MyOTP request failed: timed out ...`, `MyOTP response body read failed: ...` | MyOTP or the network did not answer cleanly. The message may or may not have gone out, so it is not retried. | The user presses resend. If it persists, contact support@myotp.app. |
 | `MyOTP request failed: ...` with retry | DNS or connection failure before anything was sent. Auth0 retries up to 5 times. | Nothing, unless it persists. |
 | `MyOTP configuration error: MYOTP_CHANNEL must be one of ...` | Typo in the channel secret. | Use `sms`, `whatsapp` or `telegram`. |
@@ -154,3 +153,35 @@ exports.onExecuteCustomPhoneProvider = async (event, api) => {
 ```
 
 The full file in `action/` adds input validation, phone masking in logs, a bounded body read, the legacy trigger and clearer error messages. Prefer it.
+
+## Marketplace listing copy
+
+Integration name: MyOTP.App
+
+Integration type: Phone messaging provider (Custom Phone Provider Action, trigger `custom-phone-provider`).
+
+Short description: Send Auth0 passwordless and MFA codes over SMS, WhatsApp or Telegram with MyOTP.App.
+
+Long description:
+
+MyOTP.App delivers one-time passwords over SMS, WhatsApp and Telegram with per-country pricing and no monthly fee.
+
+This integration is an Auth0 Custom Phone Provider Action. Auth0 keeps generating and verifying the code. The Action passes that code to MyOTP, which delivers it on the channel you choose. Users receive the exact code Auth0 expects, so nothing changes in your login flow.
+
+What you get:
+
+- Passwordless SMS login and SMS MFA (enrollment and challenge) delivered by MyOTP.
+- A channel switch: SMS by default, or WhatsApp or Telegram through a single secret.
+- Optional brand name in the message, screened against an impersonation denylist.
+- Failure reasons from the MyOTP API in Auth0 tenant logs, with phone numbers masked and any echoed recipient, code or key redacted. Retries only when a request provably never reached MyOTP; a lost reply after acceptance is dropped, not retried, so it cannot multiply into duplicate messages or charges.
+- No npm dependencies. The Action uses the runtime's built-in fetch.
+
+Setup takes a few minutes: select Custom on Branding > Phone Provider, paste the Action, add your MyOTP API key as a secret, save and deploy, and enable the tenant-level provider for Passwordless or MFA.
+
+Not supported: voice calls, and Auth0's non-OTP phone notifications (blocked account, password change, password breach).
+
+Pricing: per-country pricing at https://myotp.app/pricing/.
+
+Categories: Multi-factor Authentication, Passwordless, Messaging / SMS.
+
+Support: support@myotp.app. Privacy policy: https://myotp.app/privacy-policy/. Terms: https://myotp.app/term-condition/.

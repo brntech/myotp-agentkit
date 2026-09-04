@@ -7,16 +7,16 @@ import type {
 	INodeTypeDescription,
 	JsonObject,
 } from 'n8n-workflow';
-import { NodeApiError, NodeConnectionTypes } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
-import { buildRequest, describeApiError } from './transport';
+import { buildRequest, describeApiError, ValidationError } from './transport';
 import type { Operation, OperationParams } from './transport';
 
 export class MyOtp implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'MyOTP',
 		name: 'myOtp',
-		icon: 'file:myotp.svg',
+		icon: { light: 'file:myotp.svg', dark: 'file:myotp.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
@@ -296,13 +296,19 @@ export class MyOtp implements INodeType {
 
 				returnData.push({ json: response, pairedItem: { item: i } });
 			} catch (error) {
-				const info = describeApiError(error);
+				const info =
+					error instanceof ValidationError
+						? { message: error.message, httpCode: undefined }
+						: describeApiError(error);
 				if (this.continueOnFail()) {
 					returnData.push({
 						json: { error: info.message, http_code: info.httpCode },
 						pairedItem: { item: i },
 					});
 					continue;
+				}
+				if (error instanceof ValidationError) {
+					throw new NodeOperationError(this.getNode(), error.message, { itemIndex: i });
 				}
 				throw new NodeApiError(this.getNode(), error as JsonObject, {
 					message: info.message,

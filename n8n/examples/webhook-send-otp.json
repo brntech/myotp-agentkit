@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "send-otp",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -13,20 +14,55 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 0],
-      "webhookId": "myotp-send-otp"
+      "webhookId": "myotp-send-otp",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Send OTP webhook secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e10",
+              "leftValue": "={{ String($json.body.phone_number ?? '') }}",
+              "rightValue": "^[1-9][0-9]{6,14}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e04",
+      "name": "Valid phone number?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, 0]
     },
     {
       "parameters": {
         "operation": "sendOtp",
         "phoneNumber": "={{ $json.body.phone_number }}",
-        "channel": "={{ $json.body.channel || 'sms' }}",
+        "channel": "={{ ['sms', 'whatsapp', 'telegram'].includes($json.body.channel) ? $json.body.channel : 'sms' }}",
         "additionalFields": {}
       },
       "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e02",
       "name": "Send OTP",
       "type": "n8n-nodes-myotp.myOtp",
       "typeVersion": 1,
-      "position": [240, 0],
+      "position": [480, -100],
       "credentials": {
         "myOtpApi": {
           "id": "",
@@ -44,12 +80,32 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [480, 0]
+      "position": [720, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"phone_number must be 7 to 15 digits, country code first, no plus sign\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e05",
+      "name": "Respond 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 120]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Send OTP", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Valid phone number?", "type": "main", "index": 0 }]]
+    },
+    "Valid phone number?": {
+      "main": [
+        [{ "node": "Send OTP", "type": "main", "index": 0 }],
+        [{ "node": "Respond 400", "type": "main", "index": 0 }]
+      ]
     },
     "Send OTP": {
       "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]

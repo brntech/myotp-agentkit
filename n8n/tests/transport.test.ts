@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { BASE_URL, buildRequest, describeApiError } from '../nodes/MyOtp/transport';
+import { buildRequest, describeApiError, ValidationError } from '../nodes/MyOtp/transport';
+
+// Pinned literally on purpose: a wrong host in transport.ts must fail here.
+const BASE_URL = 'https://api.myotp.app';
 
 describe('buildRequest', () => {
 	it('sendOtp: phone number and channel only, optional fields omitted', () => {
@@ -16,7 +19,7 @@ describe('buildRequest', () => {
 		});
 	});
 
-	it('sendOtp: passes every optional field with force_send and return_otp as strings', () => {
+	it('sendOtp: passes every optional field, force_send as a string, return_otp as a boolean', () => {
 		const req = buildRequest('sendOtp', {
 			phone_number: '19876543210',
 			channel: 'whatsapp',
@@ -37,8 +40,16 @@ describe('buildRequest', () => {
 			template_order: 2,
 			brand: 'Acme',
 			force_send: 'true',
-			return_otp: 'false',
+			return_otp: false,
 		});
+	});
+
+	it('sendOtp: return_otp true stays a boolean', () => {
+		const req = buildRequest('sendOtp', {
+			phone_number: '19876543210',
+			additionalFields: { return_otp: true },
+		});
+		expect(req.body?.return_otp).toBe(true);
 	});
 
 	it('sendOtp: drops empty strings so the API applies its defaults', () => {
@@ -50,7 +61,8 @@ describe('buildRequest', () => {
 		expect(req.body).toEqual({ phone_number: '19876543210', channel: 'telegram', otp_length: 8 });
 	});
 
-	it('sendOtp: rejects a missing phone number', () => {
+	it('sendOtp: rejects a missing phone number with a ValidationError', () => {
+		expect(() => buildRequest('sendOtp', { phone_number: '' })).toThrow(ValidationError);
 		expect(() => buildRequest('sendOtp', { phone_number: '' })).toThrow('Phone Number is required');
 	});
 

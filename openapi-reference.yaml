@@ -176,7 +176,11 @@ paths:
                   description: Phone number to verify the OTP
                 message_id:
                   type: string
-                  description: ID of the message to verify
+                  description: >
+                    ID of the message to verify. When supplied, the check is scoped to that one
+                    challenge: a code from any other message to the same number does not
+                    verify. Supply it whenever you have it. Without it, the most recent active
+                    code for phone_number is checked.
                 otp:
                   type: string
                   pattern: "^[0-9]{3,8}$"

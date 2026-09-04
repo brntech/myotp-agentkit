@@ -46,7 +46,7 @@ myotp-phone-verification/
   includes/functions.php         pure helpers (normalisation, atomic counters, attempt lockout, sanitisation)
   includes/class-myotp-pv-store.php        options-table store: INSERT IGNORE add(), BINARY-guarded UPDATE cas() and DELETE, daily sweep
   includes/class-myotp-pv-api.php          wp_remote_post to /generate_otp and /verify_otp
-  includes/class-myotp-pv-session.php      per-visitor state (counters and pending in the store, verified in WC session or transient)
+  includes/class-myotp-pv-session.php      per-visitor state: counters, pending challenge, verified record and phone locks, all in the store
   includes/class-myotp-pv-widget.php       widget markup and assets
   includes/class-myotp-pv-ajax.php         send, verify, admin test
   includes/class-myotp-pv-settings.php     Settings > MyOTP
@@ -64,7 +64,7 @@ Lint and unit tests run in Docker, no composer:
 
 ```bash
 docker run --rm -v "$PWD:/w" -w /w/wordpress-plugin php:8.2-cli sh -c \
-  'for f in $(find . -name "*.php"); do php -l $f || exit 1; done && php tests/run.php'
+  'php bin/make-pot.php && for f in $(find . -name "*.php"); do php -l $f || exit 1; done && php tests/run.php'
 ```
 
 ## Example

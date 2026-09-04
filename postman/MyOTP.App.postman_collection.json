@@ -1,0 +1,585 @@
+{
+  "info": {
+    "name": "MyOTP.App",
+    "description": "Send and verify one-time passcodes over SMS, WhatsApp and Telegram from a single API key. Phone numbers are digits only, in E.164 order, with no leading '+' and no trailing national prefix.\n\nDelivery webhooks: register a callback URL against an API key in your dashboard and MyOTP will POST to it when a message reaches a terminal state, so you do not have to poll /check_otp_status. Events are otp.delivered, otp.sent, otp.read and otp.failed, on all three channels. The body is the DeliveryEvent schema below. Every request is signed with Standard Webhooks v1 (standardwebhooks.com), so you can verify it with any off-the-shelf library: the signed content is \"{webhook-id}.{webhook-timestamp}.{body}\", HMAC-SHA256 with your base64-decoded signing secret, sent in the webhook-signature header as \"v1,<base64>\". Non-2xx responses are retried 5 times at 5, 10, 20, 40 and 60 seconds. Endpoints must be https.\n\nGenerated from openapi-reference.yaml (API 1.4.0).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.myotp.app",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "phone_number",
+      "value": "19876543210",
+      "type": "string"
+    },
+    {
+      "key": "message_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otp",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Generate OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"message_id present\", () => pm.expect(json.message_id).to.be.a(\"string\"));",
+              "// Verify OTP, Extend OTP and Check OTP Status read this variable.",
+              "pm.collectionVariables.set(\"message_id\", json.message_id);",
+              "// Only present when the request asked for return_otp: true.",
+              "if (json.otp) pm.collectionVariables.set(\"otp\", json.otp);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/generate_otp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "generate_otp"
+          ]
+        },
+        "description": "Generate a One Time Password (OTP) and send it to the specified phone number, with optional branding.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone_number\": \"{{phone_number}}\",\n  \"otp_length\": 6,\n  \"otp_validity\": 300,\n  \"channel\": \"sms\",\n  \"template_order\": 1,\n  \"brand\": \"MyOTP.App\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Verify OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/verify_otp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "verify_otp"
+          ]
+        },
+        "description": "Validate the OTP for successful verification",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone_number\": \"{{phone_number}}\",\n  \"message_id\": \"{{message_id}}\",\n  \"otp\": \"{{otp}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Extend OTP Expiry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/extend_otp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "extend_otp"
+          ]
+        },
+        "description": "Extend an existing OTP expiry time",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message_id\": \"{{message_id}}\",\n  \"duration\": 300\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Transactions Report",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/report",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "report"
+          ]
+        },
+        "description": "Returns transactions within a specified date range. If `start_date` and `end_date` are omitted, the report will include the last 7 days of history. Supports pagination.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"page\": 1,\n  \"per_page\": 10\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Check message_id Status",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/check_otp_status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "check_otp_status"
+          ]
+        },
+        "description": "Delivery report for a sent OTP, plus whether the code is still active.\n\nDelivery receipts arrive a few seconds after the send, so the first call after /generate_otp normally reports a pending state rather than a carrier status. Poll every few seconds, and treat any DLR value beginning \"Pending:\" as \"ask again shortly\". If you would rather not poll at all, register a delivery webhook in the dashboard and we will POST each status change to you instead.\n\nData is retained for 24 hours after an OTP expires.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message_id\": \"{{message_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Account Identity",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "me"
+          ]
+        },
+        "description": "Returns the account the supplied API key belongs to. Useful as an integration smoke test, since it exercises both key validation and the IP allowlist."
+      },
+      "response": []
+    },
+    {
+      "name": "Top-up Quote",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/topup/quote?credits=100",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "topup",
+            "quote"
+          ],
+          "query": [
+            {
+              "key": "credits",
+              "value": "100",
+              "description": "Number of credits to price."
+            }
+          ]
+        },
+        "description": "Price a credit top-up before paying for it. No authentication. Credits cost $0.02 each; the minimum is 25 credits ($0.50, the card minimum) and the maximum is 50,000 per call.",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Buy Credits (machine payment)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/topup",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "topup"
+          ]
+        },
+        "description": "Buy credits for the account owning the API key, paid by the caller itself over the Machine Payments Protocol (MPP, https://mpp.dev). No checkout page and no card form.\n\nThe first call answers 402 Payment Required with a WWW-Authenticate header carrying two Payment challenges, one for USDC on Tempo (method \"tempo\") and one for card or Link via a Stripe shared payment token (method \"stripe\"). The client pays one of them and repeats the same request with the payment credential; any MPP client (mppx, the Stripe Link CLI) does this automatically. The repeated request answers 200 and the credits are on the balance at once.\n\nRules: $0.02 per credit, minimum 25 credits, maximum 50,000 per call. Card top-ups are capped at $100 per account per rolling 24 hours; over the cap the 402 offers USDC only, which is uncapped. A trial account moves to the Starter pay-as-you-go price table on its first top-up and no subscription is created. A payment credential never credits twice: a replay answers 200 with status \"already_credited\".\n\nPay from the command line with a USDC wallet (npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H \"x-api-key: KEY\" -H \"content-type: application/json\" -d '{\"credits\":100}') or with a Link agent wallet (npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d '{\"credits\":100}' -H \"x-api-key: KEY\" --context \"MyOTP credits\").",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"credits\": 100\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create an account (agent signup)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/agent/register",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "agent",
+            "register"
+          ]
+        },
+        "description": "Create a MyOTP.App account without a browser. No authentication. The 201 body carries the API key exactly once; store it and send it as X-API-Key on every later request.\n\nRules: no trial credits and no phone verification. The balance starts at zero, so the account can send nothing until it is topped up with POST /v1/topup. USDC top-ups work immediately; card top-ups are offered only after the account email is confirmed. The IP allowlist is open (\"*\") for agent accounts. Five registrations per IP address per 24 hours. The human signup at https://myotp.app/sign-up is unchanged: 15 free credits, email and phone verification.\n\nEmail confirmation: the address receives \"Confirm your MyOTP.App account email\" from raya@myotp.app with a link to /v1/agent/verify-email. A human has to open it and press Confirm; the agent cannot confirm on the user's behalf. The link is single use and valid for 24 hours.\n\nAgent flow: register, save the api_key, tell the human to click the email link (optional, only needed for cards), GET /v1/topup/quote, POST /v1/topup and pay the 402 (USDC works without the email step), then POST /generate_otp as usual. A 403 \"Insufficient balance\" on any send means: top up again.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"dev@example.com\",\n  \"name\": \"Acme\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Agent account status",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/agent/account",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "agent",
+            "account"
+          ]
+        },
+        "description": "The account behind the API key, in the same shape as the registration body minus the api_key. Poll email_verified to learn when the human has confirmed the email and card top-ups are unlocked."
+      },
+      "response": []
+    },
+    {
+      "name": "Resend the email confirmation link",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/agent/resend-verification",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "agent",
+            "resend-verification"
+          ]
+        },
+        "description": "Send the \"Confirm your MyOTP.App account email\" message again. Use it when the first link expired (24 hours) or was lost."
+      },
+      "response": []
+    },
+    {
+      "name": "Email confirmation page (browser-facing)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/agent/verify-email?token=",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "agent",
+            "verify-email"
+          ],
+          "query": [
+            {
+              "key": "token",
+              "value": "",
+              "description": "Single-use confirmation token from the email link."
+            }
+          ]
+        },
+        "description": "Browser-facing, not for agents. This is the link in the confirmation email. It renders an HTML page with a Confirm button; the human presses it and the page POSTs the token back. The token is single use and valid for 24 hours. An agent cannot complete this step; it should tell the human to open the email and poll GET /v1/agent/account for email_verified instead.",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Confirm the email (browser-facing)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"response is JSON\", () => pm.response.to.be.json);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/agent/verify-email",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "agent",
+            "verify-email"
+          ]
+        },
+        "description": "Browser-facing, not for agents. Submitted by the Confirm button on the GET page. Marks the account email as verified, which unlocks card top-ups. Answers an HTML page in every case; an expired or already used token shows an error page.",
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "token",
+              "value": "TOKEN_FROM_THE_CONFIRMATION_EMAIL"
+            }
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "response": []
+    }
+  ]
+}

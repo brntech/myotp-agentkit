@@ -1,0 +1,71 @@
+[
+  {
+    "name": "phone_number",
+    "type": "text",
+    "label": "Phone number",
+    "help": "Digits only, country code first, no plus sign and no leading zero. Example: 14155551234.",
+    "required": true,
+    "validate": {
+      "pattern": "^[1-9][0-9]{6,14}$"
+    }
+  },
+  {
+    "name": "channel",
+    "type": "select",
+    "label": "Channel",
+    "default": "sms",
+    "options": [
+      { "label": "SMS", "value": "sms" },
+      { "label": "WhatsApp", "value": "whatsapp" },
+      { "label": "Telegram", "value": "telegram" }
+    ]
+  },
+  {
+    "name": "otp_length",
+    "type": "uinteger",
+    "label": "OTP length",
+    "help": "4 to 8 digits. Defaults to 6.",
+    "advanced": true,
+    "validate": { "min": 4, "max": 8 }
+  },
+  {
+    "name": "otp_validity",
+    "type": "uinteger",
+    "label": "Validity (seconds)",
+    "help": "60 to 86400 seconds. Defaults to 300. SMS only.",
+    "advanced": true,
+    "validate": { "min": 60, "max": 86400 }
+  },
+  {
+    "name": "template_order",
+    "type": "uinteger",
+    "label": "Template",
+    "help": "Which of your message templates to use, 1 to 5. Defaults to 1.",
+    "advanced": true,
+    "validate": { "min": 1, "max": 5 }
+  },
+  {
+    "name": "brand",
+    "type": "text",
+    "label": "Brand",
+    "help": "3 to 16 letters, digits or dots. Overrides the account and app defaults. Screened against a denylist.",
+    "advanced": true,
+    "validate": {
+      "pattern": "^[a-zA-Z0-9.]{3,16}$"
+    }
+  },
+  {
+    "name": "force_send",
+    "type": "boolean",
+    "label": "Force send",
+    "help": "Send even if an unexpired OTP already exists for this number.",
+    "advanced": true
+  },
+  {
+    "name": "return_otp",
+    "type": "boolean",
+    "label": "Return the OTP in the output",
+    "help": "Not compliant with regulations in many markets. Leave off in production.",
+    "advanced": true
+  }
+]

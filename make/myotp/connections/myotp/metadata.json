@@ -1,0 +1,5 @@
+{
+  "name": "myotp",
+  "label": "MyOTP.App API key",
+  "type": "apikey"
+}

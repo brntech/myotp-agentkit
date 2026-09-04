@@ -1,0 +1,9 @@
+[
+  {
+    "name": "message_id",
+    "type": "text",
+    "label": "Message ID",
+    "help": "The message_id returned by Send OTP.",
+    "required": true
+  }
+]

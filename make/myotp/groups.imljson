@@ -1,0 +1,23 @@
+[
+  {
+    "label": "OTP",
+    "modules": [
+      "sendOtp",
+      "verifyOtp",
+      "extendOtp",
+      "checkOtpStatus"
+    ]
+  },
+  {
+    "label": "Account",
+    "modules": [
+      "getAccount"
+    ]
+  },
+  {
+    "label": "Other",
+    "modules": [
+      "makeApiCall"
+    ]
+  }
+]

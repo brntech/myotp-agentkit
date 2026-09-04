@@ -1,0 +1,9 @@
+{
+  "name": "extendOtp",
+  "label": "Extend OTP",
+  "description": "Extends the expiry of an OTP that has already been sent.",
+  "type": "action",
+  "actionType": "update",
+  "connection": "myotp",
+  "operation": "extend_otp_endpoint"
+}

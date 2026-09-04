@@ -1,0 +1,5 @@
+[
+  { "name": "status", "type": "text", "label": "Status" },
+  { "name": "message", "type": "text", "label": "Message" },
+  { "name": "expires_at", "type": "date", "label": "New expiry" }
+]

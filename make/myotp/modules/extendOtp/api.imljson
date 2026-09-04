@@ -1,0 +1,15 @@
+{
+  "url": "/extend_otp",
+  "method": "POST",
+  "body": {
+    "message_id": "{{parameters.message_id}}",
+    "duration": "{{parameters.duration}}"
+  },
+  "response": {
+    "output": {
+      "status": "{{body.status}}",
+      "message": "{{body.message}}",
+      "expires_at": "{{body.expires_at}}"
+    }
+  }
+}

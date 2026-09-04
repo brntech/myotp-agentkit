@@ -18,7 +18,10 @@ export interface ServerOptions {
    * - stdio mode passes a function that always returns the env var.
    * - HTTP mode passes a function that reads `X-API-Key` from the current request.
    */
-  resolveApiKey: (extra: { headers?: Record<string, string | string[] | undefined> }) => string;
+  resolveApiKey: (extra: {
+    headers?: Record<string, string | string[] | undefined>;
+    url?: string;
+  }) => string;
   client?: MyOtpClient;
 }
 
@@ -68,7 +71,13 @@ export function createServer(options: ServerOptions): McpServer {
           | Record<string, string | string[] | undefined>
           | undefined;
 
-        const apiKey = options.resolveApiKey({ headers: headers ?? {} });
+        // The SDK also carries the request URL; gateways that pass config in the
+        // query string (Smithery) are handled by the resolver through it.
+        const url = extra.requestInfo?.url;
+        const apiKey = options.resolveApiKey({
+          headers: headers ?? {},
+          url: url === undefined ? undefined : String(url),
+        });
 
         const ctx: ToolContext = { client, apiKey };
         const result = await tool.handler(parsed as Record<string, unknown>, ctx);

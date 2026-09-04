@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: MyOTPApp API
-  version: 1.4.0
+  version: 1.4.1
   description: >
     Send and verify one-time passcodes over SMS, WhatsApp and Telegram from a
     single API key. Phone numbers are digits only, in E.164 order, with no
@@ -77,6 +77,14 @@ paths:
                   minimum: 1
                   maximum: 5
                   description: Order of the template to be used for the OTP message, defaults to 1 (12 for WhatsApp).
+                otp_code:
+                  type: string
+                  pattern: "^[0-9]{3,8}$"
+                  description: >
+                    Supply your own code instead of letting MyOTP generate one (3 to 8 digits,
+                    4 to 8 for telegram). When set, otp_length is ignored. Use this when another
+                    system (for example an identity provider) already holds the code the user
+                    must type.
                 force_send:
                   type: boolean
                   default: false
@@ -111,7 +119,8 @@ paths:
                     description: ID of the message sent.
                   status:
                     type: string
-                    description: Status of the request.
+                    enum: [accepted]
+                    description: Status of the request. Always "accepted" on a 200; delivery state comes from /check_otp_status or a delivery webhook.
                   message:
                     type: string
                     description: Message describing the status of the request.
@@ -277,13 +286,11 @@ paths:
                 start_date:
                   type: string
                   format: date
-                  description: Start date of the report in YYYY-MM-DD format (optional)
-                  default: "7 days ago"
+                  description: Start date of the report in YYYY-MM-DD format. Optional; defaults to seven days ago.
                 end_date:
                   type: string
                   format: date
-                  description: End date of the report in YYYY-MM-DD format (optional)
-                  default: "current day"
+                  description: End date of the report in YYYY-MM-DD format. Optional; defaults to today.
                 page:
                   type: integer
                   format: int32
@@ -340,6 +347,7 @@ paths:
           description: Unauthorized
   /check_otp_status:
     post:
+      operationId: check_otp_status_endpoint
       summary: Check message_id Status
       description: >
         Delivery report for a sent OTP, plus whether the code is still active.
@@ -373,7 +381,7 @@ paths:
                   type: string
                   description: The message ID returned by /generate_otp.
       responses:
-        200:
+        '200':
           description: >
             The delivery report, or an explanation of why one is not available.
             Note that an unknown message_id is also a 200, carrying "message"
@@ -435,11 +443,11 @@ paths:
                     type: string
                     deprecated: true
                     description: Deprecated alias of message. Read message instead.
-        400:
+        '400':
           description: message_id is required
-        401:
+        '401':
           description: Unauthorized
-        403:
+        '403':
           description: The calling IP is not on this key's allowlist
 
   /me:

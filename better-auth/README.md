@@ -78,6 +78,10 @@ const sendByChannel = (apiKey: string) => async ({ phoneNumber, code }, request)
 | `userAgent` | `string` | `myotp-better-auth/0.1.0` | |
 | `fetch` | `typeof fetch` | `globalThis.fetch` | Inject for tests / edge runtimes |
 
+## Duplicate sends
+
+Every send passes `force_send: "true"` so a "resend code" always produces a new message. The adapter does not retry on its own, and neither does Better Auth, so a transport error surfaces to your code as `MyotpDeliveryError` rather than a second SMS. If you add retries around `sendVerificationCode`, retry only on errors raised before any bytes were sent (DNS, connection refused) or on a 429; a timeout or a 5xx may already have delivered the message.
+
 ## Error handling
 
 The adapter throws `MyotpDeliveryError` (with `.status` and `.body`) on any non-2xx from MyOTP. Better Auth surfaces this back to the caller of `signIn.phoneNumber()`. Common cases:

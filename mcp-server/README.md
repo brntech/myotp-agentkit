@@ -116,6 +116,10 @@ Cursor reads the same `.mcp.json` format. Add to your workspace settings or `.cu
 }
 ```
 
+## Gateways that pass config in the URL
+
+Some MCP gateways deliver per-user settings as query parameters rather than headers. The hosted server accepts `?apiKey=<key>` (also `?api_key=`, or a base64url `?config=` JSON blob with an `apiKey` field) as a fallback. A key in the `X-API-Key` or `Authorization: Bearer` header always wins over one in the URL. On Smithery, the config schema maps the key to the `x-api-key` header, so no URL parameter is needed there.
+
 ## Use it with Codex CLI
 
 Codex reads TOML, not JSON. Add to `~/.codex/config.toml`:

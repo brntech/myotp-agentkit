@@ -113,6 +113,36 @@ export function resolveApiKeyFromHeaders(
   return bearer ? bearer[1].trim() : "";
 }
 
+/**
+ * Some MCP gateways (Smithery is one) deliver per-user configuration as URL
+ * query parameters instead of headers. Accept `?apiKey=` / `?api_key=` and the
+ * base64url `?config=` JSON form as a fallback when no header carried a key.
+ * Headers always win, so a key in the URL can never override an explicit one.
+ */
+export function resolveApiKeyFromQuery(url: string | undefined): string {
+  if (!url) return "";
+  let params: URLSearchParams;
+  try {
+    params = new URL(url, "http://localhost").searchParams;
+  } catch {
+    return "";
+  }
+  const direct = params.get("apiKey") ?? params.get("api_key");
+  if (direct && direct.trim() !== "") return direct.trim();
+  const packed = params.get("config");
+  if (packed) {
+    try {
+      const json = Buffer.from(packed, "base64url").toString("utf8");
+      const parsed = JSON.parse(json) as Record<string, unknown>;
+      const value = parsed.apiKey ?? parsed.api_key;
+      if (typeof value === "string" && value.trim() !== "") return value.trim();
+    } catch {
+      /* not a config blob we understand */
+    }
+  }
+  return "";
+}
+
 export function getHeader(
   headers: Record<string, string | string[] | undefined> | undefined,
   name: string

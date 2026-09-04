@@ -60,6 +60,10 @@ export function createServer(options: ServerOptions): McpServer {
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        // The SDK validates `structuredContent` of every non-error result against
+        // this schema and fails the call on a mismatch, so the object is
+        // passthrough: new API fields must never break a working tool.
+        ...(tool.outputSchema ? { outputSchema: z.object(tool.outputSchema).passthrough() } : {}),
         annotations: tool.annotations ?? {},
       },
       async (args, extra) => {

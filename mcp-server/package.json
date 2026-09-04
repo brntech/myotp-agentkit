@@ -1,6 +1,6 @@
 {
   "name": "@myotp/mcp",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "mcpName": "io.github.brntech/myotp",
   "description": "Create MyOTP.App accounts, buy credits, and send OTPs by SMS, WhatsApp, or Telegram over MCP.",
   "license": "MIT",

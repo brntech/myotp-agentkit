@@ -83,6 +83,16 @@ const inputSchema = {
     ),
 };
 
+const outputSchema = {
+  message_id: z.string().describe("ID of the message sent. Pass it to verify_otp, check_otp_status and extend_otp."),
+  status: z.string().describe("Always 'accepted' on success; delivery state comes from check_otp_status."),
+  message: z.string().describe("Message describing the status of the request."),
+  date_sent: z.string().describe("ISO 8601 date-time the OTP was sent."),
+  expires_at: z.string().describe("ISO 8601 date-time the OTP expires."),
+  cost: z.number().describe("Credits charged for this send."),
+  otp: z.string().optional().describe("The OTP value, present only when return_otp was true."),
+};
+
 export const generateOtpTool: ToolDefinition<typeof inputSchema> = {
   name: "generate_otp",
   title: "Send OTP",
@@ -93,6 +103,7 @@ export const generateOtpTool: ToolDefinition<typeof inputSchema> = {
     "Each call deducts credits from the account balance; the per-message cost varies by destination country and channel and is returned in the `cost` field. " +
     "Use this whenever an app needs to verify someone's phone — signup, login 2FA, password reset, transaction confirmation, etc.",
   inputSchema,
+  outputSchema,
   annotations: {
     // Sending an OTP costs money and triggers a real SMS/message — definitely not idempotent.
     readOnlyHint: false,

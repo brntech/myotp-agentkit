@@ -13,7 +13,7 @@ import type {
   TopUpQuoteResponse,
 } from "../types.js";
 import { compact, ok, toToolError } from "./helpers.js";
-import { buildTopUpCommands } from "./get_topup_quote.js";
+import { buildTopUpCommands, howToPayShape, topUpQuoteSchema } from "./get_topup_quote.js";
 import type { ToolDefinition } from "./types.js";
 
 const API_KEY_PLACEHOLDER = "your MyOTP API key";
@@ -32,6 +32,58 @@ const inputSchema = {
     .describe("If true, return only the quote and explanation without requesting a payment challenge."),
 };
 
+/**
+ * One object covers the three results this tool returns, so every field is
+ * optional: a dry run returns `quote` + `explanation`; a settled payment
+ * returns the credited result (`status`, `credits`, `balance`, ...); a 402
+ * returns `quote`, `challengeId`, `offers`, `retry`, `how_to_pay` and
+ * `explanation`.
+ */
+const outputSchema = {
+  quote: topUpQuoteSchema.optional().describe("The quote for the requested credits (dry run and 402 results)."),
+  explanation: z.string().optional().describe("What happened and what the caller must do next (dry run and 402 results)."),
+  challengeId: z.string().optional().describe("The MPP challenge id from the 402 response."),
+  offers: z
+    .array(
+      z
+        .object({
+          method: z.string().describe("tempo (USDC) or stripe (card)."),
+          intent: z.string(),
+          id: z.string(),
+          expires: z.string().describe("ISO 8601 expiry of the offer."),
+          amount: z.union([z.string(), z.number()]),
+          amount_unit: z.string().describe("What amount is denominated in: USDC atomic units for tempo, cents for stripe."),
+          amount_usd: z.string().optional().describe("amount converted to USD with two decimals when the unit is known."),
+          currency: z.string(),
+        })
+        .passthrough()
+    )
+    .optional()
+    .describe("Decoded Payment offers from the WWW-Authenticate challenge (402 result)."),
+  retry: z
+    .object({
+      url: z.string(),
+      method: z.string(),
+      headers: z.record(z.string()).describe("Headers to send; placeholders mark the API key and payment credential."),
+      body: z.record(z.unknown()),
+    })
+    .passthrough()
+    .optional()
+    .describe("The request to replay with a payment credential (402 result)."),
+  how_to_pay: z.object(howToPayShape).passthrough().optional().describe("Ready-to-run client commands (402 result)."),
+  status: z.string().optional().describe("'credited' or 'already_credited' (settled result)."),
+  credits: z.number().int().optional().describe("Credits bought in this call (settled result)."),
+  amount_usd: z.string().optional().describe("Amount paid in US dollars (settled result)."),
+  currency: z.string().optional(),
+  payment: z
+    .object({ method: z.string().optional(), reference: z.string().optional() })
+    .passthrough()
+    .optional()
+    .describe("Payment method and reference (settled result)."),
+  balance: z.number().optional().describe("Account balance in credits after the top-up (settled result)."),
+  plan_id: z.number().int().optional(),
+};
+
 export const topUpCreditsTool: ToolDefinition<typeof inputSchema> = {
   name: "top_up_credits",
   title: "Buy MyOTP credits",
@@ -41,6 +93,7 @@ export const topUpCreditsTool: ToolDefinition<typeof inputSchema> = {
     "The tool quotes first, then returns a structured 402 challenge and exact retry details for the agent's own MPP client; " +
     "if fetch is already wrapped by a credential-carrying MPP runtime, it returns the credited response directly.",
   inputSchema,
+  outputSchema,
   annotations: {
     readOnlyHint: false,
     idempotentHint: false,

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: MyOTP Phone Verification 1.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/brntech/myotp-agentkit/issues\n"
-"POT-Creation-Date: 2026-09-04 18:42+0000\n"
+"POT-Creation-Date: 2026-09-04 18:49+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -184,6 +184,9 @@ msgid "This phone verification was already used. Verify your number again."
 msgstr ""
 
 msgid "This site sets a cookie named myotp_pv_sid for one day to tie your verification to your browser. It keeps a record of the number, the code reference and the number of attempts for as long as the code is valid (the site setting, at most 24 hours), and after five wrong codes a 15-minute cooldown for your browser on that number. A verified number stays attached to your session for up to 30 minutes. Expired records are removed by a daily clean-up."
+msgstr ""
+
+msgid "Too many checks in progress for this code. Wait a moment and try again."
 msgstr ""
 
 #. translators: %d: minutes to wait

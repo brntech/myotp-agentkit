@@ -113,48 +113,63 @@ $raw = $s->get( 'k' );
 check( 'install by cas wins', true, null !== myotp_pv_install( $s, 'k', $raw, array( 'a' => 3 ), 60 ) );
 check( 'install by stale cas loses', null, myotp_pv_install( $s, 'k', $raw, array( 'a' => 4 ), 60 ) );
 
-// Attempt reservation.
+// Attempt reservation: reserved bounds in-flight guesses, failed counts "wrong code" answers.
 $s = new MyOTP_Mem_Store();
 check( 'no pending: not ok', false, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['ok'] );
-$s->set( 'pend', myotp_pv_json( array( 'phone' => '14155551234', 'message_id' => 'm1', 'attempts' => 0, 'exp' => $now + 300 ) ), 300 );
+$s->set( 'pend', myotp_pv_json( array( 'phone' => '14155551234', 'message_id' => 'm1', 'reserved' => 0, 'failed' => 0, 'exp' => $now + 300 ) ), 300 );
 for ( $i = 1; $i <= 5; $i++ ) {
 	$r = myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
-	check( "attempt $i counted", $i, $r['attempts'] );
+	check( "reservation $i ok", true, $r['ok'] );
 }
 check( 'reserve returns the raw it wrote', $s->get( 'pend' ), $r['raw'] );
+check( 'five in flight', 5, json_decode( $s->get( 'pend' ), true )['reserved'] );
 $r = myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
-check( 'sixth attempt locked', true, $r['locked'] );
-check( 'exhausted record is not deleted by reserve', true, null !== $s->get( 'pend' ) );
+check( 'sixth in-flight reservation refused', false, $r['ok'] );
+check( 'sixth in-flight reservation is not a lock', false, $r['locked'] );
+check( 'release reserved', true, myotp_pv_release_attempt( $s, 'pend', 'm1' ) );
+check( 'release on another challenge refused', false, myotp_pv_release_attempt( $s, 'pend', 'other' ) );
+check( 'release never touches failed', 0, json_decode( $s->get( 'pend' ), true )['failed'] );
+$f = myotp_pv_record_failed( $s, 'pend', 'm1', 5, $now );
+check( 'record_failed settles one reservation', 3, json_decode( $s->get( 'pend' ), true )['reserved'] );
+check( 'record_failed counts one failure', 1, $f['failed'] );
+check( 'record_failed not exhausted', false, $f['exhausted'] );
+check( 'record_failed on another challenge refused', false, myotp_pv_record_failed( $s, 'pend', 'other', 5, $now )['ok'] );
+for ( $i = 0; $i < 3; $i++ ) {
+	$f = myotp_pv_record_failed( $s, 'pend', 'm1', 5, $now );
+}
+check( 'four failures, not exhausted', false, $f['exhausted'] );
+check( 'reserved floors at zero', 0, json_decode( $s->get( 'pend' ), true )['reserved'] );
+check( 'failed + reserved at cap refuses a reservation', true, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['ok'] );
+check( 'failed + reserved over cap refuses', false, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['ok'] );
+$f = myotp_pv_record_failed( $s, 'pend', 'm1', 5, $now );
+check( 'fifth failure is exhausted', true, $f['exhausted'] );
+check( 'exhausted raw is the stored value', $s->get( 'pend' ), $f['raw'] );
+check( 'reserve after exhaustion is locked', true, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['locked'] );
 check( 'ttl_left from exp', 300, myotp_pv_ttl_left( array( 'exp' => $now + 300 ), $now ) );
 $s->set( 'pend', 'garbage', 60 );
 myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
 check( 'garbage delete was guarded', array( 'pend', 'garbage' ), end( $s->deletes ) );
+// Reviewer ordering: A reserves 4th, B reserves 5th, B fails (failed 4), A refunds (500): no exhaustion; then a 5th failure exhausts.
 $s = new MyOTP_Mem_Store();
-$s->set( 'pend', myotp_pv_json( array( 'phone' => '14155551234', 'message_id' => 'm1', 'attempts' => 3, 'exp' => $now + 300 ) ), 300 );
-$s->before_cas = function ( $store ) use ( $now ) {
-	myotp_pv_reserve_attempt( $store, 'pend', 5, $now );
-};
-check( 'attempt race: retried and counted', 5, myotp_pv_reserve_attempt( $s, 'pend', 5, $now )['attempts'] );
-$s = new MyOTP_Mem_Store();
-$s->set( 'pend', myotp_pv_json( array( 'phone' => '1', 'message_id' => 'm', 'attempts' => 2, 'exp' => time() + 60 ) ), 60 );
-check( 'release attempt on another challenge refused', false, myotp_pv_release_attempt( $s, 'pend', 'other' ) );
-check( 'release attempt on another challenge left count', 2, json_decode( $s->get( 'pend' ), true )['attempts'] );
-check( 'release attempt decrements', true, myotp_pv_release_attempt( $s, 'pend', 'm' ) && 1 === json_decode( $s->get( 'pend' ), true )['attempts'] );
-myotp_pv_release_attempt( $s, 'pend', 'm' );
-check( 'release attempt floors at zero', false, myotp_pv_release_attempt( $s, 'pend', 'm' ) );
-
-// Exhaustion is a CAS on the raw value last read.
-$s = new MyOTP_Mem_Store();
-$s->set( 'pend', myotp_pv_json( array( 'phone' => '1', 'message_id' => 'm', 'attempts' => 5, 'exp' => time() + 60 ) ), 60 );
-$raw5 = $s->get( 'pend' );
-check( 'exhaust: wrong message id refused', false, myotp_pv_exhaust_challenge( $s, 'pend', $raw5, 'other', 5 ) );
-check( 'exhaust: below cap refused', false, myotp_pv_exhaust_challenge( $s, 'pend', myotp_pv_json( array( 'phone' => '1', 'message_id' => 'm', 'attempts' => 4, 'exp' => time() + 60 ) ), 'm', 5 ) );
-myotp_pv_release_attempt( $s, 'pend', 'm' ); // a concurrent refund lands: row is now attempts 4
-check( 'exhaust: stale raw after a refund loses', false, myotp_pv_exhaust_challenge( $s, 'pend', $raw5, 'm', 5 ) );
-check( 'exhaust: challenge survives the stale attempt', 4, json_decode( $s->get( 'pend' ), true )['attempts'] );
+$s->set( 'pend', myotp_pv_json( array( 'phone' => '14155551234', 'message_id' => 'm1', 'reserved' => 0, 'failed' => 3, 'exp' => $now + 300 ) ), 300 );
+$ra = myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
+$rb = myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
+check( 'ordering: both reservations ok', true, $ra['ok'] && $rb['ok'] );
+$fb = myotp_pv_record_failed( $s, 'pend', 'm1', 5, $now );
+check( 'ordering: B failed makes 4', 4, $fb['failed'] );
+check( 'ordering: not exhausted', false, $fb['exhausted'] );
+check( 'ordering: A refund releases its reservation', true, myotp_pv_release_attempt( $s, 'pend', 'm1' ) );
+check( 'ordering: reserved back to zero', 0, json_decode( $s->get( 'pend' ), true )['reserved'] );
+check( 'ordering: still four failures', 4, json_decode( $s->get( 'pend' ), true )['failed'] );
 myotp_pv_reserve_attempt( $s, 'pend', 5, $now );
-check( 'exhaust: fresh raw at cap wins', true, myotp_pv_exhaust_challenge( $s, 'pend', $s->get( 'pend' ), 'm', 5 ) );
-check( 'exhaust: challenge gone', null, $s->get( 'pend' ) );
+check( 'ordering: fifth failure exhausts', true, myotp_pv_record_failed( $s, 'pend', 'm1', 5, $now )['exhausted'] );
+// Race on record_failed: an interleaved failure is counted, not overwritten.
+$s = new MyOTP_Mem_Store();
+$s->set( 'pend', myotp_pv_json( array( 'phone' => '1', 'message_id' => 'm', 'reserved' => 2, 'failed' => 3, 'exp' => $now + 300 ) ), 300 );
+$s->before_cas = function ( $store ) use ( $now ) {
+	myotp_pv_record_failed( $store, 'pend', 'm', 5, $now );
+};
+check( 'failed race: retried and exhausted on the stored value', true, myotp_pv_record_failed( $s, 'pend', 'm', 5, $now )['exhausted'] );
 
 // Cooldown record (add-only, timed).
 $s = new MyOTP_Mem_Store();
@@ -410,11 +425,11 @@ myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-2' ) );
 myotp_test_send( '14155551234' );
 myotp_test_wrong( 3 );
-check( '409 own: three attempts used before resend', 3, myotp_test_pending()['attempts'] );
+check( '409 own: three failures recorded before resend', 3, myotp_test_pending()['failed'] );
 myotp_test_http( 409, array( 'error' => array( 'http_code' => 409, 'message' => 'OTP already active' ) ) );
 $r = myotp_test_send( '14155551234' );
 check( '409 own: soft success', true, $r->success );
-check( '409 own: attempts kept', 3, myotp_test_pending()['attempts'] );
+check( '409 own: failures kept', 3, myotp_test_pending()['failed'] );
 check( '409 own: message id kept', 'msg-2', myotp_test_pending()['message_id'] );
 check( '409 own: site slot refunded', 1, myotp_test_counter( 'send_site' ) );
 check( '409 own: one provider call only', 5, count( $GLOBALS['myotp_test']['http_log'] ) );
@@ -478,7 +493,7 @@ $_COOKIE['myotp_pv_sid'] = str_repeat( 'a', 32 );
 MyOTP_PV_Store::$instance->rows[ 'cool:c_' . str_repeat( 'a', 32 ) . ':14155551234' ] = myotp_pv_json( array( 'at' => time() - 1000, 'until' => time() - 1 ) );
 myotp_test_http( 200, array( 'message_id' => 'msg-5' ) );
 check( 'cooldown: expired cooldown allows a new send', true, myotp_test_send( '14155551234' )->success );
-check( 'cooldown: new challenge starts at zero attempts', 0, myotp_test_pending()['attempts'] );
+check( 'cooldown: new challenge starts at zero failures', 0, myotp_test_pending()['failed'] );
 
 // Only "failed" counts.
 myotp_test_configure();
@@ -486,29 +501,30 @@ myotp_test_http( 200, array( 'message_id' => 'msg-9' ) );
 myotp_test_send( '14155551234' );
 check( 'count: bad code shape 400', 400, myotp_test_verify( '12' )->status );
 check( 'count: changed number refused', 400, myotp_test_verify( '123456', '14155559999' )->status );
-check( 'count: mismatch did not consume', 0, myotp_test_pending()['attempts'] );
+check( 'count: mismatch did not consume', array( 0, 0 ), array( myotp_test_pending()['reserved'], myotp_test_pending()['failed'] ) );
 myotp_test_http( 'wp_error', null );
 myotp_test_verify( '123456' );
-check( 'count: transport did not consume', 0, myotp_test_pending()['attempts'] );
+check( 'count: transport did not consume', array( 0, 0 ), array( myotp_test_pending()['reserved'], myotp_test_pending()['failed'] ) );
 myotp_test_http( 500, '<html>oops</html>' );
 myotp_test_verify( '123456' );
-check( 'count: 5xx did not consume', 0, myotp_test_pending()['attempts'] );
+check( 'count: 5xx did not consume', array( 0, 0 ), array( myotp_test_pending()['reserved'], myotp_test_pending()['failed'] ) );
 myotp_test_http( 401, array( 'error' => array( 'http_code' => 401, 'message' => 'bad key' ) ) );
 myotp_test_verify( '123456' );
-check( 'count: 4xx did not consume', 0, myotp_test_pending()['attempts'] );
+check( 'count: 4xx did not consume', 0, myotp_test_pending()['failed'] );
 myotp_test_http( 200, array( 'status' => 'weird', 'message' => 'unknown' ) );
 myotp_test_verify( '123456' );
-check( 'count: unknown status did not consume', 0, myotp_test_pending()['attempts'] );
+check( 'count: unknown status did not consume', 0, myotp_test_pending()['failed'] );
 myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
 $r = myotp_test_verify( '123456' );
-check( 'count: failed consumed', 1, myotp_test_pending()['attempts'] );
+check( 'count: failed consumed', 1, myotp_test_pending()['failed'] );
+check( 'count: failed settled its reservation', 0, myotp_test_pending()['reserved'] );
 check( 'count: remaining reported on failed', 4, $r->data['remaining'] );
 check( 'count: message_id on the wire', 'msg-9', myotp_test_last_body()['message_id'] );
 for ( $i = 0; $i < 20; $i++ ) {
 	myotp_test_http( 500, '<html>oops</html>' );
 	myotp_test_verify( '123456' );
 }
-check( 'count: a provider outage never exhausts a challenge', 1, myotp_test_pending()['attempts'] );
+check( 'count: a provider outage never exhausts a challenge', 1, myotp_test_pending()['failed'] );
 myotp_test_http( 200, array( 'status' => 'expired', 'message' => 'OTP expired' ) );
 check( 'count: expired surfaced', 'OTP expired', myotp_test_verify( '111111' )->data['message'] );
 check( 'count: expired dropped the challenge', null, myotp_test_pending() );
@@ -547,7 +563,7 @@ check( 'verify over claim: not reported as success', false, $r->success );
 check( 'verify over claim: message', 'Verification state changed. Try again.', $r->data['message'] );
 check( 'verify over claim: claim intact', 'claiming:14155551234:rid-x', myotp_test_vrec()['state'] );
 check( 'verify over claim: pending kept', 'msg-11', myotp_test_pending()['message_id'] );
-check( 'verify over claim: attempt not charged', 0, myotp_test_pending()['attempts'] );
+check( 'verify over claim: reservation released', 0, myotp_test_pending()['reserved'] );
 // Verified row consumed while the provider call is in flight: same outcome.
 myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-12' ) );
@@ -588,64 +604,37 @@ myotp_test_http( 200, array( 'message_id' => 'msg-B2' ) );
 $r = myotp_test_send( '14155551234' );
 check( 'send race: B send refused (pending changed under it)', 409, $r->status );
 check( 'send race: A proof kept', 'verified', myotp_test_vrec()['state'] );
-// A claim lands between send's preflight and its pre-provider clear: the guarded clear
-// fails, the slots are refunded, the provider is never called, and no pending row is written.
+// A failed resend must not destroy a valid proof: the verified record is untouched until the provider succeeded.
 myotp_test_configure();
 myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'verified' ) );
-MyOTP_PV_Store::$instance->before_delete = function () {
+myotp_test_http( 'wp_error', null );
+check( 'resend transport failure: error', false, myotp_test_send( '14155551234' )->success );
+check( 'resend transport failure: proof intact', 'verified', myotp_test_vrec()['state'] );
+myotp_test_http( 503, array( 'error' => array( 'http_code' => 503, 'message' => 'Down' ) ) );
+myotp_test_send( '14155551234' );
+check( 'resend 5xx: proof intact', 'verified', myotp_test_vrec()['state'] );
+$GLOBALS['myotp_test']['http_before'] = function () {
+	check( 'send order: proof still present while the provider is called', 'verified', myotp_test_vrec()['state'] );
+};
+myotp_test_http( 200, array( 'message_id' => 'msg-C' ) );
+check( 'send order: success', true, myotp_test_send( '14155551234' )->success );
+check( 'send order: proof cleared after the provider succeeded', null, myotp_test_vrec() );
+check( 'send order: challenge installed', 'msg-C', myotp_test_pending()['message_id'] );
+// The one narrow case: a claim lands during the provider call. The SMS went out; nothing is
+// refunded, no challenge is installed next to the claim, and the visitor is told to finish the checkout.
+myotp_test_configure();
+myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'verified' ) );
+$GLOBALS['myotp_test']['http_before'] = function () {
 	myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'claiming:14155551234:rid-c' ) );
 };
+myotp_test_http( 200, array( 'message_id' => 'msg-D' ) );
 $r = myotp_test_send( '14155551234' );
 check( 'send vs late claim: refused', 409, $r->status );
 check( 'send vs late claim: message', 'A checkout is using this verification. Finish it first.', $r->data['message'] );
 check( 'send vs late claim: claim intact', 'claiming:14155551234:rid-c', myotp_test_vrec()['state'] );
-check( 'send vs late claim: provider not called', 0, count( $GLOBALS['myotp_test']['http_log'] ) );
 check( 'send vs late claim: no pending written', null, myotp_test_pending() );
-check( 'send vs late claim: slots refunded', 0, myotp_test_counter( 'send_p_14155551234' ) );
-check( 'send vs late claim: site slot refunded', 0, myotp_test_counter( 'send_site' ) );
-// The verified record is cleared before the provider is called, so pending and claiming never coexist.
-myotp_test_configure();
-myotp_test_vset( array( 'phone' => '14155551234', 'at' => time() - 5, 'state' => 'verified' ) );
-$GLOBALS['myotp_test']['http_before'] = function () {
-	check( 'send order: verified record already cleared when the provider is called', null, myotp_test_vrec() );
-};
-myotp_test_http( 200, array( 'message_id' => 'msg-C' ) );
-check( 'send order: success', true, myotp_test_send( '14155551234' )->success );
-
-// Cooldown decided by CAS: A reserves the 4th, B the 5th, A refunds (500) first, then B hears "failed".
-myotp_test_configure();
-myotp_test_http( 200, array( 'message_id' => 'msg-cas' ) );
-myotp_test_send( '14155551234' );
-myotp_test_wrong( 3 );
-$a = MyOTP_PV_Session::reserve_attempt(); // request A holds the 4th attempt
-check( 'cas cooldown: A holds attempt 4', 4, $a['attempts'] );
-$GLOBALS['myotp_test']['http_before'] = function () {
-	// While B waits on the provider, A's 500 arrives and A refunds its attempt.
-	MyOTP_PV_Session::release_attempt( 'msg-cas' );
-};
-myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
-$r = myotp_test_verify( '000000' ); // request B: reserved the 5th ordinal
-check( 'cas cooldown: B answer surfaced', 'Invalid OTP', $r->data['message'] );
-check( 'cas cooldown: stale ordinal did not retire the challenge', 4, myotp_test_pending()['attempts'] );
-check( 'cas cooldown: no cooldown written', 0, MyOTP_PV_Session::cooldown_remaining( '14155551234' ) );
-
-// Scoped refund: A's 500 arrives after B replaced the challenge; A must not decrement B's count.
-myotp_test_configure();
-myotp_test_http( 200, array( 'message_id' => 'msg-old' ) );
-myotp_test_send( '14155551234' );
-$GLOBALS['myotp_test']['http_before'] = function () {
-	array_unshift( $GLOBALS['myotp_test']['http_queue'], array( 200, array( 'message_id' => 'msg-new' ) ) );
-	myotp_test_send( '14155551234' );
-	for ( $i = 0; $i < 2; $i++ ) { // two real wrong answers against the new challenge, served ahead of A's pending 500
-		array_unshift( $GLOBALS['myotp_test']['http_queue'], array( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) ) );
-		myotp_test_verify( '000000' );
-	}
-	$_POST = array( 'otp' => '123456', 'phone' => '', 'nonce' => 'x' );
-};
-myotp_test_http( 500, '<html>oops</html>' );
-myotp_test_verify( '123456' ); // request A, on the old challenge
-check( 'scoped refund: new challenge keeps its count', 2, myotp_test_pending()['attempts'] );
-check( 'scoped refund: new challenge is the live one', 'msg-new', myotp_test_pending()['message_id'] );
+check( 'send vs late claim: slots kept (the code went out)', 1, myotp_test_counter( 'send_p_14155551234' ) );
+check( 'send vs late claim: site slot kept', 1, myotp_test_counter( 'send_site' ) );
 
 // Admin test through its hook.
 myotp_test_configure();

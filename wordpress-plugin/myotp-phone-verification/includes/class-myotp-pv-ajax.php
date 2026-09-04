@@ -96,14 +96,6 @@ class MyOTP_PV_Ajax {
 			);
 		}
 
-		// Clear the old verified record (verified or consumed) BEFORE the provider is
-		// called, so pending and claiming state can never coexist. If a claim landed
-		// since the preflight, give the slots back and say so.
-		if ( null !== $verified_raw && ! MyOTP_PV_Session::clear_verified( $verified_raw ) ) {
-			MyOTP_PV_Session::release_send( $limit['taken'] );
-			wp_send_json_error( array( 'message' => __( 'A checkout is using this verification. Finish it first.', 'myotp-phone-verification' ) ), 409 );
-		}
-
 		// First try without force_send so this visitor's own unexpired code is reused, not re-billed.
 		$result = MyOTP_PV_Api::generate( $phone, false );
 
@@ -133,6 +125,14 @@ class MyOTP_PV_Ajax {
 			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
 		}
 
+		// The code went out. Retire the old verified record (verified or consumed) with
+		// a guarded delete before installing the new challenge, so pending and claiming
+		// state never coexist. A failed resend above left the proof untouched.
+		if ( null !== $verified_raw && ! MyOTP_PV_Session::clear_verified( $verified_raw ) ) {
+			// A claim landed while the provider was called. The SMS went out, so nothing
+			// is refunded, but no challenge is installed next to the claim.
+			wp_send_json_error( array( 'message' => __( 'A checkout is using this verification. Finish it first.', 'myotp-phone-verification' ) ), 409 );
+		}
 		if ( ! MyOTP_PV_Session::install_pending( $phone, (string) $result['body']['message_id'], $pending_raw ) ) {
 			// The pending row changed while the provider was called. Touch nothing else, refund nothing.
 			wp_send_json_error( array( 'message' => __( 'State changed. Request a new code.', 'myotp-phone-verification' ) ), 409 );
@@ -174,14 +174,18 @@ class MyOTP_PV_Ajax {
 
 		$verified_raw = MyOTP_PV_Session::verified_raw();
 
-		// Reserve the attempt atomically before the provider call so parallel
-		// guesses cannot exceed the cap; it is given back unless the provider says "wrong code".
+		// Reserve an in-flight attempt atomically before the provider call so parallel
+		// guesses cannot exceed the cap; it is settled as "failed" only on a "wrong code"
+		// answer and released on anything else.
 		$reserve = MyOTP_PV_Session::reserve_attempt();
 		if ( $reserve['locked'] ) {
-			self::exhaust( $reserve );
+			self::exhaust( $reserve['pending']['phone'], $reserve['raw'] );
 			self::refuse_cooldown( MyOTP_PV_Session::LOCK_TTL );
 		}
 		if ( ! $reserve['ok'] ) {
+			if ( null !== $reserve['pending'] ) {
+				wp_send_json_error( array( 'message' => __( 'Too many checks in progress for this code. Wait a moment and try again.', 'myotp-phone-verification' ) ), 429 );
+			}
 			wp_send_json_error( array( 'message' => __( 'Request a code first.', 'myotp-phone-verification' ) ), 400 );
 		}
 		$pending     = $reserve['pending'];
@@ -204,9 +208,12 @@ class MyOTP_PV_Ajax {
 				// Challenge is dead; drop it without counting.
 				MyOTP_PV_Session::clear_pending( $pending_raw );
 			} elseif ( 'failed' === $status ) {
-				// The one answer that counts. At the fifth, retire this challenge and start the cooldown.
-				if ( $reserve['attempts'] >= MyOTP_PV_Session::MAX_ATTEMPTS ) {
-					self::exhaust( $reserve );
+				// The one answer that counts. Settled by CAS on the stored record; exhaustion
+				// is decided there, never by the reservation ordinal.
+				$settled   = MyOTP_PV_Session::record_failed( $message_id );
+				$remaining = $settled['ok'] ? max( 0, MyOTP_PV_Session::MAX_ATTEMPTS - $settled['failed'] ) : null;
+				if ( $settled['ok'] && $settled['exhausted'] ) {
+					self::exhaust( $pending['phone'], $settled['raw'] );
 				}
 			} else {
 				MyOTP_PV_Session::release_attempt( $message_id );
@@ -215,7 +222,7 @@ class MyOTP_PV_Ajax {
 				array(
 					'message'   => $text,
 					'status'    => $status,
-					'remaining' => 'failed' === $status ? max( 0, MyOTP_PV_Session::MAX_ATTEMPTS - $reserve['attempts'] ) : null,
+					'remaining' => 'failed' === $status ? $remaining : null,
 				),
 				200
 			);
@@ -238,18 +245,17 @@ class MyOTP_PV_Ajax {
 	}
 
 	/**
-	 * Retire this visitor's challenge and start their cooldown on the
-	 * number. The retirement is a CAS on the raw value last read (attempts
-	 * at the cap, same message id); the cooldown is written only when that
-	 * CAS wins, so a stale ordinal never cools anyone down. Nothing is
-	 * keyed on the phone alone.
+	 * The challenge has failed >= MAX_ATTEMPTS on the stored record. Write
+	 * the cooldown first (add-only; an existing cooldown is fine), then
+	 * retire the challenge with a delete guarded by the raw value that
+	 * carried the exhausting count. Nothing is keyed on the phone alone.
 	 *
-	 * @param array $reserve Result of reserve_attempt().
+	 * @param string $phone Digits.
+	 * @param string $raw   Raw pending value holding failed >= max.
 	 */
-	private static function exhaust( array $reserve ) {
-		if ( MyOTP_PV_Session::exhaust_challenge( $reserve['raw'], (string) $reserve['pending']['message_id'] ) ) {
-			MyOTP_PV_Session::start_cooldown( $reserve['pending']['phone'] );
-		}
+	private static function exhaust( $phone, $raw ) {
+		MyOTP_PV_Session::start_cooldown( $phone );
+		MyOTP_PV_Session::clear_pending( $raw );
 	}
 
 	/**

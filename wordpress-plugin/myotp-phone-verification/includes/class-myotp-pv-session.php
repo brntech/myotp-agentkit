@@ -233,7 +233,8 @@ class MyOTP_PV_Session {
 			array(
 				'phone'      => $phone,
 				'message_id' => (string) $message_id,
-				'attempts'   => 0,
+				'reserved'   => 0,
+				'failed'     => 0,
 				'sent_at'    => time(),
 				'exp'        => time() + $ttl,
 			),
@@ -244,7 +245,7 @@ class MyOTP_PV_Session {
 	/**
 	 * Reserve one verify attempt.
 	 *
-	 * @return array{ok: bool, locked: bool, pending: array|null, attempts: int, raw: string|null}
+	 * @return array{ok: bool, locked: bool, pending: array|null, failed: int, raw: string|null}
 	 */
 	public static function reserve_attempt() {
 		return myotp_pv_reserve_attempt( MyOTP_PV_Store::instance(), self::pending_key(), self::MAX_ATTEMPTS, time() );
@@ -261,14 +262,13 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Retire an exhausted challenge by CAS on the raw value last read.
+	 * Settle a reservation as a "wrong code" answer (CAS, scoped to the challenge).
 	 *
-	 * @param string $raw        Raw pending value last read.
 	 * @param string $message_id Challenge id.
-	 * @return bool
+	 * @return array{ok: bool, failed: int, exhausted: bool, raw: string|null, pending: array|null}
 	 */
-	public static function exhaust_challenge( $raw, $message_id ) {
-		return myotp_pv_exhaust_challenge( MyOTP_PV_Store::instance(), self::pending_key(), (string) $raw, (string) $message_id, self::MAX_ATTEMPTS );
+	public static function record_failed( $message_id ) {
+		return myotp_pv_record_failed( MyOTP_PV_Store::instance(), self::pending_key(), (string) $message_id, self::MAX_ATTEMPTS, time() );
 	}
 
 	/**

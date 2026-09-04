@@ -8,6 +8,13 @@
  * user meta. If core aborts the registration after our claim, the record
  * stays "claiming" until it expires and the visitor must verify again.
  *
+ * Accepted residual: save() writes the durable meta first and then runs
+ * the consume CAS. A lost CAS there means the record changed under us
+ * (expiry or the sweep), not that the account was unverified: this same
+ * request claimed the proof at validation, on the same phone. A stamp
+ * that survives a failed rollback is therefore not a false stamp; the
+ * rollback and its note are best effort and stay as they are.
+ *
  * @package myotp-phone-verification
  */
 

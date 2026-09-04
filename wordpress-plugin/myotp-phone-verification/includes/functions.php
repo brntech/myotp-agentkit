@@ -201,25 +201,26 @@ function myotp_pv_take_send_slots( $store, array $dims, $now, $window ) {
 }
 
 /**
- * Atomically reserve one verification attempt on a pending record. The
- * record is JSON with phone, message_id, attempts and exp (absolute unix
- * expiry). When $max attempts are already used the record is left alone
- * and locked is true; the caller writes the phone lock. Returns the raw
- * value written so later transitions can be guarded by it.
+ * Atomically reserve one in-flight verification attempt on a pending
+ * record. The record is JSON with phone, message_id, reserved (guesses in
+ * flight), failed (provider "wrong code" answers) and exp (absolute unix
+ * expiry). A reservation is refused when failed + reserved would exceed
+ * $max; locked is true when failed alone already reached $max. Returns
+ * the raw value written so later transitions can be guarded by it.
  *
  * @param object $store Store.
  * @param string $key   Pending key.
  * @param int    $max   Max attempts.
  * @param int    $now   Unix time.
- * @return array{ok: bool, locked: bool, pending: array|null, attempts: int, raw: string|null}
+ * @return array{ok: bool, locked: bool, pending: array|null, failed: int, raw: string|null}
  */
 function myotp_pv_reserve_attempt( $store, $key, $max, $now ) {
 	$none = array(
-		'ok'       => false,
-		'locked'   => false,
-		'pending'  => null,
-		'attempts' => 0,
-		'raw'      => null,
+		'ok'      => false,
+		'locked'  => false,
+		'pending' => null,
+		'failed'  => 0,
+		'raw'     => null,
 	);
 	for ( $try = 0; $try < 8; $try++ ) {
 		$raw = $store->get( $key );
@@ -231,25 +232,81 @@ function myotp_pv_reserve_attempt( $store, $key, $max, $now ) {
 			$store->delete( $key, $raw );
 			return $none;
 		}
-		$attempts = isset( $data['attempts'] ) ? (int) $data['attempts'] : 0;
-		if ( $attempts >= $max ) {
+		$failed   = isset( $data['failed'] ) ? (int) $data['failed'] : 0;
+		$reserved = isset( $data['reserved'] ) ? (int) $data['reserved'] : 0;
+		if ( $failed >= $max ) {
 			return array(
-				'ok'       => false,
-				'locked'   => true,
-				'pending'  => $data,
-				'attempts' => $attempts,
-				'raw'      => $raw,
+				'ok'      => false,
+				'locked'  => true,
+				'pending' => $data,
+				'failed'  => $failed,
+				'raw'     => $raw,
 			);
 		}
-		$data['attempts'] = $attempts + 1;
+		if ( $failed + $reserved >= $max ) {
+			return array(
+				'ok'      => false,
+				'locked'  => false,
+				'pending' => $data,
+				'failed'  => $failed,
+				'raw'     => $raw,
+			);
+		}
+		$data['reserved'] = $reserved + 1;
 		$next             = myotp_pv_json( $data );
 		if ( $store->cas( $key, $raw, $next, myotp_pv_ttl_left( $data, $now ) ) ) {
 			return array(
-				'ok'       => true,
-				'locked'   => false,
-				'pending'  => $data,
-				'attempts' => $attempts + 1,
-				'raw'      => $next,
+				'ok'      => true,
+				'locked'  => false,
+				'pending' => $data,
+				'failed'  => $failed,
+				'raw'     => $next,
+			);
+		}
+	}
+	return $none;
+}
+
+/**
+ * Settle a reservation as a provider "wrong code" answer: reserved - 1,
+ * failed + 1, by CAS from the current raw value while the row still holds
+ * $message_id. Exhaustion (failed >= $max) is decided here, on the value
+ * actually stored, never on a reservation ordinal.
+ *
+ * @param object $store      Store.
+ * @param string $key        Pending key.
+ * @param string $message_id Challenge the attempt was reserved on.
+ * @param int    $max        Max attempts.
+ * @param int    $now        Unix time.
+ * @return array{ok: bool, failed: int, exhausted: bool, raw: string|null, pending: array|null}
+ */
+function myotp_pv_record_failed( $store, $key, $message_id, $max, $now ) {
+	$none = array(
+		'ok'        => false,
+		'failed'    => 0,
+		'exhausted' => false,
+		'raw'       => null,
+		'pending'   => null,
+	);
+	for ( $try = 0; $try < 8; $try++ ) {
+		$raw = $store->get( $key );
+		if ( null === $raw ) {
+			return $none;
+		}
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || ! isset( $data['message_id'] ) || (string) $data['message_id'] !== (string) $message_id ) {
+			return $none;
+		}
+		$data['failed']   = ( isset( $data['failed'] ) ? (int) $data['failed'] : 0 ) + 1;
+		$data['reserved'] = max( 0, ( isset( $data['reserved'] ) ? (int) $data['reserved'] : 0 ) - 1 );
+		$next             = myotp_pv_json( $data );
+		if ( $store->cas( $key, $raw, $next, myotp_pv_ttl_left( $data, $now ) ) ) {
+			return array(
+				'ok'        => true,
+				'failed'    => (int) $data['failed'],
+				'exhausted' => (int) $data['failed'] >= (int) $max,
+				'raw'       => $next,
+				'pending'   => $data,
 			);
 		}
 	}
@@ -315,10 +372,11 @@ function myotp_pv_lock_remaining( $store, $key, $now ) {
 }
 
 /**
- * Give back one reserved attempt (the provider gave no "wrong code"
- * answer). Refunds only while the row still holds the challenge that was
- * reserved ($message_id), via CAS from the current raw value, so a stale
- * request can never decrement a replacement challenge. Floors at zero.
+ * Give back one in-flight reservation (the provider gave no "wrong code"
+ * answer). Decrements reserved only while the row still holds the
+ * challenge that was reserved ($message_id), via CAS from the current raw
+ * value, so a stale request can never touch a replacement challenge.
+ * Floors at zero and never changes failed.
  *
  * @param object $store      Store.
  * @param string $key        Pending key.
@@ -332,43 +390,18 @@ function myotp_pv_release_attempt( $store, $key, $message_id ) {
 			return false;
 		}
 		$data = json_decode( $raw, true );
-		if ( ! is_array( $data ) || empty( $data['attempts'] ) ) {
+		if ( ! is_array( $data ) || empty( $data['reserved'] ) ) {
 			return false;
 		}
 		if ( ! isset( $data['message_id'] ) || (string) $data['message_id'] !== (string) $message_id ) {
 			return false;
 		}
-		$data['attempts'] = (int) $data['attempts'] - 1;
+		$data['reserved'] = (int) $data['reserved'] - 1;
 		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), myotp_pv_ttl_left( $data, time() ) ) ) {
 			return true;
 		}
 	}
 	return false;
-}
-
-/**
- * Retire an exhausted challenge. Succeeds only when the row still holds
- * exactly $raw (the value the caller last read), that record's attempts
- * are at or above $max, and its message_id is $message_id; the guarded
- * delete is the CAS. A stale ordinal from an earlier reservation can
- * therefore never retire a challenge whose count was refunded meanwhile.
- *
- * @param object $store      Store.
- * @param string $key        Pending key.
- * @param string $raw        Raw value last read.
- * @param string $message_id Challenge id.
- * @param int    $max        Max attempts.
- * @return bool True when this call retired the challenge.
- */
-function myotp_pv_exhaust_challenge( $store, $key, $raw, $message_id, $max ) {
-	$data = json_decode( (string) $raw, true );
-	if ( ! is_array( $data ) || ! isset( $data['attempts'], $data['message_id'] ) ) {
-		return false;
-	}
-	if ( (int) $data['attempts'] < (int) $max || (string) $data['message_id'] !== (string) $message_id ) {
-		return false;
-	}
-	return (bool) $store->delete( $key, $raw );
 }
 
 /**

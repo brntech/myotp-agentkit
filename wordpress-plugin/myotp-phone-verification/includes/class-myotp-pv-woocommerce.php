@@ -11,6 +11,13 @@
  * example) the record stays "claiming" until it expires and the shopper
  * must verify again.
  *
+ * Accepted residual: consume() writes the durable stamp first and then
+ * runs the consume CAS. A lost CAS at that point means the record changed
+ * under us (expiry or the sweep), not that the order was unverified: the
+ * proof was already claimed by this very request at validation, on the
+ * same phone. So a stamp that survives a failed rollback is not a false
+ * stamp; the rollback and its notes are best effort and stay as they are.
+ *
  * @package myotp-phone-verification
  */
 

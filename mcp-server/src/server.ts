@@ -26,7 +26,10 @@ export interface ServerOptions {
 }
 
 export const SERVER_NAME = "myotp-mcp";
-export const SERVER_VERSION = "0.1.7";
+import { createRequire } from "node:module";
+// Read from package.json so the version a client sees in initialize() can never
+// lag the published version again (0.1.8 and 0.1.9 still announced 0.1.7).
+export const SERVER_VERSION: string = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 export function createServer(options: ServerOptions): McpServer {
   const client = options.client ?? new MyOtpClient();

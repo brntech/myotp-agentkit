@@ -254,7 +254,7 @@ npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: your MyO
 Card or Link wallet (run `npx @stripe/link-cli auth login` once first):
 
 ```bash
-npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: your MyOTP API key" --context "MyOTP credits"
+npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: your MyOTP API key" --context "Buying MyOTP.App credits to send one-time passcodes over SMS, WhatsApp and Telegram for phone verification in my app."
 ```
 
 ## Account creation

@@ -164,7 +164,7 @@ curl -sS "https://api.myotp.app/v1/topup/quote?credits=100"
 npx -y mppx@0.9.2 https://api.myotp.app/v1/topup -X POST -H "x-api-key: $MYOTP_API_KEY" -H "content-type: application/json" -d "{\"credits\":100}"
 
 # Card via the Stripe Link agent wallet. Run npx @stripe/link-cli auth login once.
-npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: $MYOTP_API_KEY" --context "MyOTP credits"
+npx -y @stripe/link-cli mpp pay https://api.myotp.app/v1/topup -X POST -d "{\"credits\":100}" -H "x-api-key: $MYOTP_API_KEY" --context "Buying MyOTP.App credits to send one-time passcodes over SMS, WhatsApp and Telegram for phone verification in my app."
 ```
 
 In a Node harness, `import { Mppx, tempo } from "mppx/client"` wraps global fetch, so a plain `fetch()` to the endpoint pays automatically.

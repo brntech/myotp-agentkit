@@ -78,7 +78,8 @@ async function runHttp(config: CliConfig): Promise<void> {
   // See resolveApiKeyFromHeaders for why Authorization: Bearer is also accepted.
   const resolveApiKey = (extra: {
     headers?: Record<string, string | string[] | undefined>;
-  }): string => resolveApiKeyFromHeaders(extra.headers);
+    url?: string;
+  }): string => resolveApiKeyFromHeaders(extra.headers) || resolveApiKeyFromQuery(extra.url);
 
   const handleMcpRequest = async (req: Request, res: Response): Promise<void> => {
     const sessionId = req.header("mcp-session-id") ?? undefined;

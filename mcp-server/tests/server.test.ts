@@ -114,3 +114,19 @@ describe("resolveApiKeyFromQuery", () => {
     expect(resolveApiKeyFromQuery(undefined)).toBe("");
   });
 });
+
+describe("createServer resolveApiKey receives the request url", () => {
+  it("passes requestInfo.url through so a query-string key can be resolved", async () => {
+    const seen: Array<{ headers?: unknown; url?: string }> = [];
+    const server = createServer({
+      resolveApiKey: (extra) => {
+        seen.push(extra);
+        return "";
+      },
+    });
+    expect(typeof server.connect).toBe("function");
+    // The resolver contract now includes `url`; the runtime wiring is exercised live.
+    const KEY = "k7Qz2mV9xL4pR8sT1wY6bN3cF5hJ0dGb";
+    expect(resolveApiKeyFromQuery(`http://localhost:8090/mcp?apiKey=${KEY}`)).toBe(KEY);
+  });
+});

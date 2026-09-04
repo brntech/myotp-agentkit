@@ -95,7 +95,11 @@ npm run lint    # eslint-plugin-n8n-nodes-base
 npm run build   # tsc + copy icons and codex json into dist/
 ```
 
-To run n8n's community package scanner (`@n8n/scan-community-package`) on the built package before it is published, install the scanner in a scratch directory, `npm pack` this package, unpack the tarball and run `node scripts/scan-package.mjs <unpacked-dir> <source-dir>`. The exact Docker one-liner is in the repository's lane notes.
+To run n8n's community package scanner (`@n8n/scan-community-package`) on the built package before it is published, install the scanner in a scratch directory, `npm pack` this package, unpack the tarball and run `node scripts/scan-package.mjs <unpacked-dir> <source-dir>`. In Docker, from this folder's parent:
+
+```bash
+docker run --rm -v "$PWD:/w" -w /w/n8n node:22-alpine sh -c "npm ci && npm run build && mkdir -p /scan && cd /scan && npm init -y >/dev/null && npm install @n8n/scan-community-package@0.34.0 && cd /w/n8n && npm pack --pack-destination /scan && mkdir -p /scan/pkg /scan/src && tar xzf /scan/n8n-nodes-myotp-*.tgz -C /scan/pkg --strip-components=1 && cp -r credentials nodes package.json /scan/src/ && node scripts/scan-package.mjs /scan/pkg /scan/src"
+```
 
 The package publishes `dist/` only. API reference: https://myotp.app/developer-api/ and the OpenAPI file at the root of this repository.
 

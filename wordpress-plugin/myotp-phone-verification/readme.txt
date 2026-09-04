@@ -25,9 +25,10 @@ How it stays safe:
 
 * The API key never leaves the server. The browser talks to admin-ajax.php only.
 * Every AJAX call carries a nonce. Admin actions check `manage_options`.
-* Send limits, enforced together with atomic counters: 5 codes per visitor, 10 per client IP, 3 per destination number, each per 10 minutes, plus a site-wide ceiling of 100 codes per hour (setting and `myotp_pv_site_hourly_cap` filter). An unexpired code for the same number is reused rather than sent again, and reusing it does not reset the attempt count.
-* 5 wrong codes discard the pending code; the visitor must request a new one. Attempts are counted on every provider answer, never on a network failure.
-* A verification is valid for 30 minutes and is claimed atomically by exactly one order or one account.
+* Send limits, enforced together with atomic counters: 5 codes per visitor, 10 per client IP, 3 per destination number, each per 10 minutes, plus a site-wide ceiling (default 100, setting and `myotp_pv_site_hourly_cap` filter). The site-wide count uses a fixed one-hour window that starts at the first send, so up to twice the ceiling can go out across a window boundary. It exists to bound what an attacker with many addresses and many numbers can make the site spend. A code that was not billed (provider answered 409 or a server error) is not counted against it.
+* A visitor can only verify the code they requested: the challenge reference from the provider is stored with the pending record and sent back on every check. If the provider still has an active code that this visitor did not request, the request is refused until it expires.
+* 5 wrong codes lock the phone number for 15 minutes, for every visitor. Sending and checking are both refused while the lock lasts. Attempts are counted on every provider answer, never on a network failure.
+* A verification is valid for 30 minutes and is claimed by exactly one checkout or one registration at validation time, then consumed when the order or account exists. If checkout fails after validation (a declined payment, for example) the visitor verifies again.
 * Phone numbers are reduced to digits before they are sent. Leading zeros are kept.
 
 Not in this version: the WooCommerce block checkout. The classic shortcode checkout is supported.
@@ -39,7 +40,7 @@ This plugin sends the phone number a visitor enters to the MyOTP.App API at http
 = Data stored on your site =
 
 * A cookie `myotp_pv_sid` (random id, one day) so a guest's verification can be tied to their browser.
-* Short-lived rows in the options table (`myotp_pv_kv_` prefix, not autoloaded): rate-limit counters (10 minutes, site-wide counter 1 hour), the pending number with its code reference and attempt count (up to one hour), and the verified number (30 minutes). Expired rows are removed on the next read or by a daily WP-Cron sweep, so within 24 hours of expiry.
+* Rows in the options table (`myotp_pv_kv_` prefix, not autoloaded): rate-limit counters (10 minutes, site-wide counter 1 hour), the pending number with its code reference and attempt count (kept for the configured code validity, at most 24 hours), a 15-minute lock per number after five wrong codes, and the verified number (30 minutes). Expired rows are removed on the next read of that row and by a daily WP-Cron sweep (`myotp_pv_sweep`). WP-Cron runs on page visits, so on a quiet site the sweep can run later than scheduled.
 * Order meta `_myotp_verified_phone` on each verified WooCommerce order.
 * User meta `myotp_verified_phone` on each account registered through the verified form.
 

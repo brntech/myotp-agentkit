@@ -198,7 +198,7 @@ class MyOTP_PV_Settings {
 						<td>
 							<input type="number" id="myotp_pv_site_hourly_cap" min="1" max="100000" step="1" class="small-text"
 								name="<?php echo esc_attr( $name ); ?>[site_hourly_cap]" value="<?php echo esc_attr( $o['site_hourly_cap'] ); ?>" />
-							<p class="description"><?php esc_html_e( 'Ceiling on codes sent by the whole site in any hour, on top of the per-visitor, per-IP and per-number limits. Behind a reverse proxy the per-IP limit may see only the proxy address, so this is the real backstop. Filter: myotp_pv_site_hourly_cap.', 'myotp-phone-verification' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Why this exists: it bounds what an attacker with many addresses and many numbers can make the site spend. Counted in a fixed one-hour window that starts at the first send, so up to twice this number can go out across a window boundary. On top of the per-visitor, per-IP and per-number limits. Behind a reverse proxy the per-IP limit may see only the proxy address, so this is the real backstop. Filter: myotp_pv_site_hourly_cap.', 'myotp-phone-verification' ); ?></p>
 						</td>
 					</tr>
 					<tr>

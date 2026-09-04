@@ -195,36 +195,33 @@ class MyOTP_PV_Store {
 	}
 
 	/**
-	 * Remove expired rows in batches. Runs from the daily cron. Reads rows
-	 * by name order in pages of $batch, decodes the expiry prefix in PHP,
-	 * and deletes each expired row guarded by the value read.
+	 * Remove expired rows with set-based deletes. The expiry is the leading
+	 * 12 zero-padded digits of option_value, so a plain string comparison
+	 * against "<now>|" selects every expired row without decoding. Runs
+	 * up to $max_batches deletes of $batch rows; reports whether the last
+	 * batch was full so the caller can schedule a continuation.
 	 *
-	 * @param int $batch Rows per page.
-	 * @return int Rows removed.
+	 * @param int $batch       Rows per DELETE.
+	 * @param int $max_batches Batches per call.
+	 * @return array{removed: int, full: bool}
 	 */
-	public function sweep_expired( $batch = 200 ) {
+	public function sweep_expired( $batch = 1000, $max_batches = 20 ) {
 		global $wpdb;
 		$removed = 0;
-		$after   = '';
-		$now     = time();
+		$full    = false;
 		$like    = $wpdb->esc_like( self::PREFIX ) . '%';
-		for ( $page = 0; $page < 500; $page++ ) {
-			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s AND option_name > %s ORDER BY option_name ASC LIMIT %d", $like, $after, (int) $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			if ( empty( $rows ) ) {
-				break;
-			}
-			foreach ( $rows as $row ) {
-				$after = $row['option_name'];
-				$parts = $this->split( $row['option_value'] );
-				if ( null === $parts || $parts[0] <= $now ) {
-					$done     = $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value = BINARY %s", $row['option_name'], $row['option_value'] ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-					$removed += (int) $done;
-				}
-			}
-			if ( count( $rows ) < $batch ) {
+		$cutoff  = sprintf( '%012d', time() ) . '|';
+		for ( $i = 0; $i < $max_batches; $i++ ) {
+			$done     = (int) $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s AND option_value < BINARY %s LIMIT %d", $like, $cutoff, (int) $batch ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$removed += $done;
+			$full     = $done >= $batch;
+			if ( ! $full ) {
 				break;
 			}
 		}
-		return $removed;
+		return array(
+			'removed' => $removed,
+			'full'    => $full,
+		);
 	}
 }

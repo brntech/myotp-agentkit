@@ -202,64 +202,116 @@ function myotp_pv_take_send_slots( $store, array $dims, $now, $window ) {
 
 /**
  * Atomically reserve one verification attempt on a pending record. The
- * record is JSON with at least phone, message_id, attempts. When attempts
- * already reached $max the record is deleted (conditionally, on the value
- * read) and locked is true. The store's delete( $key, $expected_raw )
- * must only remove the row when it still holds $expected_raw.
+ * record is JSON with phone, message_id, attempts and exp (absolute unix
+ * expiry). When $max attempts are already used the record is left alone
+ * and locked is true; the caller writes the phone lock. Returns the raw
+ * value written so later transitions can be guarded by it.
  *
  * @param object $store Store.
  * @param string $key   Pending key.
  * @param int    $max   Max attempts.
- * @return array{ok: bool, locked: bool, pending: array|null, attempts: int}
+ * @param int    $now   Unix time.
+ * @return array{ok: bool, locked: bool, pending: array|null, attempts: int, raw: string|null}
  */
-function myotp_pv_reserve_attempt( $store, $key, $max ) {
+function myotp_pv_reserve_attempt( $store, $key, $max, $now ) {
+	$none = array(
+		'ok'       => false,
+		'locked'   => false,
+		'pending'  => null,
+		'attempts' => 0,
+		'raw'      => null,
+	);
 	for ( $try = 0; $try < 8; $try++ ) {
 		$raw = $store->get( $key );
 		if ( null === $raw ) {
-			return array(
-				'ok'       => false,
-				'locked'   => false,
-				'pending'  => null,
-				'attempts' => 0,
-			);
+			return $none;
 		}
 		$data = json_decode( $raw, true );
 		if ( ! is_array( $data ) || empty( $data['phone'] ) ) {
 			$store->delete( $key, $raw );
-			return array(
-				'ok'       => false,
-				'locked'   => false,
-				'pending'  => null,
-				'attempts' => 0,
-			);
+			return $none;
 		}
 		$attempts = isset( $data['attempts'] ) ? (int) $data['attempts'] : 0;
 		if ( $attempts >= $max ) {
-			$store->delete( $key, $raw );
 			return array(
 				'ok'       => false,
 				'locked'   => true,
 				'pending'  => $data,
 				'attempts' => $attempts,
+				'raw'      => $raw,
 			);
 		}
 		$data['attempts'] = $attempts + 1;
-		$ttl              = isset( $data['ttl'] ) ? (int) $data['ttl'] : 3600;
-		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), $ttl ) ) {
+		$next             = myotp_pv_json( $data );
+		if ( $store->cas( $key, $raw, $next, myotp_pv_ttl_left( $data, $now ) ) ) {
 			return array(
 				'ok'       => true,
 				'locked'   => false,
 				'pending'  => $data,
 				'attempts' => $attempts + 1,
+				'raw'      => $next,
 			);
 		}
 	}
-	return array(
-		'ok'       => false,
-		'locked'   => false,
-		'pending'  => null,
-		'attempts' => 0,
+	return $none;
+}
+
+/**
+ * Seconds until a record's absolute expiry, at least 1.
+ *
+ * @param array $data Record with exp (unix time) or ttl (seconds).
+ * @param int   $now  Unix time.
+ * @return int
+ */
+function myotp_pv_ttl_left( array $data, $now ) {
+	if ( isset( $data['exp'] ) ) {
+		return max( 1, (int) $data['exp'] - (int) $now );
+	}
+	return isset( $data['ttl'] ) ? max( 1, (int) $data['ttl'] ) : 3600;
+}
+
+/**
+ * Write a phone lock (5 wrong codes) atomically. add() only, so a lock
+ * cannot be shortened by a later writer. Returns true when this call
+ * created it.
+ *
+ * @param object $store Store.
+ * @param string $key   Lock key.
+ * @param int    $now   Unix time.
+ * @param int    $ttl   Lock seconds.
+ * @return bool
+ */
+function myotp_pv_lock_phone( $store, $key, $now, $ttl ) {
+	return $store->add(
+		$key,
+		myotp_pv_json(
+			array(
+				'at'    => (int) $now,
+				'until' => (int) $now + (int) $ttl,
+			)
+		),
+		$ttl
 	);
+}
+
+/**
+ * Seconds left on a phone lock, 0 when none.
+ *
+ * @param object $store Store.
+ * @param string $key   Lock key.
+ * @param int    $now   Unix time.
+ * @return int
+ */
+function myotp_pv_lock_remaining( $store, $key, $now ) {
+	$raw = $store->get( $key );
+	if ( null === $raw ) {
+		return 0;
+	}
+	$data = json_decode( $raw, true );
+	if ( ! is_array( $data ) || ! isset( $data['until'] ) ) {
+		return 0;
+	}
+	return max( 0, (int) $data['until'] - (int) $now );
 }
 
 /**
@@ -281,8 +333,7 @@ function myotp_pv_release_attempt( $store, $key ) {
 			return false;
 		}
 		$data['attempts'] = (int) $data['attempts'] - 1;
-		$ttl              = isset( $data['ttl'] ) ? (int) $data['ttl'] : 3600;
-		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), $ttl ) ) {
+		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), myotp_pv_ttl_left( $data, time() ) ) ) {
 			return true;
 		}
 	}
@@ -290,34 +341,71 @@ function myotp_pv_release_attempt( $store, $key ) {
 }
 
 /**
- * Atomically claim a verified record: state "verified" becomes
- * "consumed:<tag>". Returns the phone when this caller won the claim,
- * empty when the record is missing, expired, or already consumed.
+ * Atomically move a verified record from one state to another. The record
+ * must be unexpired and in exactly $from. Returns the phone when this
+ * caller won the CAS, empty when missing, expired, in another state, or
+ * lost the race.
  *
  * @param object $store Store.
  * @param string $key   Verified key.
- * @param string $tag   Consumer tag, e.g. order:123.
+ * @param string $from  Required current state, e.g. verified.
+ * @param string $to    New state, e.g. claiming:<phone>:<rid> or consumed:order:<id>.
  * @param int    $now   Unix time.
- * @param int    $ttl   Seconds a verification stays valid.
+ * @param int    $ttl   Seconds a verification stays valid from its timestamp.
  * @return string
  */
-function myotp_pv_claim_verified( $store, $key, $tag, $now, $ttl = 1800 ) {
+function myotp_pv_transition_verified( $store, $key, $from, $to, $now, $ttl = 1800 ) {
 	for ( $try = 0; $try < 8; $try++ ) {
 		$raw = $store->get( $key );
 		if ( null === $raw ) {
 			return '';
 		}
-		$data  = json_decode( $raw, true );
-		$phone = myotp_pv_verified_phone_from( $data, $now, $ttl );
-		if ( '' === $phone ) {
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || empty( $data['phone'] ) || ! isset( $data['at'] ) ) {
 			return '';
 		}
-		$data['state'] = 'consumed:' . $tag;
+		$state = isset( $data['state'] ) ? (string) $data['state'] : 'verified';
+		if ( $state !== $from || (int) $data['at'] + $ttl <= $now || (int) $data['at'] > $now ) {
+			return '';
+		}
+		$data['state'] = $to;
 		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), max( 60, (int) $data['at'] + $ttl - $now ) ) ) {
-			return $phone;
+			return (string) $data['phone'];
 		}
 	}
 	return '';
+}
+
+/**
+ * Claim a verified record: verified -> claiming:<phone>:<rid>.
+ *
+ * @param object $store Store.
+ * @param string $key   Verified key.
+ * @param string $phone Phone that passed validation.
+ * @param string $rid   Per-request id.
+ * @param int    $now   Unix time.
+ * @param int    $ttl   Validity seconds.
+ * @return string Phone when won, empty otherwise.
+ */
+function myotp_pv_claim_verified( $store, $key, $phone, $rid, $now, $ttl = 1800 ) {
+	$phone = myotp_pv_transition_verified( $store, $key, 'verified', 'claiming:' . $phone . ':' . $rid, $now, $ttl );
+	return $phone;
+}
+
+/**
+ * Consume a claimed record: claiming:<phone>:<rid> -> consumed:<tag>.
+ *
+ * @param object $store Store.
+ * @param string $key   Verified key.
+ * @param string $phone Phone in the claim.
+ * @param string $rid   Per-request id used in the claim.
+ * @param string $tag   Consumer, e.g. order:123 or user:7.
+ * @param int    $now   Unix time.
+ * @param int    $ttl   Validity seconds.
+ * @return string Phone when won, empty otherwise.
+ */
+function myotp_pv_consume_claim( $store, $key, $phone, $rid, $tag, $now, $ttl = 1800 ) {
+	return myotp_pv_transition_verified( $store, $key, 'claiming:' . $phone . ':' . $rid, 'consumed:' . $tag, $now, $ttl );
 }
 
 /**
@@ -339,6 +427,26 @@ function myotp_pv_verified_phone_from( $record, $now, $ttl = 1800 ) {
 		return '';
 	}
 	return (string) $record['phone'];
+}
+
+/**
+ * Install a record guarded by what the caller read earlier: add() when
+ * it read nothing, cas() from that raw value otherwise. Returns the raw
+ * value written, or null when another writer got there first.
+ *
+ * @param object      $store    Store.
+ * @param string      $key      Key.
+ * @param string|null $expected Raw value read earlier, or null for absent.
+ * @param array       $data     New record.
+ * @param int         $ttl      Seconds.
+ * @return string|null
+ */
+function myotp_pv_install( $store, $key, $expected, array $data, $ttl ) {
+	$raw = myotp_pv_json( $data );
+	if ( null === $expected ) {
+		return $store->add( $key, $raw, $ttl ) ? $raw : null;
+	}
+	return $store->cas( $key, $expected, $raw, $ttl ) ? $raw : null;
 }
 
 /**

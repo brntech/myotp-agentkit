@@ -13,6 +13,7 @@ declare(strict_types=1);
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'DAY_IN_SECONDS', 86400 );
 define( 'HOUR_IN_SECONDS', 3600 );
+define( 'MINUTE_IN_SECONDS', 60 );
 define( 'COOKIEPATH', '/' );
 define( 'COOKIE_DOMAIN', '' );
 
@@ -72,8 +73,12 @@ class MyOTP_Mem_Store {
 		unset( $this->rows[ $key ] );
 		return true;
 	}
-	public function sweep_expired( $batch = 200 ) {
-		return 0;
+	public $sweep_full = false;
+	public function sweep_expired( $batch = 1000, $max_batches = 20 ) {
+		return array(
+			'removed' => 0,
+			'full'    => $this->sweep_full,
+		);
 	}
 }
 
@@ -152,7 +157,10 @@ function myotp_test_reset() {
 	$_POST                                = array();
 	$_COOKIE                              = array();
 	$_SERVER['REMOTE_ADDR']               = '203.0.113.5';
+	$GLOBALS['myotp_test']['http_before'] = null;
+	$GLOBALS['myotp_test']['single']      = array();
 	MyOTP_PV_Store::$instance             = new MyOTP_Mem_Store();
+	MyOTP_PV_Session::$request_id         = 'rid-' . bin2hex( random_bytes( 4 ) );
 }
 
 /** Queue a canned HTTP answer: array( code, body-array|string ) or 'wp_error'. */
@@ -221,6 +229,7 @@ function register_setting( $group, $name, $args = array() ) { $GLOBALS['myotp_te
 function wp_next_scheduled( $hook ) { return isset( $GLOBALS['myotp_test']['cron'][ $hook ] ) ? $GLOBALS['myotp_test']['cron'][ $hook ] : false; }
 function wp_schedule_event( $ts, $recurrence, $hook ) { $GLOBALS['myotp_test']['cron'][ $hook ] = array( $ts, $recurrence ); return true; }
 function wp_clear_scheduled_hook( $hook ) { unset( $GLOBALS['myotp_test']['cron'][ $hook ] ); return 1; }
+function wp_schedule_single_event( $ts, $hook ) { $GLOBALS['myotp_test']['single'][] = array( $ts, $hook ); return true; }
 
 // Options, transients, meta.
 function get_option( $name, $default = false ) {
@@ -273,6 +282,12 @@ function wp_send_json_error( $data = null, $status = 200 ) { throw new MyOTP_Tes
 // HTTP.
 function wp_remote_post( $url, $args ) {
 	$GLOBALS['myotp_test']['http_log'][] = array( 'url' => $url, 'args' => $args );
+	// A one-shot hook that runs while the "provider call" is in flight, to interleave another request.
+	if ( ! empty( $GLOBALS['myotp_test']['http_before'] ) ) {
+		$hook                                = $GLOBALS['myotp_test']['http_before'];
+		$GLOBALS['myotp_test']['http_before'] = null;
+		$hook();
+	}
 	$next = array_shift( $GLOBALS['myotp_test']['http_queue'] );
 	if ( null === $next ) {
 		throw new RuntimeException( 'no canned HTTP answer queued' );

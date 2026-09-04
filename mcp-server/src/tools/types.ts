@@ -39,6 +39,14 @@ export interface ToolDefinition<Shape extends ZodRawShape> {
   description: string;
   inputSchema: Shape;
   /**
+   * Zod raw shape describing the `structuredContent` a successful call returns.
+   * server.ts wraps it in `z.object(...).passthrough()` before registration, so
+   * fields the API adds later never fail validation. Error results (`isError`)
+   * carry the `toolErrorSchema` shape from helpers.ts instead; the SDK does not
+   * validate those against the output schema.
+   */
+  outputSchema?: ZodRawShape;
+  /**
    * Optional MCP annotations. We use `readOnlyHint` and `idempotentHint` to give
    * agents hints about whether they can safely retry or cache calls.
    */

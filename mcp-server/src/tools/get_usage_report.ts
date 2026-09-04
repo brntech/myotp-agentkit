@@ -42,6 +42,35 @@ const inputSchema = {
     .describe("Results per page, 1-100. Default 10."),
 };
 
+const outputSchema = {
+  total_count: z.number().int().optional().describe("Total transactions matching the date range."),
+  total_pages: z.number().int().optional().describe("Number of pages at the requested per_page."),
+  current_page: z.number().int().optional().describe("The page returned."),
+  per_page: z.number().int().optional().describe("Rows per page."),
+  transactions: z
+    .array(
+      z
+        .object({
+          message_id: z.string().optional(),
+          message_timestamp: z.string().optional().describe("ISO 8601 date-time of the transaction."),
+          message_type: z.number().int().optional().describe("Whether this was an OTP send or a verification."),
+          phone_number: z.string().optional(),
+          channel: z.string().optional().describe("sms, whatsapp or telegram."),
+          country: z.string().optional(),
+          force_send: z.boolean().optional(),
+          application: z.string().nullable().optional(),
+          cost: z.number().optional().describe("Credits charged."),
+          status: z.string().optional().describe("Transaction status, e.g. delivered, read, failed.NoBalance."),
+          description: z.string().nullable().optional(),
+          client_ip: z.string().nullable().optional(),
+        })
+        .passthrough()
+    )
+    .optional()
+    .describe("Transaction rows for the page. May be empty or absent when there is no data."),
+  message: z.string().optional().describe("Present when the endpoint has no data for the range."),
+};
+
 export const getUsageReportTool: ToolDefinition<typeof inputSchema> = {
   name: "get_usage_report",
   title: "Get usage report",
@@ -52,6 +81,7 @@ export const getUsageReportTool: ToolDefinition<typeof inputSchema> = {
     "Requires the API_REPORTING entitlement (Business or Enterprise plan). " +
     "Use this to: audit recent activity, build internal dashboards, reconcile billing, or debug delivery issues across many recipients.",
   inputSchema,
+  outputSchema,
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,

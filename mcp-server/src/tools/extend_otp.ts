@@ -25,6 +25,12 @@ const inputSchema = {
     ),
 };
 
+const outputSchema = {
+  status: z.string().describe("Status of the request."),
+  message: z.string().describe("Message describing the result."),
+  expires_at: z.string().describe("The new ISO 8601 expiry date-time."),
+};
+
 export const extendOtpTool: ToolDefinition<typeof inputSchema> = {
   name: "extend_otp",
   title: "Extend OTP expiry",
@@ -35,6 +41,7 @@ export const extendOtpTool: ToolDefinition<typeof inputSchema> = {
     "Requires the EXTEND_OTP entitlement (Business or Enterprise plan). Some destination countries don't allow extensions — the API will return 403 in that case. " +
     "Cheaper and less spammy than calling `generate_otp` again.",
   inputSchema,
+  outputSchema,
   annotations: {
     readOnlyHint: false,
     idempotentHint: false,

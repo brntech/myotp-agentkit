@@ -23,6 +23,28 @@ const inputSchema = {
     .describe("Optional account, company, or product name (maximum 64 characters)."),
 };
 
+const outputSchema = {
+  account_id: z.string().describe("Account identifier, 'a' followed by 12 hex characters."),
+  api_key: z.string().describe("The API key. Shown once, in this response only. Send it as the X-API-Key header."),
+  api_key_note: z.string().optional(),
+  email: z.string(),
+  email_verified: z.boolean().describe("True once the human has confirmed the emailed link. Unlocks card top-ups."),
+  balance: z.number().describe("Credits on the balance. Zero at registration."),
+  plan_id: z.number().int(),
+  status: z.string().describe("Account status, 'active' when the key can be used."),
+  topup: z
+    .object({
+      quote: z.string().optional(),
+      endpoint: z.string().optional(),
+      note: z.string().optional(),
+    })
+    .passthrough()
+    .optional()
+    .describe("Where to buy credits."),
+  docs: z.string().optional(),
+  verification_email_sent: z.boolean().optional().describe("Whether the confirmation email was queued."),
+};
+
 export const createAccountTool: ToolDefinition<typeof inputSchema> = {
   name: "create_account",
   title: "Create a MyOTP agent account",
@@ -31,6 +53,7 @@ export const createAccountTool: ToolDefinition<typeof inputSchema> = {
     "No API key is required for this tool. The new account starts with zero balance; " +
     "USDC top-ups work immediately, while card top-ups unlock after a human confirms the email address.",
   inputSchema,
+  outputSchema,
   annotations: {
     readOnlyHint: false,
     idempotentHint: false,

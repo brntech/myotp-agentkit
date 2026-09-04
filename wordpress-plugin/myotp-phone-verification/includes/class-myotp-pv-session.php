@@ -1,8 +1,10 @@
 <?php
 /**
- * Per-visitor state. Counters, the pending code and the verified record
- * all live in the atomic store (options table), so every transition is a
- * compare-and-swap. The WooCommerce customer id or the user id names the
+ * Per-visitor state. Counters, the pending challenge, the verified record
+ * and phone locks all live in the atomic store (options table). Every
+ * transition on a pending or verified row is guarded by the raw value the
+ * caller read, so a stale request cannot overwrite or delete what another
+ * request just wrote. The WooCommerce customer id or the user id names the
  * visitor when available, otherwise a random cookie does.
  *
  * @package myotp-phone-verification
@@ -18,13 +20,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 class MyOTP_PV_Session {
 
 	const COOKIE       = 'myotp_pv_sid';
-	const TTL          = 3600;
 	const VERIFIED_TTL = 1800;
+	const LOCK_TTL     = 900;
 	const MAX_ATTEMPTS = 5;
 	const MAX_VISITOR  = 5;
 	const MAX_IP       = 10;
 	const MAX_PHONE    = 3;
 	const SITE_WINDOW  = 3600;
+	const SITE_KEY     = 'send_site';
+
+	/**
+	 * Per-request random id used in claim states. Tests may overwrite it.
+	 *
+	 * @var string
+	 */
+	public static $request_id = '';
 
 	/**
 	 * Stable visitor id: WC customer id, user id, or a random cookie.
@@ -56,6 +66,18 @@ class MyOTP_PV_Session {
 	}
 
 	/**
+	 * Random id for this request, used to tie a claim to its consumer.
+	 *
+	 * @return string
+	 */
+	public static function request_id() {
+		if ( '' === self::$request_id ) {
+			self::$request_id = substr( md5( wp_generate_password( 32, false ) . microtime( true ) ), 0, 16 );
+		}
+		return self::$request_id;
+	}
+
+	/**
 	 * Client IP. REMOTE_ADDR only; forwarding headers are forgeable. Hosts
 	 * behind a trusted reverse proxy can supply the real address through
 	 * the myotp_pv_client_ip filter.
@@ -77,7 +99,8 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Site-wide sends per hour. Setting, then the myotp_pv_site_hourly_cap filter.
+	 * Site-wide sends per fixed one-hour window. Setting, then the
+	 * myotp_pv_site_hourly_cap filter.
 	 *
 	 * @return int
 	 */
@@ -85,6 +108,16 @@ class MyOTP_PV_Session {
 		$o   = myotp_pv_get_options();
 		$cap = isset( $o['site_hourly_cap'] ) ? (int) $o['site_hourly_cap'] : 100;
 		return max( 1, (int) apply_filters( 'myotp_pv_site_hourly_cap', $cap ) );
+	}
+
+	/**
+	 * Pending record lifetime: the configured code validity, capped at a day.
+	 *
+	 * @return int
+	 */
+	public static function pending_ttl() {
+		$o = myotp_pv_get_options();
+		return min( 86400, max( 60, (int) $o['otp_validity'] ) );
 	}
 
 	/**
@@ -100,7 +133,7 @@ class MyOTP_PV_Session {
 				array( 'send_v_' . self::visitor_key(), self::MAX_VISITOR ),
 				array( self::ip_key(), self::MAX_IP ),
 				array( 'send_p_' . $phone, self::MAX_PHONE ),
-				array( 'send_site', self::site_hourly_cap(), self::SITE_WINDOW ),
+				array( self::SITE_KEY, self::site_hourly_cap(), self::SITE_WINDOW ),
 			),
 			time(),
 			MYOTP_PV_RATE_WINDOW
@@ -108,13 +141,26 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Give the slots back (provider never reached).
+	 * Give every slot back (provider never reached).
 	 *
 	 * @param array $taken Pairs of key and window returned by take_send().
 	 */
 	public static function release_send( array $taken ) {
 		foreach ( $taken as $pair ) {
 			myotp_pv_release_slot( MyOTP_PV_Store::instance(), $pair[0], time(), (int) $pair[1] );
+		}
+	}
+
+	/**
+	 * Give only the site-wide slot back (provider answered 409 or 5xx: no code was billed).
+	 *
+	 * @param array $taken Pairs of key and window returned by take_send().
+	 */
+	public static function release_site_slot( array $taken ) {
+		foreach ( $taken as $pair ) {
+			if ( self::SITE_KEY === $pair[0] ) {
+				myotp_pv_release_slot( MyOTP_PV_Store::instance(), $pair[0], time(), (int) $pair[1] );
+			}
 		}
 	}
 
@@ -137,12 +183,31 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Current pending record, or null.
+	 * Key for a phone lock.
 	 *
+	 * @param string $phone Digits.
+	 * @return string
+	 */
+	private static function lock_key( $phone ) {
+		return 'lock:' . $phone;
+	}
+
+	/**
+	 * Raw pending value for this visitor, or null.
+	 *
+	 * @return string|null
+	 */
+	public static function pending_raw() {
+		return MyOTP_PV_Store::instance()->get( self::pending_key() );
+	}
+
+	/**
+	 * Decode a raw pending value.
+	 *
+	 * @param string|null $raw Raw value.
 	 * @return array|null
 	 */
-	public static function get_pending() {
-		$raw = MyOTP_PV_Store::instance()->get( self::pending_key() );
+	public static function decode_pending( $raw ) {
 		if ( null === $raw ) {
 			return null;
 		}
@@ -151,34 +216,37 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Store a fresh pending record with zero attempts.
+	 * Install a fresh pending challenge, guarded by the raw value read earlier.
 	 *
-	 * @param string $phone      Digits.
-	 * @param string $message_id Message id, may be empty.
+	 * @param string      $phone      Digits.
+	 * @param string      $message_id Message id from /generate_otp.
+	 * @param string|null $expected   Raw pending value read before the provider call.
+	 * @return bool True when written.
 	 */
-	public static function set_pending( $phone, $message_id ) {
-		MyOTP_PV_Store::instance()->set(
+	public static function install_pending( $phone, $message_id, $expected ) {
+		$ttl = self::pending_ttl();
+		return null !== myotp_pv_install(
+			MyOTP_PV_Store::instance(),
 			self::pending_key(),
-			myotp_pv_json(
-				array(
-					'phone'      => $phone,
-					'message_id' => (string) $message_id,
-					'attempts'   => 0,
-					'sent_at'    => time(),
-					'ttl'        => self::TTL,
-				)
+			$expected,
+			array(
+				'phone'      => $phone,
+				'message_id' => (string) $message_id,
+				'attempts'   => 0,
+				'sent_at'    => time(),
+				'exp'        => time() + $ttl,
 			),
-			self::TTL
+			$ttl
 		);
 	}
 
 	/**
 	 * Reserve one verify attempt.
 	 *
-	 * @return array{ok: bool, locked: bool, pending: array|null, attempts: int}
+	 * @return array{ok: bool, locked: bool, pending: array|null, attempts: int, raw: string|null}
 	 */
 	public static function reserve_attempt() {
-		return myotp_pv_reserve_attempt( MyOTP_PV_Store::instance(), self::pending_key(), self::MAX_ATTEMPTS );
+		return myotp_pv_reserve_attempt( MyOTP_PV_Store::instance(), self::pending_key(), self::MAX_ATTEMPTS, time() );
 	}
 
 	/**
@@ -189,56 +257,125 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Forget the pending record.
+	 * Delete the pending record only while it still holds $raw.
+	 *
+	 * @param string $raw Raw value that authorised the delete.
+	 * @return bool
 	 */
-	public static function clear_pending() {
-		MyOTP_PV_Store::instance()->delete( self::pending_key() );
+	public static function clear_pending( $raw ) {
+		return MyOTP_PV_Store::instance()->delete( self::pending_key(), (string) $raw );
 	}
 
 	/**
-	 * Mark the phone verified now (state "verified").
+	 * Lock a phone after too many wrong codes. add() only.
 	 *
 	 * @param string $phone Digits.
+	 * @return bool
 	 */
-	public static function set_verified( $phone ) {
-		MyOTP_PV_Store::instance()->set(
+	public static function lock_phone( $phone ) {
+		return myotp_pv_lock_phone( MyOTP_PV_Store::instance(), self::lock_key( $phone ), time(), self::LOCK_TTL );
+	}
+
+	/**
+	 * Seconds left on a phone lock, 0 when none.
+	 *
+	 * @param string $phone Digits.
+	 * @return int
+	 */
+	public static function lock_remaining( $phone ) {
+		return myotp_pv_lock_remaining( MyOTP_PV_Store::instance(), self::lock_key( $phone ), time() );
+	}
+
+	/**
+	 * Raw verified value for this visitor, or null.
+	 *
+	 * @return string|null
+	 */
+	public static function verified_raw() {
+		return MyOTP_PV_Store::instance()->get( self::verified_key() );
+	}
+
+	/**
+	 * Mark the phone verified now (state "verified"), guarded by the raw
+	 * verified value read earlier (null when there was none).
+	 *
+	 * @param string      $phone    Digits.
+	 * @param string|null $expected Raw verified value read earlier.
+	 * @return bool
+	 */
+	public static function set_verified( $phone, $expected ) {
+		return null !== myotp_pv_install(
+			MyOTP_PV_Store::instance(),
 			self::verified_key(),
-			myotp_pv_json(
-				array(
-					'phone' => $phone,
-					'at'    => time(),
-					'state' => 'verified',
-				)
+			$expected,
+			array(
+				'phone' => $phone,
+				'at'    => time(),
+				'state' => 'verified',
 			),
 			self::VERIFIED_TTL
 		);
 	}
 
 	/**
-	 * The verified phone for this visitor, or empty when none, consumed or expired.
+	 * The verified phone for this visitor, or empty when none, claimed, consumed or expired.
 	 *
 	 * @return string
 	 */
 	public static function verified_phone() {
-		$raw = MyOTP_PV_Store::instance()->get( self::verified_key() );
+		$raw = self::verified_raw();
 		return myotp_pv_verified_phone_from( null === $raw ? null : json_decode( $raw, true ), time(), self::VERIFIED_TTL );
 	}
 
 	/**
-	 * Atomically consume the verification for one order or account.
-	 * Returns the phone when this caller won, empty otherwise.
+	 * True when this visitor's verification exists, is unexpired, and has
+	 * already been claimed or consumed by a checkout or registration.
 	 *
-	 * @param string $tag Consumer tag, e.g. order:123 or user:7.
-	 * @return string
+	 * @return bool
 	 */
-	public static function claim_verified( $tag ) {
-		return myotp_pv_claim_verified( MyOTP_PV_Store::instance(), self::verified_key(), $tag, time(), self::VERIFIED_TTL );
+	public static function verified_is_used() {
+		$raw = self::verified_raw();
+		if ( null === $raw ) {
+			return false;
+		}
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || ! isset( $data['state'], $data['at'] ) ) {
+			return false;
+		}
+		if ( (int) $data['at'] + self::VERIFIED_TTL <= time() ) {
+			return false;
+		}
+		return 0 === strpos( (string) $data['state'], 'claiming:' ) || 0 === strpos( (string) $data['state'], 'consumed:' );
 	}
 
 	/**
-	 * Drop the verified record (a new send starts over).
+	 * Claim the verification for this request: verified -> claiming:<phone>:<rid>.
+	 *
+	 * @param string $phone Phone that passed validation.
+	 * @return string Phone when won, empty otherwise.
 	 */
-	public static function clear_verified() {
-		MyOTP_PV_Store::instance()->delete( self::verified_key() );
+	public static function claim_verified( $phone ) {
+		return myotp_pv_claim_verified( MyOTP_PV_Store::instance(), self::verified_key(), $phone, self::request_id(), time(), self::VERIFIED_TTL );
+	}
+
+	/**
+	 * Consume this request's claim: claiming:<phone>:<rid> -> consumed:<tag>.
+	 *
+	 * @param string $phone Phone in the claim.
+	 * @param string $tag   Consumer, e.g. order:123 or user:7.
+	 * @return string Phone when won, empty otherwise.
+	 */
+	public static function consume_claim( $phone, $tag ) {
+		return myotp_pv_consume_claim( MyOTP_PV_Store::instance(), self::verified_key(), $phone, self::request_id(), $tag, time(), self::VERIFIED_TTL );
+	}
+
+	/**
+	 * Delete the verified record only while it still holds $raw.
+	 *
+	 * @param string $raw Raw value that authorised the delete.
+	 * @return bool
+	 */
+	public static function clear_verified( $raw ) {
+		return MyOTP_PV_Store::instance()->delete( self::verified_key(), (string) $raw );
 	}
 }

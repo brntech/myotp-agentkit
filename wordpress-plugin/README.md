@@ -9,7 +9,7 @@ A WordPress plugin that verifies phone numbers with a one-time code over SMS, Wh
 - **Shortcode.** `[myotp_verify]` renders the widget anywhere. On success it fires `myotp:verified` on `document` with `event.detail.phone`.
 - **Settings page.** Settings > MyOTP: API key (masked), channel, code length (4 to 8), validity in seconds, optional brand, and a Send test code button.
 
-The API key stays on the server. The browser only calls `admin-ajax.php` and every call carries a nonce. Sends are capped with atomic counters on four dimensions at once: 5 per visitor, 10 per client IP, 3 per destination number, each per 10 minutes, and 100 per site per hour (setting, or the `myotp_pv_site_hourly_cap` filter). Five wrong codes discard the pending code, and reusing an active code does not reset that count. A verification lasts 30 minutes and is claimed atomically by exactly one order or one account.
+The API key stays on the server. The browser only calls `admin-ajax.php` and every call carries a nonce. Sends are capped with atomic counters on four dimensions at once: 5 per visitor, 10 per client IP, 3 per destination number, each per 10 minutes, and a site-wide ceiling (default 100) in a fixed one-hour window that starts at the first send, so up to twice the ceiling can pass across a boundary. The site ceiling exists to bound what an attacker with many addresses and numbers can make the site spend. A visitor can only verify the challenge they requested (the provider's message id travels with the pending record). Five wrong codes lock the number for 15 minutes for everyone. A verification lasts 30 minutes, is claimed by exactly one checkout or registration at validation, and consumed when the order or account exists.
 
 The per-IP counter reads `REMOTE_ADDR` only. Behind a reverse proxy or CDN that may be the proxy's address, so the site-wide hourly cap is the real backstop there. If your host guarantees a trusted forwarding header, return the real address from the `myotp_pv_client_ip` filter.
 
@@ -54,7 +54,8 @@ myotp-phone-verification/
   includes/class-myotp-pv-registration.php wp-login.php?action=register
   includes/class-myotp-pv-woocommerce.php  classic checkout
   assets/js, assets/css, languages/, readme.txt, uninstall.php
-tests/run.php                     plain PHP tests: pure helpers, then the AJAX, registration and checkout handlers against tests/wp-stubs.php
+tests/run.php                     plain PHP tests: pure helpers, then every hook and flow against tests/wp-stubs.php
+bin/make-pot.php                  regenerates languages/*.pot from the sources
 ```
 
 ## Test

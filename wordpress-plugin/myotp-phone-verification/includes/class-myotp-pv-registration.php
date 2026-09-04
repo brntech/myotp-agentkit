@@ -2,6 +2,12 @@
 /**
  * Phone verification on wp-login.php?action=register.
  *
+ * Proof lifecycle: registration_errors claims the verified record for this
+ * request (verified -> claiming:<phone>:<rid>) once every other check has
+ * passed; register_new_user consumes it (-> consumed:user:<id>) and stamps
+ * user meta. If core aborts the registration after our claim, the record
+ * stays "claiming" until it expires and the visitor must verify again.
+ *
  * @package myotp-phone-verification
  */
 
@@ -17,12 +23,11 @@ class MyOTP_PV_Registration {
 	const META = 'myotp_verified_phone';
 
 	/**
-	 * Phones that passed validate() in this request with no other errors,
-	 * keyed by normalised number. save() stamps only a matching phone.
+	 * Phone claimed by this request's validation, empty when none.
 	 *
-	 * @var array<string, bool>
+	 * @var string
 	 */
-	private static $passed = array();
+	private static $claimed = '';
 
 	/**
 	 * Hook registration.
@@ -65,8 +70,10 @@ class MyOTP_PV_Registration {
 	}
 
 	/**
-	 * Block registration until the submitted number equals the verified one.
-	 * The comparison always runs; an empty submission fails.
+	 * Block registration until the submitted number equals the verified
+	 * one, then claim the proof for this request. The claim happens only
+	 * when no other registration error is present, so core will go on to
+	 * create the account.
 	 *
 	 * @param WP_Error $errors     Errors so far.
 	 * @param string   $login      Username.
@@ -74,39 +81,56 @@ class MyOTP_PV_Registration {
 	 * @return WP_Error
 	 */
 	public static function validate( $errors, $login, $user_email ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
-		$phone    = self::posted_phone();
-		$verified = MyOTP_PV_Session::verified_phone();
-		$clean    = ! ( $errors instanceof WP_Error ) || empty( $errors->get_error_codes() );
+		self::$claimed = '';
+		$phone         = self::posted_phone();
+		$verified      = MyOTP_PV_Session::verified_phone();
+		$clean         = ! ( $errors instanceof WP_Error ) || empty( $errors->get_error_codes() );
 
 		if ( '' === $verified ) {
+			if ( MyOTP_PV_Session::verified_is_used() ) {
+				$errors->add( 'myotp_pv_claimed', __( 'This phone verification was already used. Verify your number again.', 'myotp-phone-verification' ) );
+				return $errors;
+			}
 			$errors->add( 'myotp_pv_unverified', __( 'Verify your phone number before registering.', 'myotp-phone-verification' ) );
-		} elseif ( $phone !== $verified ) {
-			$errors->add( 'myotp_pv_mismatch', __( 'The phone number changed after verification. Verify it again.', 'myotp-phone-verification' ) );
-		} elseif ( $clean ) {
-			self::$passed[ $verified ] = true;
+			return $errors;
 		}
+		if ( $phone !== $verified ) {
+			$errors->add( 'myotp_pv_mismatch', __( 'The phone number changed after verification. Verify it again.', 'myotp-phone-verification' ) );
+			return $errors;
+		}
+		if ( ! $clean ) {
+			return $errors;
+		}
+		$claimed = MyOTP_PV_Session::claim_verified( $verified );
+		if ( '' === $claimed ) {
+			$errors->add( 'myotp_pv_claimed', __( 'This phone verification was already used. Verify your number again.', 'myotp-phone-verification' ) );
+			return $errors;
+		}
+		self::$claimed = $claimed;
 		return $errors;
 	}
 
 	/**
-	 * Store the verified number as user meta. Runs on register_new_user
-	 * (successful public registration only), requires the posted phone to
-	 * be one validate() passed in this request, and atomically claims the
-	 * verification for this user id.
+	 * Consume this request's claim for the new account and stamp user
+	 * meta. Runs on register_new_user (successful public registration
+	 * only). If the meta write fails the claim stays consumed and the
+	 * failure is logged; the user can verify again from their profile
+	 * flow in a later version.
 	 *
 	 * @param int $user_id New user id.
 	 */
 	public static function save( $user_id ) {
-		$phone = self::posted_phone();
-		if ( '' === $phone || empty( self::$passed[ $phone ] ) ) {
+		if ( '' === self::$claimed || self::posted_phone() !== self::$claimed ) {
 			return;
 		}
-		unset( self::$passed[ $phone ] );
-		$claimed = MyOTP_PV_Session::claim_verified( 'user:' . (int) $user_id );
-		if ( $claimed !== $phone ) {
+		$phone         = MyOTP_PV_Session::consume_claim( self::$claimed, 'user:' . (int) $user_id );
+		self::$claimed = '';
+		if ( '' === $phone ) {
 			return;
 		}
-		update_user_meta( $user_id, self::META, $phone );
+		if ( false === update_user_meta( $user_id, self::META, $phone ) ) {
+			error_log( 'myotp-phone-verification: update_user_meta failed for user ' . (int) $user_id . '; verification consumed but not stamped.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
 	}
 
 	/**

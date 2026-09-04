@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       MyOTP Phone Verification
  * Plugin URI:        https://github.com/brntech/myotp-agentkit/tree/main/wordpress-plugin
- * Description:       Phone verification by SMS, WhatsApp or Telegram OTP for WooCommerce checkout, WordPress registration and any page via the [myotp_verify] shortcode.
+ * Description:       Phone verification by SMS, WhatsApp or Telegram code for WooCommerce checkout, registration and the [myotp_verify] shortcode.
  * Version:           1.0.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
@@ -88,17 +88,23 @@ function myotp_pv_privacy_policy() {
 	}
 	$content = '<p class="privacy-policy-tutorial">' . esc_html__( 'Suggested text for sites using MyOTP Phone Verification.', 'myotp-phone-verification' ) . '</p>'
 		. '<p>' . esc_html__( 'When you verify a phone number on this site, the number is sent to MyOTP.App (api.myotp.app) so a one-time code can be delivered by SMS, WhatsApp or Telegram and checked. MyOTP.App processes the number under its own privacy policy and terms: https://myotp.app/privacy-policy/ and https://myotp.app/term-condition/.', 'myotp-phone-verification' ) . '</p>'
-		. '<p>' . esc_html__( 'This site sets a cookie named myotp_pv_sid for one day to tie your verification to your browser, and keeps a short-lived record of the number, the pending code reference and the number of attempts for up to one hour. A verified number stays attached to your session for up to 30 minutes.', 'myotp-phone-verification' ) . '</p>'
+		. '<p>' . esc_html__( 'This site sets a cookie named myotp_pv_sid for one day to tie your verification to your browser. It keeps a record of the number, the code reference and the number of attempts for as long as the code is valid (the site setting, at most 24 hours), and after five wrong codes a 15-minute lock on the number. A verified number stays attached to your session for up to 30 minutes. Expired records are removed by a daily clean-up.', 'myotp-phone-verification' ) . '</p>'
 		. '<p>' . esc_html__( 'If you register an account, the verified number is stored in your user profile. If you place an order, it is stored with the order. Both stay with your account or order data until they are deleted.', 'myotp-phone-verification' ) . '</p>';
 	wp_add_privacy_policy_content( __( 'MyOTP Phone Verification', 'myotp-phone-verification' ), wp_kses_post( $content ) );
 }
 add_action( 'admin_init', 'myotp_pv_privacy_policy' );
 
 /**
- * Daily sweep of expired store rows (counters, pending codes, verified records).
+ * Daily sweep of expired store rows (counters, pending codes, verified
+ * records, phone locks). Deletes in batches of 1000, at most 20 per run;
+ * when the last batch was full a single continuation is scheduled five
+ * minutes later on the same hook.
  */
 function myotp_pv_sweep() {
-	MyOTP_PV_Store::instance()->sweep_expired( 200 );
+	$result = MyOTP_PV_Store::instance()->sweep_expired( 1000, 20 );
+	if ( ! empty( $result['full'] ) ) {
+		wp_schedule_single_event( time() + 5 * MINUTE_IN_SECONDS, 'myotp_pv_sweep' );
+	}
 }
 add_action( 'myotp_pv_sweep', 'myotp_pv_sweep' );
 

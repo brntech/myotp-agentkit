@@ -3,6 +3,14 @@
  * WooCommerce classic checkout: verify the billing phone before the order
  * can be placed. Loaded only when WooCommerce is active.
  *
+ * Proof lifecycle: validation claims the verified record for this request
+ * (verified -> claiming:<phone>:<rid>), so a second checkout sharing the
+ * same proof fails validation instead of creating an order. Once the order
+ * exists, the claim is consumed (-> consumed:order:<id>) and the order is
+ * stamped. If checkout fails after validation (payment declined, for
+ * example) the record stays "claiming" until it expires and the shopper
+ * must verify again.
+ *
  * @package myotp-phone-verification
  */
 
@@ -18,6 +26,13 @@ class MyOTP_PV_WooCommerce {
 	const ORDER_META = '_myotp_verified_phone';
 
 	/**
+	 * Phone claimed by this request's validation, empty when none.
+	 *
+	 * @var string
+	 */
+	private static $claimed = '';
+
+	/**
 	 * Hook registration.
 	 */
 	public static function init() {
@@ -27,7 +42,7 @@ class MyOTP_PV_WooCommerce {
 		}
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'widget' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
-		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'claim' ) );
+		add_action( 'woocommerce_checkout_order_created', array( __CLASS__, 'consume' ) );
 	}
 
 	/**
@@ -61,12 +76,14 @@ class MyOTP_PV_WooCommerce {
 	}
 
 	/**
-	 * Block the order until the billing phone matches the verified number.
+	 * Block the order until the billing phone matches the verified number,
+	 * then claim the proof for this request so no other checkout can use it.
 	 *
 	 * @param array    $data   Posted checkout data.
 	 * @param WP_Error $errors Errors collected so far.
 	 */
 	public static function validate( $data, $errors ) {
+		self::$claimed = '';
 		if ( ! self::required() ) {
 			return;
 		}
@@ -74,33 +91,43 @@ class MyOTP_PV_WooCommerce {
 		$verified = MyOTP_PV_Session::verified_phone();
 
 		if ( '' === $verified ) {
+			if ( MyOTP_PV_Session::verified_is_used() ) {
+				$errors->add( 'myotp_pv_claimed', __( 'This phone verification was already used by another checkout. Verify your number again.', 'myotp-phone-verification' ) );
+				return;
+			}
 			$errors->add( 'myotp_pv_unverified', __( 'Verify your billing phone number before placing the order. Use the Send code button under the billing details.', 'myotp-phone-verification' ) );
 			return;
 		}
 		if ( $billing !== $verified ) {
 			$errors->add( 'myotp_pv_mismatch', __( 'The billing phone number does not match the number you verified. Verify the new number or change it back.', 'myotp-phone-verification' ) );
+			return;
 		}
+		$claimed = MyOTP_PV_Session::claim_verified( $verified );
+		if ( '' === $claimed ) {
+			$errors->add( 'myotp_pv_claimed', __( 'This phone verification was already used by another checkout. Verify your number again.', 'myotp-phone-verification' ) );
+			return;
+		}
+		self::$claimed = $claimed;
 	}
 
 	/**
-	 * Atomically claim the verification for this order once it exists.
-	 * The CAS moves the record from "verified" to "consumed:order:<id>";
-	 * only the winner stamps the order. A loser (a parallel checkout that
-	 * passed validation on the same proof) gets an order note instead.
+	 * Consume this request's claim once the order exists and stamp the
+	 * order with the phone from the claim. If the consume CAS loses (the
+	 * record changed under us) the order gets a note instead.
 	 *
 	 * @param WC_Order $order The created order.
 	 */
-	public static function claim( $order ) {
-		if ( ! self::required() || ! is_object( $order ) ) {
+	public static function consume( $order ) {
+		if ( ! self::required() || ! is_object( $order ) || '' === self::$claimed ) {
 			return;
 		}
-		$phone = MyOTP_PV_Session::claim_verified( 'order:' . $order->get_id() );
+		$phone         = MyOTP_PV_Session::consume_claim( self::$claimed, 'order:' . $order->get_id() );
+		self::$claimed = '';
 		if ( '' !== $phone ) {
 			$order->update_meta_data( self::ORDER_META, $phone );
 			$order->save();
-		} else {
-			$order->add_order_note( __( 'MyOTP: phone verification could not be claimed for this order (already used by another order or expired). Billing phone is unverified.', 'myotp-phone-verification' ) );
+			return;
 		}
-		MyOTP_PV_Session::clear_pending();
+		$order->add_order_note( __( 'MyOTP: the phone verification claimed at checkout could not be consumed for this order (it changed or expired in between). Billing phone is unverified.', 'myotp-phone-verification' ) );
 	}
 }

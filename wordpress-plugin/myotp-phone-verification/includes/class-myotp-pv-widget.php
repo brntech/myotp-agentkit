@@ -18,14 +18,17 @@ class MyOTP_PV_Widget {
 	 * Hook registration.
 	 */
 	public static function init() {
-		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
-		add_action( 'login_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'front_assets' ) );
+		add_action( 'login_enqueue_scripts', array( __CLASS__, 'login_assets' ) );
 	}
 
 	/**
-	 * Register (not enqueue) the front-end assets. Callers enqueue when they render.
+	 * Register (not enqueue) the front-end assets.
 	 */
 	public static function register_assets() {
+		if ( wp_script_is( 'myotp-pv', 'registered' ) ) {
+			return;
+		}
 		wp_register_style( 'myotp-pv', MYOTP_PV_URL . 'assets/css/myotp-verify.css', array(), MYOTP_PV_VERSION );
 		wp_register_script( 'myotp-pv', MYOTP_PV_URL . 'assets/js/myotp-verify.js', array(), MYOTP_PV_VERSION, true );
 		wp_localize_script(
@@ -51,12 +54,42 @@ class MyOTP_PV_Widget {
 	}
 
 	/**
-	 * Enqueue the registered assets.
+	 * Front end: enqueue in the head on pages that will render the widget.
+	 */
+	public static function front_assets() {
+		self::register_assets();
+		$o    = myotp_pv_get_options();
+		$need = false;
+		if ( ! empty( $o['wc_enabled'] ) && function_exists( 'is_checkout' ) && is_checkout() ) {
+			$need = true;
+		}
+		$post = get_post();
+		if ( $post instanceof WP_Post && has_shortcode( (string) $post->post_content, 'myotp_verify' ) ) {
+			$need = true;
+		}
+		if ( $need ) {
+			self::enqueue();
+		}
+	}
+
+	/**
+	 * Login screen: enqueue when the registration form is shown.
+	 */
+	public static function login_assets() {
+		self::register_assets();
+		$o = myotp_pv_get_options();
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing on the core login screen.
+		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+		if ( ! empty( $o['register_enabled'] ) && 'register' === $action ) {
+			self::enqueue();
+		}
+	}
+
+	/**
+	 * Enqueue the registered assets (fallback when render happens after head).
 	 */
 	public static function enqueue() {
-		if ( ! wp_script_is( 'myotp-pv', 'registered' ) ) {
-			self::register_assets();
-		}
+		self::register_assets();
 		wp_enqueue_style( 'myotp-pv' );
 		wp_enqueue_script( 'myotp-pv' );
 	}
@@ -65,9 +98,10 @@ class MyOTP_PV_Widget {
 	 * Build the widget markup.
 	 *
 	 * Keys: phone_selector (CSS selector of an external phone input; empty
-	 * renders an inline input), phone_value (prefill for the inline input),
-	 * verified (already-verified digits or empty), label (inline input label),
-	 * context (free-form id: checkout, register, shortcode).
+	 * renders an inline input plus a hidden myotp_pv_phone field that always
+	 * posts the number), phone_value (prefill for the inline input), verified
+	 * (already-verified digits or empty), label (inline input label), context
+	 * (free-form id: checkout, register, shortcode).
 	 *
 	 * @param array $args Arguments, see above.
 	 * @return string HTML.
@@ -87,6 +121,7 @@ class MyOTP_PV_Widget {
 
 		$id       = 'myotp-pv-' . wp_unique_id();
 		$verified = '' !== $args['verified'];
+		$value    = $verified ? $args['verified'] : $args['phone_value'];
 
 		ob_start();
 		?>
@@ -98,9 +133,10 @@ class MyOTP_PV_Widget {
 				<p class="myotp-pv-row">
 					<label for="<?php echo esc_attr( $id ); ?>-phone"><?php echo esc_html( $args['label'] ); ?></label>
 					<input type="tel" class="myotp-pv-phone" id="<?php echo esc_attr( $id ); ?>-phone"
-						name="myotp_pv_phone" autocomplete="tel" inputmode="tel"
-						value="<?php echo esc_attr( $verified ? $args['verified'] : $args['phone_value'] ); ?>"
+						name="myotp_pv_phone_display" autocomplete="tel" inputmode="tel"
+						value="<?php echo esc_attr( $value ); ?>"
 						placeholder="14155551234" <?php disabled( $verified ); ?> />
+					<input type="hidden" class="myotp-pv-phone-hidden" name="myotp_pv_phone" value="<?php echo esc_attr( $value ); ?>" />
 				</p>
 			<?php endif; ?>
 			<p class="myotp-pv-row myotp-pv-actions">

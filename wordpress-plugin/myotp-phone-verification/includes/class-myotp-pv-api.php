@@ -15,7 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class MyOTP_PV_Api {
 
 	/**
-	 * POST JSON to the API. Returns array( ok, http, body, message ).
+	 * POST JSON to the API. Returns array( ok, http, body, message, transport ).
+	 * transport is true when the request never got an HTTP answer.
 	 *
 	 * @param string $path    Endpoint path, e.g. /generate_otp.
 	 * @param array  $payload JSON body.
@@ -27,10 +28,11 @@ class MyOTP_PV_Api {
 
 		if ( '' === $api_key ) {
 			return array(
-				'ok'      => false,
-				'http'    => 0,
-				'body'    => null,
-				'message' => __( 'Phone verification is not configured on this site yet.', 'myotp-phone-verification' ),
+				'ok'        => false,
+				'http'      => 0,
+				'body'      => null,
+				'transport' => true,
+				'message'   => __( 'Phone verification is not configured on this site yet.', 'myotp-phone-verification' ),
 			);
 		}
 
@@ -50,10 +52,11 @@ class MyOTP_PV_Api {
 
 		if ( is_wp_error( $response ) ) {
 			return array(
-				'ok'      => false,
-				'http'    => 0,
-				'body'    => null,
-				'message' => __( 'Could not reach the verification service. Try again in a moment.', 'myotp-phone-verification' ),
+				'ok'        => false,
+				'http'      => 0,
+				'body'      => null,
+				'transport' => true,
+				'message'   => __( 'Could not reach the verification service. Try again in a moment.', 'myotp-phone-verification' ),
 			);
 		}
 
@@ -62,15 +65,17 @@ class MyOTP_PV_Api {
 		$ok   = $http >= 200 && $http < 300 && is_array( $body );
 
 		return array(
-			'ok'      => $ok,
-			'http'    => $http,
-			'body'    => is_array( $body ) ? $body : null,
-			'message' => $ok ? '' : myotp_pv_error_message( $body, $http, __( 'The verification service returned an error.', 'myotp-phone-verification' ) ),
+			'ok'        => $ok,
+			'http'      => $http,
+			'body'      => is_array( $body ) ? $body : null,
+			'transport' => false,
+			'message'   => $ok ? '' : myotp_pv_error_message( $body, $http, __( 'The verification service returned an error.', 'myotp-phone-verification' ) ),
 		);
 	}
 
 	/**
-	 * Send a code.
+	 * Send a code. force_send stays false so an unexpired code for the same
+	 * number is not re-billed; the API answers 409 in that case.
 	 *
 	 * @param string $phone Digits only.
 	 * @return array
@@ -82,12 +87,17 @@ class MyOTP_PV_Api {
 			'otp_length'   => (int) $options['otp_length'],
 			'otp_validity' => (int) $options['otp_validity'],
 			'channel'      => $options['channel'],
-			'force_send'   => true,
+			'force_send'   => false,
 		);
 		if ( '' !== $options['brand'] ) {
 			$payload['brand'] = $options['brand'];
 		}
-		return self::post( '/generate_otp', $payload );
+		$result = self::post( '/generate_otp', $payload );
+		if ( $result['ok'] && ! myotp_pv_is_send_body( $result['body'] ) ) {
+			$result['ok']      = false;
+			$result['message'] = __( 'The verification service gave an unexpected answer. Try again.', 'myotp-phone-verification' );
+		}
+		return $result;
 	}
 
 	/**

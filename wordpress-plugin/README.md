@@ -9,7 +9,7 @@ A WordPress plugin that verifies phone numbers with a one-time code over SMS, Wh
 - **Shortcode.** `[myotp_verify]` renders the widget anywhere. On success it fires `myotp:verified` on `document` with `event.detail.phone`.
 - **Settings page.** Settings > MyOTP: API key (masked), channel, code length (4 to 8), validity in seconds, optional brand, and a Send test code button.
 
-The API key stays on the server. The browser only calls `admin-ajax.php`, every call carries a nonce, and each visitor session gets at most 5 sends per 10 minutes.
+The API key stays on the server. The browser only calls `admin-ajax.php` and every call carries a nonce. Sends are capped with atomic counters on three dimensions at once: 5 per visitor, 10 per client IP, 3 per destination number, each per 10 minutes. Five wrong codes discard the pending code. A verification lasts 30 minutes and is consumed when the order or account is created.
 
 ## Get a key
 
@@ -39,9 +39,10 @@ Country code first, digits only, no plus sign: `14155551234`. The plugin strips 
 ```
 myotp-phone-verification/
   myotp-phone-verification.php   plugin header, constants, boot
-  includes/functions.php         pure helpers (normalisation, rate limit, sanitisation)
+  includes/functions.php         pure helpers (normalisation, atomic counters, attempt lockout, sanitisation)
+  includes/class-myotp-pv-store.php        options-table store with INSERT IGNORE add() and guarded UPDATE cas()
   includes/class-myotp-pv-api.php          wp_remote_post to /generate_otp and /verify_otp
-  includes/class-myotp-pv-session.php      per-visitor state (WC session or transients)
+  includes/class-myotp-pv-session.php      per-visitor state (counters and pending in the store, verified in WC session or transient)
   includes/class-myotp-pv-widget.php       widget markup and assets
   includes/class-myotp-pv-ajax.php         send, verify, admin test
   includes/class-myotp-pv-settings.php     Settings > MyOTP
@@ -49,7 +50,7 @@ myotp-phone-verification/
   includes/class-myotp-pv-registration.php wp-login.php?action=register
   includes/class-myotp-pv-woocommerce.php  classic checkout
   assets/js, assets/css, languages/, readme.txt, uninstall.php
-tests/run.php                     plain PHP tests for includes/functions.php
+tests/run.php                     plain PHP tests: pure helpers, then the AJAX, registration and checkout handlers against tests/wp-stubs.php
 ```
 
 ## Test

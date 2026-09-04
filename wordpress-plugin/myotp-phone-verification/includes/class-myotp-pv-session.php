@@ -1,8 +1,9 @@
 <?php
 /**
- * Per-visitor state: rate limit window, pending message id, verified number.
- * Uses the WooCommerce session when it is loaded, otherwise transients keyed
- * on a visitor cookie.
+ * Per-visitor state. Counters and the pending code live in the atomic
+ * store (options table). The verified record lives in the WooCommerce
+ * session when one is loaded, otherwise in a transient keyed on a visitor
+ * cookie, and carries a timestamp so it expires.
  *
  * @package myotp-phone-verification
  */
@@ -16,8 +17,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class MyOTP_PV_Session {
 
-	const COOKIE = 'myotp_pv_sid';
-	const TTL    = 3600;
+	const COOKIE       = 'myotp_pv_sid';
+	const TTL          = 3600;
+	const VERIFIED_TTL = 1800;
+	const MAX_ATTEMPTS = 5;
+	const MAX_VISITOR  = 5;
+	const MAX_IP       = 10;
+	const MAX_PHONE    = 3;
 
 	/**
 	 * Stable visitor id: WC customer id, user id, or a random cookie.
@@ -49,54 +55,22 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Transient name for a state slot.
+	 * Hashed client IP from REMOTE_ADDR only (proxy headers are forgeable).
 	 *
-	 * @param string $slot Slot name.
 	 * @return string
 	 */
-	private static function name( $slot ) {
-		return 'myotp_pv_' . $slot . '_' . md5( self::visitor_key() );
+	public static function ip_key() {
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		return 'ip_' . md5( wp_salt( 'nonce' ) . '|' . $ip );
 	}
 
 	/**
-	 * Read a slot.
+	 * Transient name for a verified slot.
 	 *
-	 * @param string $slot Slot name.
-	 * @return mixed
+	 * @return string
 	 */
-	public static function get( $slot ) {
-		if ( self::use_wc() ) {
-			return WC()->session->get( 'myotp_pv_' . $slot );
-		}
-		$v = get_transient( self::name( $slot ) );
-		return false === $v ? null : $v;
-	}
-
-	/**
-	 * Write a slot.
-	 *
-	 * @param string $slot  Slot name.
-	 * @param mixed  $value Value.
-	 */
-	public static function set( $slot, $value ) {
-		if ( self::use_wc() ) {
-			WC()->session->set( 'myotp_pv_' . $slot, $value );
-			return;
-		}
-		set_transient( self::name( $slot ), $value, self::TTL );
-	}
-
-	/**
-	 * Delete a slot.
-	 *
-	 * @param string $slot Slot name.
-	 */
-	public static function delete( $slot ) {
-		if ( self::use_wc() ) {
-			WC()->session->set( 'myotp_pv_' . $slot, null );
-			return;
-		}
-		delete_transient( self::name( $slot ) );
+	private static function verified_name() {
+		return 'myotp_pv_verified_' . md5( self::visitor_key() );
 	}
 
 	/**
@@ -109,31 +83,121 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Rate-limit check for the current visitor. Records the send when allowed.
+	 * Take a send slot on visitor, IP and destination, all or nothing.
 	 *
-	 * @return array{allowed: bool, retry_after: int}
+	 * @param string $phone Destination digits.
+	 * @return array{allowed: bool, retry_after: int, denied: string, taken: array}
 	 */
-	public static function consume_send() {
-		$now    = time();
-		$result = myotp_pv_rate_limit( (array) self::get( 'sends' ), $now, MYOTP_PV_RATE_MAX, MYOTP_PV_RATE_WINDOW );
-		if ( $result['allowed'] ) {
-			$stamps   = $result['timestamps'];
-			$stamps[] = $now;
-			self::set( 'sends', $stamps );
-		}
-		return array(
-			'allowed'     => $result['allowed'],
-			'retry_after' => $result['retry_after'],
+	public static function take_send( $phone ) {
+		return myotp_pv_take_send_slots(
+			MyOTP_PV_Store::instance(),
+			array(
+				array( 'send_v_' . self::visitor_key(), self::MAX_VISITOR ),
+				array( self::ip_key(), self::MAX_IP ),
+				array( 'send_p_' . $phone, self::MAX_PHONE ),
+			),
+			time(),
+			MYOTP_PV_RATE_WINDOW
 		);
 	}
 
 	/**
-	 * The verified phone number for this visitor, or empty string.
+	 * Give the slots back (provider never reached).
+	 *
+	 * @param array $taken Keys returned by take_send().
+	 */
+	public static function release_send( array $taken ) {
+		foreach ( $taken as $key ) {
+			myotp_pv_release_slot( MyOTP_PV_Store::instance(), $key, time(), MYOTP_PV_RATE_WINDOW );
+		}
+	}
+
+	/**
+	 * Key for the pending record of this visitor.
+	 *
+	 * @return string
+	 */
+	private static function pending_key() {
+		return 'pending_' . self::visitor_key();
+	}
+
+	/**
+	 * Store a fresh pending record with zero attempts.
+	 *
+	 * @param string $phone      Digits.
+	 * @param string $message_id Message id, may be empty.
+	 */
+	public static function set_pending( $phone, $message_id ) {
+		MyOTP_PV_Store::instance()->set(
+			self::pending_key(),
+			myotp_pv_json(
+				array(
+					'phone'      => $phone,
+					'message_id' => (string) $message_id,
+					'attempts'   => 0,
+					'sent_at'    => time(),
+					'ttl'        => self::TTL,
+				)
+			),
+			self::TTL
+		);
+	}
+
+	/**
+	 * Reserve one verify attempt.
+	 *
+	 * @return array{ok: bool, locked: bool, pending: array|null, attempts: int}
+	 */
+	public static function reserve_attempt() {
+		return myotp_pv_reserve_attempt( MyOTP_PV_Store::instance(), self::pending_key(), self::MAX_ATTEMPTS );
+	}
+
+	/**
+	 * Forget the pending record.
+	 */
+	public static function clear_pending() {
+		MyOTP_PV_Store::instance()->delete( self::pending_key() );
+	}
+
+	/**
+	 * Mark the phone verified now.
+	 *
+	 * @param string $phone Digits.
+	 */
+	public static function set_verified( $phone ) {
+		$record = array(
+			'phone' => $phone,
+			'at'    => time(),
+		);
+		if ( self::use_wc() ) {
+			WC()->session->set( 'myotp_pv_verified', $record );
+			return;
+		}
+		set_transient( self::verified_name(), $record, self::VERIFIED_TTL );
+	}
+
+	/**
+	 * The verified phone for this visitor, or empty when none or expired.
 	 *
 	 * @return string
 	 */
 	public static function verified_phone() {
-		$phone = self::get( 'verified' );
-		return is_string( $phone ) ? $phone : '';
+		if ( self::use_wc() ) {
+			$record = WC()->session->get( 'myotp_pv_verified' );
+		} else {
+			$record = get_transient( self::verified_name() );
+		}
+		return myotp_pv_verified_phone_from( $record, time(), self::VERIFIED_TTL );
+	}
+
+	/**
+	 * Consume the verified record (after it was used for an order or a registration).
+	 */
+	public static function clear_verified() {
+		if ( self::use_wc() ) {
+			WC()->session->set( 'myotp_pv_verified', null );
+			return;
+		}
+		delete_transient( self::verified_name() );
 	}
 }

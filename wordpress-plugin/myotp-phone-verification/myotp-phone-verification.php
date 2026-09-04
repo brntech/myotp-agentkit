@@ -31,6 +31,7 @@ define( 'MYOTP_PV_RATE_MAX', 5 );
 define( 'MYOTP_PV_RATE_WINDOW', 600 );
 
 require_once MYOTP_PV_DIR . 'includes/functions.php';
+require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-store.php';
 require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-api.php';
 require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-session.php';
 require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-widget.php';
@@ -77,6 +78,21 @@ function myotp_pv_declare_wc_compat() {
 	}
 }
 add_action( 'before_woocommerce_init', 'myotp_pv_declare_wc_compat' );
+
+/**
+ * Suggested text for the site's privacy policy (Settings > Privacy).
+ */
+function myotp_pv_privacy_policy() {
+	if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
+		return;
+	}
+	$content = '<p class="privacy-policy-tutorial">' . esc_html__( 'Suggested text for sites using MyOTP Phone Verification.', 'myotp-phone-verification' ) . '</p>'
+		. '<p>' . esc_html__( 'When you verify a phone number on this site, the number is sent to MyOTP.App (api.myotp.app) so a one-time code can be delivered by SMS, WhatsApp or Telegram and checked. MyOTP.App processes the number under its own privacy policy and terms: https://myotp.app/privacy-policy/ and https://myotp.app/term-condition/.', 'myotp-phone-verification' ) . '</p>'
+		. '<p>' . esc_html__( 'This site sets a cookie named myotp_pv_sid for one day to tie your verification to your browser, and keeps a short-lived record of the number, the pending code reference and the number of attempts for up to one hour. A verified number stays attached to your session for up to 30 minutes.', 'myotp-phone-verification' ) . '</p>'
+		. '<p>' . esc_html__( 'If you register an account, the verified number is stored in your user profile. If you place an order, it is stored with the order. Both stay with your account or order data until they are deleted.', 'myotp-phone-verification' ) . '</p>';
+	wp_add_privacy_policy_content( __( 'MyOTP Phone Verification', 'myotp-phone-verification' ), wp_kses_post( $content ) );
+}
+add_action( 'admin_init', 'myotp_pv_privacy_policy' );
 
 /**
  * Seed defaults on activation.

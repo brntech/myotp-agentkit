@@ -48,7 +48,7 @@ class MyOTP_PV_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Enter the number with the country code, digits only, for example 14155551234.', 'myotp-phone-verification' ) ), 400 );
 		}
 
-		$limit = MyOTP_PV_Session::consume_send();
+		$limit = MyOTP_PV_Session::take_send( $phone );
 		if ( ! $limit['allowed'] ) {
 			wp_send_json_error(
 				array(
@@ -63,19 +63,29 @@ class MyOTP_PV_Ajax {
 		}
 
 		$result = MyOTP_PV_Api::generate( $phone );
+
+		if ( ! $result['ok'] && 409 === (int) $result['http'] ) {
+			// An unexpired code for this number already exists; let the visitor use it.
+			MyOTP_PV_Session::set_pending( $phone, '' );
+			MyOTP_PV_Session::clear_verified();
+			wp_send_json_success(
+				array(
+					'message'  => __( 'A code is already on its way to this number. Enter it below.', 'myotp-phone-verification' ),
+					'phone'    => $phone,
+					'existing' => true,
+				)
+			);
+		}
+
 		if ( ! $result['ok'] ) {
+			if ( ! empty( $result['transport'] ) ) {
+				MyOTP_PV_Session::release_send( $limit['taken'] );
+			}
 			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
 		}
 
-		MyOTP_PV_Session::set(
-			'pending',
-			array(
-				'phone'      => $phone,
-				'message_id' => isset( $result['body']['message_id'] ) ? (string) $result['body']['message_id'] : '',
-				'sent_at'    => time(),
-			)
-		);
-		MyOTP_PV_Session::delete( 'verified' );
+		MyOTP_PV_Session::set_pending( $phone, (string) $result['body']['message_id'] );
+		MyOTP_PV_Session::clear_verified();
 
 		wp_send_json_success(
 			array(
@@ -91,21 +101,26 @@ class MyOTP_PV_Ajax {
 	public static function verify() {
 		check_ajax_referer( 'myotp_pv_public', 'nonce' );
 
-		$otp     = preg_replace( '/[^0-9]/', '', self::field( 'otp' ) );
-		$phone   = myotp_pv_normalize_phone( self::field( 'phone' ) );
-		$pending = MyOTP_PV_Session::get( 'pending' );
+		$otp   = preg_replace( '/[^0-9]/', '', self::field( 'otp' ) );
+		$phone = myotp_pv_normalize_phone( self::field( 'phone' ) );
 
 		if ( ! myotp_pv_is_valid_otp( $otp ) ) {
 			wp_send_json_error( array( 'message' => __( 'Enter the code you received.', 'myotp-phone-verification' ) ), 400 );
 		}
-		if ( ! is_array( $pending ) || empty( $pending['phone'] ) ) {
+
+		$reserve = MyOTP_PV_Session::reserve_attempt();
+		if ( $reserve['locked'] ) {
+			wp_send_json_error( array( 'message' => __( 'Too many wrong codes. Send a new code and try again.', 'myotp-phone-verification' ) ), 429 );
+		}
+		if ( ! $reserve['ok'] ) {
 			wp_send_json_error( array( 'message' => __( 'Request a code first.', 'myotp-phone-verification' ) ), 400 );
 		}
+		$pending = $reserve['pending'];
 		if ( '' !== $phone && $phone !== $pending['phone'] ) {
 			wp_send_json_error( array( 'message' => __( 'The number changed after the code was sent. Send a new code.', 'myotp-phone-verification' ) ), 400 );
 		}
 
-		$result = MyOTP_PV_Api::verify( $pending['phone'], $otp, isset( $pending['message_id'] ) ? $pending['message_id'] : '' );
+		$result = MyOTP_PV_Api::verify( $pending['phone'], $otp, isset( $pending['message_id'] ) ? (string) $pending['message_id'] : '' );
 		if ( ! $result['ok'] ) {
 			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
 		}
@@ -115,17 +130,21 @@ class MyOTP_PV_Ajax {
 			$text = isset( $result['body']['message'] ) && is_string( $result['body']['message'] )
 				? $result['body']['message']
 				: __( 'That code is not correct.', 'myotp-phone-verification' );
+			if ( 'expired' === $status ) {
+				MyOTP_PV_Session::clear_pending();
+			}
 			wp_send_json_error(
 				array(
-					'message' => $text,
-					'status'  => $status,
+					'message'   => $text,
+					'status'    => $status,
+					'remaining' => max( 0, MyOTP_PV_Session::MAX_ATTEMPTS - $reserve['attempts'] ),
 				),
 				200
 			);
 		}
 
-		MyOTP_PV_Session::set( 'verified', $pending['phone'] );
-		MyOTP_PV_Session::delete( 'pending' );
+		MyOTP_PV_Session::set_verified( $pending['phone'] );
+		MyOTP_PV_Session::clear_pending();
 
 		wp_send_json_success(
 			array(
@@ -167,7 +186,7 @@ class MyOTP_PV_Ajax {
 					/* translators: 1: phone number, 2: message id */
 					__( 'Sent to %1$s. Message ID %2$s.', 'myotp-phone-verification' ),
 					$phone,
-					isset( $body['message_id'] ) ? (string) $body['message_id'] : '?'
+					(string) $body['message_id']
 				),
 				'status'     => isset( $body['status'] ) ? (string) $body['status'] : '',
 				'cost'       => isset( $body['cost'] ) ? $body['cost'] : null,

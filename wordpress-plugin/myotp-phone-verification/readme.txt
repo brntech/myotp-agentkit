@@ -25,12 +25,25 @@ How it stays safe:
 
 * The API key never leaves the server. The browser talks to admin-ajax.php only.
 * Every AJAX call carries a nonce. Admin actions check `manage_options`.
-* Each visitor session can request at most 5 codes per 10 minutes.
+* Send limits, enforced together with atomic counters: 5 codes per visitor, 10 per client IP, 3 per destination number, each per 10 minutes. An unexpired code for the same number is reused rather than sent again.
+* 5 wrong codes discard the pending code; the visitor must request a new one.
+* A verification is valid for 30 minutes and is consumed when the order or the account is created.
 * Phone numbers are reduced to digits before they are sent. Leading zeros are kept.
 
 Not in this version: the WooCommerce block checkout. The classic shortcode checkout is supported.
 
-This plugin sends phone numbers to the MyOTP.App API (api.myotp.app) to deliver and verify codes. See https://myotp.app for the privacy policy and terms.
+= External service =
+
+This plugin sends the phone number a visitor enters to the MyOTP.App API at https://api.myotp.app to deliver a one-time code and to check the code the visitor types. No other data is sent. MyOTP.App privacy policy: https://myotp.app/privacy-policy/. Terms: https://myotp.app/term-condition/.
+
+= Data stored on your site =
+
+* A cookie `myotp_pv_sid` (random id, one day) so a guest's verification can be tied to their browser.
+* Short-lived rows in the options table: rate-limit counters (10 minutes), the pending number with its code reference and attempt count (up to one hour), and the verified number (30 minutes, in the WooCommerce session when one exists, otherwise a transient).
+* Order meta `_myotp_verified_phone` on each verified WooCommerce order.
+* User meta `myotp_verified_phone` on each account registered through the verified form.
+
+Uninstalling removes the settings, the counters, the pending records and the transients. Order meta and user meta are part of your customer records and are kept. The plugin registers suggested text for your privacy policy under Settings > Privacy.
 
 == Installation ==
 

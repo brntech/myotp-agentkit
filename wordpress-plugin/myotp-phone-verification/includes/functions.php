@@ -45,35 +45,244 @@ function myotp_pv_is_valid_otp( $otp ) {
 }
 
 /**
- * Sliding-window rate limit. Returns the pruned timestamp list and whether
- * one more send is allowed right now. Does not append the new send; the
- * caller appends $now after a successful send.
+ * Stable JSON encoding without WordPress. Keys are sorted so two encodes of
+ * the same data compare equal byte for byte.
  *
- * @param array $timestamps Unix timestamps of earlier sends.
- * @param int   $now        Current unix time.
- * @param int   $max        Max sends in the window.
- * @param int   $window     Window length in seconds.
- * @return array{allowed: bool, timestamps: array, retry_after: int}
+ * @param array $data Data.
+ * @return string
  */
-function myotp_pv_rate_limit( $timestamps, $now, $max = 5, $window = 600 ) {
-	$kept = array();
-	foreach ( (array) $timestamps as $ts ) {
-		$ts = (int) $ts;
-		if ( $ts > $now - $window && $ts <= $now ) {
-			$kept[] = $ts;
+function myotp_pv_json( array $data ) {
+	ksort( $data );
+	return (string) json_encode( $data ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+}
+
+/**
+ * Atomic fixed-window counter over a store. The store is any object with
+ * get( $key ) : string|null, add( $key, $raw, $ttl ) : bool (only when
+ * absent), cas( $key, $expected_raw, $new_raw, $ttl ) : bool (only when the
+ * stored raw value still equals $expected_raw) and delete( $key ).
+ * Values are JSON strings so cas compares bytes.
+ *
+ * @param object $store  Store.
+ * @param string $key    Counter key.
+ * @param int    $now    Unix time.
+ * @param int    $max    Max takes per window.
+ * @param int    $window Window length in seconds.
+ * @return array{allowed: bool, count: int, retry_after: int}
+ */
+function myotp_pv_take_slot( $store, $key, $now, $max, $window ) {
+	for ( $try = 0; $try < 8; $try++ ) {
+		$raw   = $store->get( $key );
+		$fresh = myotp_pv_json(
+			array(
+				'c' => 1,
+				's' => $now,
+			)
+		);
+		if ( null === $raw ) {
+			if ( $store->add( $key, $fresh, $window ) ) {
+				return array(
+					'allowed'     => true,
+					'count'       => 1,
+					'retry_after' => 0,
+				);
+			}
+			continue;
+		}
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || ! isset( $data['c'], $data['s'] ) || (int) $data['s'] + $window <= $now ) {
+			if ( $store->cas( $key, $raw, $fresh, $window ) ) {
+				return array(
+					'allowed'     => true,
+					'count'       => 1,
+					'retry_after' => 0,
+				);
+			}
+			continue;
+		}
+		if ( (int) $data['c'] >= $max ) {
+			return array(
+				'allowed'     => false,
+				'count'       => (int) $data['c'],
+				'retry_after' => max( 1, (int) $data['s'] + $window - $now ),
+			);
+		}
+		$next = myotp_pv_json(
+			array(
+				'c' => (int) $data['c'] + 1,
+				's' => (int) $data['s'],
+			)
+		);
+		if ( $store->cas( $key, $raw, $next, $window ) ) {
+			return array(
+				'allowed'     => true,
+				'count'       => (int) $data['c'] + 1,
+				'retry_after' => 0,
+			);
 		}
 	}
-	sort( $kept );
-	$allowed     = count( $kept ) < $max;
-	$retry_after = 0;
-	if ( ! $allowed ) {
-		$retry_after = max( 1, ( $kept[0] + $window ) - $now );
+	return array(
+		'allowed'     => false,
+		'count'       => $max,
+		'retry_after' => $window,
+	);
+}
+
+/**
+ * Give back one take on a counter (used when the provider call never left
+ * the server). Never goes below zero, never touches an expired window.
+ *
+ * @param object $store  Store.
+ * @param string $key    Counter key.
+ * @param int    $now    Unix time.
+ * @param int    $window Window length in seconds.
+ * @return bool True when a take was released.
+ */
+function myotp_pv_release_slot( $store, $key, $now, $window ) {
+	for ( $try = 0; $try < 8; $try++ ) {
+		$raw = $store->get( $key );
+		if ( null === $raw ) {
+			return false;
+		}
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || ! isset( $data['c'], $data['s'] ) || (int) $data['s'] + $window <= $now || (int) $data['c'] <= 0 ) {
+			return false;
+		}
+		$next = myotp_pv_json(
+			array(
+				'c' => (int) $data['c'] - 1,
+				's' => (int) $data['s'],
+			)
+		);
+		if ( $store->cas( $key, $raw, $next, $window ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Take one slot on every dimension, all or nothing. $dims is a list of
+ * array( key, max ). When any dimension denies, the ones already taken are
+ * released so a denied request costs nothing.
+ *
+ * @param object $store  Store.
+ * @param array  $dims   List of array( key, max ).
+ * @param int    $now    Unix time.
+ * @param int    $window Window seconds shared by all dimensions.
+ * @return array{allowed: bool, retry_after: int, denied: string, taken: array}
+ */
+function myotp_pv_take_send_slots( $store, array $dims, $now, $window ) {
+	$taken = array();
+	foreach ( $dims as $dim ) {
+		$r = myotp_pv_take_slot( $store, $dim[0], $now, (int) $dim[1], $window );
+		if ( ! $r['allowed'] ) {
+			foreach ( $taken as $k ) {
+				myotp_pv_release_slot( $store, $k, $now, $window );
+			}
+			return array(
+				'allowed'     => false,
+				'retry_after' => $r['retry_after'],
+				'denied'      => $dim[0],
+				'taken'       => array(),
+			);
+		}
+		$taken[] = $dim[0];
 	}
 	return array(
-		'allowed'     => $allowed,
-		'timestamps'  => $kept,
-		'retry_after' => $retry_after,
+		'allowed'     => true,
+		'retry_after' => 0,
+		'denied'      => '',
+		'taken'       => $taken,
 	);
+}
+
+/**
+ * Atomically reserve one verification attempt on a pending record. The
+ * record is JSON with at least phone, message_id, attempts. When attempts
+ * already reached $max the record is deleted and locked is true.
+ *
+ * @param object $store Store.
+ * @param string $key   Pending key.
+ * @param int    $max   Max attempts.
+ * @return array{ok: bool, locked: bool, pending: array|null, attempts: int}
+ */
+function myotp_pv_reserve_attempt( $store, $key, $max ) {
+	for ( $try = 0; $try < 8; $try++ ) {
+		$raw = $store->get( $key );
+		if ( null === $raw ) {
+			return array(
+				'ok'       => false,
+				'locked'   => false,
+				'pending'  => null,
+				'attempts' => 0,
+			);
+		}
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) || empty( $data['phone'] ) ) {
+			$store->delete( $key );
+			return array(
+				'ok'       => false,
+				'locked'   => false,
+				'pending'  => null,
+				'attempts' => 0,
+			);
+		}
+		$attempts = isset( $data['attempts'] ) ? (int) $data['attempts'] : 0;
+		if ( $attempts >= $max ) {
+			$store->delete( $key );
+			return array(
+				'ok'       => false,
+				'locked'   => true,
+				'pending'  => $data,
+				'attempts' => $attempts,
+			);
+		}
+		$data['attempts'] = $attempts + 1;
+		$ttl              = isset( $data['ttl'] ) ? (int) $data['ttl'] : 3600;
+		if ( $store->cas( $key, $raw, myotp_pv_json( $data ), $ttl ) ) {
+			return array(
+				'ok'       => true,
+				'locked'   => false,
+				'pending'  => $data,
+				'attempts' => $attempts + 1,
+			);
+		}
+	}
+	return array(
+		'ok'       => false,
+		'locked'   => false,
+		'pending'  => null,
+		'attempts' => 0,
+	);
+}
+
+/**
+ * The phone in a verified record, or empty when missing or older than $ttl.
+ *
+ * @param mixed $record Array with phone and at, or anything else.
+ * @param int   $now    Unix time.
+ * @param int   $ttl    Seconds a verification stays valid.
+ * @return string
+ */
+function myotp_pv_verified_phone_from( $record, $now, $ttl = 1800 ) {
+	if ( ! is_array( $record ) || empty( $record['phone'] ) || ! isset( $record['at'] ) ) {
+		return '';
+	}
+	if ( (int) $record['at'] + $ttl <= $now || (int) $record['at'] > $now ) {
+		return '';
+	}
+	return (string) $record['phone'];
+}
+
+/**
+ * True when a /generate_otp 2xx body has the shape we rely on.
+ *
+ * @param mixed $body Decoded body.
+ * @return bool
+ */
+function myotp_pv_is_send_body( $body ) {
+	return is_array( $body ) && isset( $body['message_id'] ) && is_scalar( $body['message_id'] ) && '' !== (string) $body['message_id'];
 }
 
 /**

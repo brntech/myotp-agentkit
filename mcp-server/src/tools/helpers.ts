@@ -2,8 +2,23 @@
  * Helpers shared across tool handlers — error formatting and result construction.
  */
 
+import { z } from "zod";
 import { MyOtpApiError } from "../types.js";
 import type { ToolResult } from "./types.js";
+
+/**
+ * The `structuredContent` every `isError` result carries (built by `toToolError`).
+ * `status`, `endpoint` and `body` are present only for MyOtpApiError; `body` is
+ * `null` when the API answered with an empty or non-JSON body.
+ */
+export const toolErrorShape = {
+  error: z.string().describe("Human-readable error message."),
+  status: z.number().int().optional().describe("HTTP status the MyOTP API answered with."),
+  endpoint: z.string().optional().describe("API path that failed, e.g. /generate_otp."),
+  body: z.unknown().optional().describe("Parsed JSON error body from the API, or null."),
+};
+
+export const toolErrorSchema = z.object(toolErrorShape).passthrough();
 
 /** Wrap a successful API response in a ToolResult, with both text and structured payloads. */
 export function ok(data: Record<string, unknown>, summary: string): ToolResult {

@@ -23,6 +23,8 @@ Exposes 10 tools:
 | `get_topup_quote` | Quote a credit purchase and return USDC and card payment commands. |
 | `top_up_credits` | Return an MPP payment challenge and retry details, or the credited result. |
 
+Every tool declares an `outputSchema`, so clients can type-check `structuredContent`; error results carry `{ error, status?, endpoint?, body? }` with `isError: true`.
+
 All tools call the public MyOTP REST API at `https://api.myotp.app`. Override with the `MYOTP_BASE_URL` env var for a mock server.
 
 ## Install

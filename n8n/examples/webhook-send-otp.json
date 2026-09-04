@@ -1,0 +1,60 @@
+{
+  "name": "MyOTP: webhook to Send OTP",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-otp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "myotp-send-otp"
+    },
+    {
+      "parameters": {
+        "operation": "sendOtp",
+        "phoneNumber": "={{ $json.body.phone_number }}",
+        "channel": "={{ $json.body.channel || 'sms' }}",
+        "additionalFields": {}
+      },
+      "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e02",
+      "name": "Send OTP",
+      "type": "n8n-nodes-myotp.myOtp",
+      "typeVersion": 1,
+      "position": [240, 0],
+      "credentials": {
+        "myOtpApi": {
+          "id": "",
+          "name": "MyOTP API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"message_id\": $json.message_id, \"expires_at\": $json.expires_at } }}",
+        "options": {}
+      },
+      "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e03",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Send OTP", "type": "main", "index": 0 }]]
+    },
+    "Send OTP": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}

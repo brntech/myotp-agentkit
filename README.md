@@ -26,7 +26,7 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 | [`@myotp/mcp`](mcp-server/) | Model Context Protocol server exposing 7 MyOTP tools to MCP clients (Claude Desktop, Cursor, Continue, etc.). Stdio + streamable HTTP. | `npx @myotp/mcp` |
 | [`@myotp/cli`](cli/) | CLI for testing OTP flows from a terminal. `init` saves a key locally, `test`/`verify`/`status` exercise the API. | `npx @myotp/cli init` |
 | [`@myotp/better-auth`](better-auth/) | Drop-in adapter for [Better Auth](https://www.better-auth.com)'s `phoneNumber()` plugin. Twilio-free SMS / WhatsApp / Telegram delivery. | `npm install @myotp/better-auth` |
-| [`n8n-nodes-myotp`](n8n/) | n8n community node: Send, Verify, Extend, Check Status, Account, Usage Report. Header-auth example workflow included. | n8n Settings > Community Nodes > `n8n-nodes-myotp` (publish pending) |
+| [`n8n-nodes-myotp`](n8n/) | n8n community node: Send, Verify, Extend, Check Status, Account, Usage Report. Header-auth example workflow included. | n8n Settings > Community Nodes > `n8n-nodes-myotp` |
 
 ## Integrations for other platforms
 
@@ -35,7 +35,7 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 | [`auth0/`](auth0/) | Auth0 | Custom Phone Provider Action: Auth0's own code delivered by MyOTP over SMS, WhatsApp or Telegram. Tests, setup guide, Marketplace listing draft |
 | [`make/`](make/) | Make.com | Custom app definition (connection + 5 action modules + universal call), validated against the spec |
 | [`postman/`](postman/) | Postman | Collection v2.1 + environment generated from `openapi-reference.yaml`; `npm run build` in `postman/` regenerates it |
-| [`wordpress-plugin/`](wordpress-plugin/) | WordPress / WooCommerce | Phone verification at checkout, registration and via shortcode (`myotp-phone-verification`, wp.org submission pending) |
+| [`wordpress-plugin/`](wordpress-plugin/) | WordPress / WooCommerce | Phone verification at checkout, registration and via shortcode (`myotp-phone-verification`) |
 
 ## Skills (drop into your agent's config)
 

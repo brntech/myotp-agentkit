@@ -80,7 +80,7 @@ Don't gate appointment confirmation behind OTP — that's friction patients hate
 
 - **Never include diagnostic info, medication names, or test results in OTP messages.** "Your ClinicName login code is 123456" is fine. "Your code to view your HIV test results is 123456" is a HIPAA breach waiting to happen.
 - **Consider voice channel for accessibility.** Some elderly patients struggle with SMS but can hear a code over a phone call. (MyOTP has no voice channel.)
-- **Test in the patient's preferred language.** OTP messages should be in the language the patient registered with. Use the brand's default template via the `template_order` parameter (requires ACCESS_TO_TEMPLATES entitlement) or pre-register localized templates.
+- **Test in the patient's preferred language.** OTP messages should be in the language the patient registered with. Select a template with the `template_order` parameter or pre-register localized templates. WhatsApp has four templates: 12 (English, 5-minute code), 13 (English, 10 minutes), 14 (Spanish es_MX, 5 minutes) and 15 (Spanish es_MX, 10 minutes). On WhatsApp the template's own expiry overrides `otp_validity`. Choosing a template requires the ACCESS_TO_TEMPLATES entitlement (Business plan and up).
 
 ## Channel selection for healthcare
 

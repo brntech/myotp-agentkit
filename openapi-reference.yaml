@@ -75,8 +75,13 @@ paths:
                   type: integer
                   default: 1
                   minimum: 1
-                  maximum: 5
-                  description: Order of the template to be used for the OTP message, defaults to 1 (12 for WhatsApp).
+                  maximum: 99
+                  description: >
+                    Order of the template to be used for the OTP message, defaults to 1 (12 for WhatsApp).
+                    WhatsApp has four templates: 12 (English, 5-minute code), 13 (English, 10 minutes),
+                    14 (Spanish es_MX, 5 minutes) and 15 (Spanish es_MX, 10 minutes).
+                    On WhatsApp the template's own expiry overrides otp_validity.
+                    Requires the ACCESS_TO_TEMPLATES entitlement (Business plan and up).
                 otp_code:
                   type: string
                   pattern: "^[0-9]{3,8}$"

@@ -35,7 +35,7 @@ Do not invent function names that are not listed below. Do not assume parameter 
           "brand": {"type": "string", "pattern": "^[a-zA-Z0-9.]+$", "minLength": 3, "maxLength": 16, "description": "Sender brand shown to recipient."},
           "return_otp": {"type": "string", "enum": ["true", "false"], "default": "false", "description": "If 'true', echoes the OTP in the response. Test only."},
           "force_send": {"type": "string", "enum": ["true", "false"], "default": "false", "description": "If 'true', resends even when an OTP is already active."},
-          "template_order": {"type": "integer", "minimum": 1, "maximum": 99, "description": "Pick a specific message template. Requires ACCESS_TO_TEMPLATES."}
+          "template_order": {"type": "integer", "minimum": 1, "maximum": 99, "description": "Pick a specific message template. WhatsApp has four: 12 (English, 5-minute code), 13 (English, 10 minutes), 14 (Spanish es_MX, 5 minutes), 15 (Spanish es_MX, 10 minutes). On WhatsApp the template's own expiry overrides otp_validity. Requires ACCESS_TO_TEMPLATES (Business plan and up)."}
         },
         "required": ["phone_number"]
       }

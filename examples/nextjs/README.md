@@ -64,7 +64,7 @@ After deploy, copy the production deployment's outbound IP from the Vercel dashb
 ## Extending
 
 - **Persistent verification state** — replace the redirect with a session cookie or your own auth system. The `message_id` returned by `generateOtp` is the canonical handle for that OTP attempt.
-- **Custom OTP length / brand / template** — `generate_otp` accepts `otp_length`, `brand`, `template_order`, and others. See https://api.myotp.app docs.
+- **Custom OTP length / brand / template** — `generate_otp` accepts `otp_length`, `brand`, `template_order`, and others. See https://api.myotp.app docs. WhatsApp has four templates: `template_order` 12 (English, 5-minute code), 13 (English, 10 minutes), 14 (Spanish es_MX, 5 minutes) and 15 (Spanish es_MX, 10 minutes). On WhatsApp the template's own expiry overrides `otp_validity`. Choosing a template requires the ACCESS_TO_TEMPLATES entitlement (Business plan and up).
 - **Resend / cooldown** — the MyOTP API returns 409 if an OTP is already active for that phone. Either wait for it to expire or pass `force_send: "true"`.
 
 ## License

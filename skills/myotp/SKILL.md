@@ -147,3 +147,7 @@ See `samples/README.md` for the index.
 ## Channel choice
 
 Default to SMS. Add `whatsapp` for India / Brazil / Indonesia / Mexico / Nigeria / Turkey markets where WhatsApp open rates beat SMS. Add `telegram` only when the audience is Telegram-heavy (4-8 digit OTP, max 1-hour validity). All three channels share the same request shape — only the `channel` field changes.
+
+### WhatsApp templates
+
+WhatsApp has four OTP templates, picked with `template_order`: 12 (English, 5-minute code), 13 (English, 10 minutes), 14 (Spanish es_MX, 5 minutes) and 15 (Spanish es_MX, 10 minutes). On WhatsApp the template's own expiry overrides `otp_validity`, so pick the template that matches the window you want. Choosing a template requires the ACCESS_TO_TEMPLATES entitlement (Business plan and up).

@@ -120,7 +120,7 @@ For volume estimation: MyOTP's per-country pricing is at https://myotp.app/prici
 
 - **Don't hardcode E.164 prefix `+`** — strip it before calling MyOTP.
 - **Don't assume SMS works** in India for unregistered brands. Test before launch.
-- **Don't show OTP in English** when targeting Spanish/Portuguese/Hindi/Arabic users. Use `template_order` (with ACCESS_TO_TEMPLATES entitlement) for localized message body, OR pre-translate the template you register.
+- **Don't show OTP in English** when targeting Spanish/Portuguese/Hindi/Arabic users. Use `template_order` for a localized message body, OR pre-translate the template you register. WhatsApp has four templates: 12 (English, 5-minute code), 13 (English, 10 minutes), 14 (Spanish es_MX, 5 minutes) and 15 (Spanish es_MX, 10 minutes) — so LATAM traffic on WhatsApp should pass 14 or 15. On WhatsApp the template's own expiry overrides `otp_validity`. Choosing a template requires the ACCESS_TO_TEMPLATES entitlement (Business plan and up).
 - **Don't fail-soft** in Saudi/UAE/Singapore — if your brand isn't registered, the message goes to spam or is blocked. Failures here mean "fix sender ID config", not "retry".
 
 ## Trial limit reminder

@@ -79,7 +79,11 @@ const inputSchema = {
     .max(99)
     .optional()
     .describe(
-      "Pick a specific message template by its order number (1-99). Requires ACCESS_TO_TEMPLATES entitlement. Not supported on telegram (Telegram generates its own message text)."
+      "Pick a specific message template by its order number (1-99). " +
+        "WhatsApp has four: 12 (English, 5-minute code), 13 (English, 10 minutes), 14 (Spanish es_MX, 5 minutes), 15 (Spanish es_MX, 10 minutes). " +
+        "On WhatsApp the template's own expiry overrides otp_validity. " +
+        "Requires the ACCESS_TO_TEMPLATES entitlement (Business plan and up). " +
+        "Not supported on telegram (Telegram generates its own message text)."
     ),
 };
 

@@ -91,7 +91,16 @@ describe("MyOtpClient — headers", () => {
   it("omits X-API-Key when no apiKey is given (e.g. register)", async () => {
     const { calls, fetchImpl } = captureFetch({ body: {} });
     const c = new MyOtpClient({ baseUrl: "https://api.example.com", fetchImpl });
-    await c.register({ email: "a@b.com", phone: "14155551234", company_name: "X", source: "cli" });
+    await c.register({ email: "a@b.com", name: "Acme" });
+    expect("X-API-Key" in (calls[0]?.headers ?? {})).toBe(false);
+  });
+
+  it("omits X-API-Key on register even when the client holds one", async () => {
+    // register() passes authenticate=false, so a configured key must not leak
+    // onto the unauthenticated signup endpoint.
+    const { calls, fetchImpl } = captureFetch({ body: {} });
+    const c = new MyOtpClient({ baseUrl: "https://api.example.com", apiKey: "secret", fetchImpl });
+    await c.register({ email: "a@b.com" });
     expect("X-API-Key" in (calls[0]?.headers ?? {})).toBe(false);
   });
 
@@ -251,10 +260,43 @@ describe("MyOtpClient — endpoint methods", () => {
     expect(r.email).toBe("a@b.com");
   });
 
-  it("register does POST /v1/agent/register", async () => {
-    const { calls, fetchImpl } = captureFetch({ body: { account_id: "a", status: "pending" } });
+  it("register does POST /v1/agent/register with only email and name", async () => {
+    const { calls, fetchImpl } = captureFetch({
+      body: {
+        account_id: "a0123456789ab",
+        api_key: "k".repeat(32),
+        api_key_note: "shown once",
+        email: "a@b.com",
+        email_verified: false,
+        balance: 0,
+        plan_id: 1,
+        status: "active",
+        topup: { quote: "/v1/topup/quote", endpoint: "/v1/topup", note: "USDC or card" },
+        docs: "https://myotp.app/api-reference/",
+        verification_email_sent: true,
+      },
+    });
     const c = new MyOtpClient({ baseUrl: "https://api.example.com", fetchImpl });
-    await c.register({ email: "a@b.com", phone: "14155551234", company_name: "X", source: "cli" });
+    const r = await c.register({ email: "a@b.com", name: "Acme" });
+
+    expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.url.endsWith("/v1/agent/register")).toBe(true);
+    // The endpoint takes email and an optional name. Phone, company_name and
+    // source were retired with the agent-signup flow; sending them again would
+    // be an unknown-field regression, so pin the exact key set.
+    expect(Object.keys(JSON.parse(calls[0]?.body ?? "{}")).sort()).toEqual(["email", "name"]);
+
+    // The account starts at zero balance and active, with the key shown once.
+    expect(r.balance).toBe(0);
+    expect(r.status).toBe("active");
+    expect(r.api_key).toHaveLength(32);
+    expect(r.email_verified).toBe(false);
+  });
+
+  it("register omits name when it was not supplied", async () => {
+    const { calls, fetchImpl } = captureFetch({ body: {} });
+    const c = new MyOtpClient({ baseUrl: "https://api.example.com", fetchImpl });
+    await c.register({ email: "a@b.com" });
+    expect(Object.keys(JSON.parse(calls[0]?.body ?? "{}"))).toEqual(["email"]);
   });
 });

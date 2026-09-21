@@ -414,8 +414,15 @@ paths:
                       reported yet" (accepted, no receipt yet).
 
 
-                      Permanent failures are reported as failed.<reason>, for
-                      example failed.NoBalance or failed.SMPP.
+                      Failures are reported as failed.<reason>. On WhatsApp the
+                      reason is one of two values: failed.Undeliverable, meaning
+                      the number cannot receive WhatsApp, which is permanent and
+                      is your signal to fall back to SMS, and failed.Provider,
+                      meaning the send failed on our side or the carrier's, which
+                      is worth retrying. SMS reasons name the stage that failed,
+                      for example failed.NoBalance or failed.SMPP. A bare failed
+                      predates the WhatsApp reasons and should be read as
+                      failed.Provider.
 
 
                       Unavailable, which are statements about your plan or the

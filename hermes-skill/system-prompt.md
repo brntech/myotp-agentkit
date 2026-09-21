@@ -61,7 +61,7 @@ Do not invent function names that are not listed below. Do not assume parameter 
     "type": "function",
     "function": {
       "name": "check_otp_status",
-      "description": "Check whether an OTP is still active and (with DLR_ACCESS) its delivery status. Returns is_active and expires_at; with DLR_ACCESS also returns DLR ('delivered'|'sent'|'read'|'failed'|'pending'). Does not verify a code.",
+      "description": "Check whether an OTP is still active and (with DLR_ACCESS) its delivery status. Returns is_active and expires_at; with DLR_ACCESS also returns DLR ('delivered'|'sent'|'read'|'pending'|'failed.<reason>'; on WhatsApp 'failed.Undeliverable' = no WhatsApp on that number, 'failed.Provider' = retry). Does not verify a code.",
       "parameters": {
         "type": "object",
         "properties": {

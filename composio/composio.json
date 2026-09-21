@@ -151,7 +151,7 @@
       "returns": {
         "type": "object",
         "properties": {
-          "DLR": { "type": "string", "enum": ["delivered", "sent", "read", "failed", "pending"] },
+          "DLR": { "type": "string", "description": "delivered, sent, read, pending, or a failure as failed.<reason> (WhatsApp: failed.Undeliverable when the number cannot receive WhatsApp, failed.Provider when a retry is worth it)" },
           "is_active": { "type": "boolean" },
           "expires_at": { "type": "string" }
         }

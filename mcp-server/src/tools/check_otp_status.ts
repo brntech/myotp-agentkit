@@ -37,7 +37,8 @@ export const checkOtpStatusTool: ToolDefinition<typeof inputSchema> = {
   description:
     "Check whether a previously sent OTP is still active and (with DLR_ACCESS entitlement on Enterprise plan) get its delivery status. " +
     "Returns `is_active` (bool) and `expires_at` (ISO timestamp) on every plan. " +
-    "On Enterprise plans, also returns `DLR` (one of 'delivered', 'sent', 'read', 'failed', 'pending'). " +
+    "On Enterprise plans, also returns `DLR`: 'delivered', 'sent', 'read', 'pending', or a failure as `failed.<reason>` " +
+    "(on WhatsApp, `failed.Undeliverable` means the number cannot receive WhatsApp and `failed.Provider` means a retry is worth it). " +
     "Useful when an end user reports they didn't receive the code — you can confirm whether MyOTP delivered it before deciding to resend. " +
     "Does NOT verify a code; use `verify_otp` for that.",
   inputSchema,

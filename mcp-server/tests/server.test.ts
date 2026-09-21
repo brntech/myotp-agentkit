@@ -10,7 +10,7 @@ describe("createServer", () => {
   it("uses the documented name and version", () => {
     expect(SERVER_NAME).toBe("myotp-mcp");
     expect(SERVER_VERSION).toMatch(/^\d+\.\d+\.\d+/);
-    expect(SERVER_VERSION).toBe("0.1.12");
+    expect(SERVER_VERSION).toBe("0.1.13");
   });
 
   it("returns an McpServer instance with a `connect` method", () => {

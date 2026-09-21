@@ -22,8 +22,8 @@
       "environmentVariables": [
         {
           "name": "MYOTP_API_KEY",
-          "description": "MyOTP.App API key. Get one free at https://myotp.app/sign-up/ (15 trial credits, no card).",
-          "isRequired": true,
+          "description": "MyOTP.App API key, needed by every tool except create_account and get_topup_quote. No key yet? Start the server without it and call create_account to get one.",
+          "isRequired": false,
           "isSecret": true
         }
       ]
@@ -36,8 +36,8 @@
       "headers": [
         {
           "name": "X-API-Key",
-          "description": "MyOTP.App API key, sent per request so the hosted server never stores it. Note: calls reach the MyOTP API from 108.61.176.199, so add that IP to your key's allowlist or every call returns 403.",
-          "isRequired": true,
+          "description": "MyOTP.App API key, sent per request so the hosted server never stores it. Omit it to call create_account or get_topup_quote, which need no key. Note: calls reach the MyOTP API from 108.61.176.199, so add that IP to your key's allowlist or every call returns 403.",
+          "isRequired": false,
           "isSecret": true
         }
       ]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createServer, getHeader, resolveApiKeyFromHeaders, resolveApiKeyFromQuery, SERVER_NAME, SERVER_VERSION } from "../src/server.js";
+import { createServer, getHeader, resolveApiKeyFromHeaders, resolveApiKeyFromQuery, SERVER_INSTRUCTIONS, SERVER_NAME, SERVER_VERSION } from "../src/server.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { allTools } from "../src/tools/index.js";
@@ -160,6 +160,26 @@ describe("output schemas", () => {
     await client.connect(clientTransport);
     return { client, server };
   }
+
+  it("hands the client onboarding instructions for the agent path, not human signup", async () => {
+    const { client, server } = await connect(makeFakeClient());
+    const instructions = client.getInstructions() ?? "";
+
+    expect(instructions).toBe(SERVER_INSTRUCTIONS);
+    // Accounts come from the create_account tool: an email, no phone step, a
+    // key shown once, a zero balance, and a top-up before the first send.
+    expect(instructions).toContain("create_account");
+    expect(instructions).toContain("no phone step");
+    expect(instructions).toContain("balance starts at zero");
+    expect(instructions).toContain("top_up_credits");
+    // The dashboard signup page and its trial credits are the human path and
+    // must not be what the model is told to do.
+    expect(instructions).not.toContain("sign-up");
+    expect(instructions).not.toContain("trial");
+
+    await client.close();
+    await server.close();
+  });
 
   it("tools/list advertises an object outputSchema for all ten tools", async () => {
     const { client, server } = await connect(makeFakeClient());

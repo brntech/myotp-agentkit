@@ -31,21 +31,29 @@ import { createRequire } from "node:module";
 // lag the published version again (0.1.8 and 0.1.9 still announced 0.1.7).
 export const SERVER_VERSION: string = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
+/**
+ * The instructions block a client shows the model after `initialize`.
+ *
+ * Exported so a test can pin the onboarding flow it describes: it used to send
+ * the model to the dashboard signup page for trial credits, which is the human
+ * path, not the one an agent can walk.
+ */
+export const SERVER_INSTRUCTIONS: string =
+  "MyOTP.App MCP server — send and verify OTPs over SMS, WhatsApp, and Telegram. " +
+  "Typical flow: call `generate_otp` with a phone number to send a code, save the returned `message_id`, " +
+  "then call `verify_otp` with the code the end user typed. Use `check_otp_status` to debug delivery, " +
+  "`extend_otp` to give users more time, and `get_usage_report` for transaction history. " +
+  "Every tool except `create_account` needs a MyOTP API key. No key yet? Call `create_account` with an email address: " +
+  "no phone step, the key is returned once, and the balance starts at zero. " +
+  "Then `get_topup_quote` and `top_up_credits` buy credits with USDC or card before the first send. " +
+  "Phone numbers must be in international format with no leading + or 0 (e.g. '14155551234' for a US number).";
+
 export function createServer(options: ServerOptions): McpServer {
   const client = options.client ?? new MyOtpClient();
 
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    {
-      instructions:
-        "MyOTP.App MCP server — send and verify OTPs over SMS, WhatsApp, and Telegram. " +
-        "Typical flow: call `generate_otp` with a phone number to send a code, save the returned `message_id`, " +
-        "then call `verify_otp` with the code the end user typed. Use `check_otp_status` to debug delivery, " +
-        "`extend_otp` to give users more time, and `get_usage_report` for transaction history. " +
-        "Every tool except `create_account` needs a MyOTP API key. No key yet? Call `create_account` (zero balance, then `top_up_credits`), " +
-        "or a human can sign up at https://myotp.app/sign-up/ for 15 free trial credits. " +
-        "Phone numbers must be in international format with no leading + or 0 (e.g. '14155551234' for a US number).",
-    }
+    { instructions: SERVER_INSTRUCTIONS }
   );
 
   for (const tool of allTools) {

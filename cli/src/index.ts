@@ -8,8 +8,7 @@ import { runStatus } from './commands/status.js';
 import { runTopup } from './commands/topup.js';
 import { runConfig } from './commands/config.js';
 import { colors, logErrorHuman, logHuman } from './lib/output.js';
-
-const VERSION = '0.1.5';
+import { VERSION } from './lib/version.js';
 
 const program = new Command();
 

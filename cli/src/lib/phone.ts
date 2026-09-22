@@ -2,7 +2,7 @@
  * Normalize a user-supplied phone number into the digits-only format the
  * MyOTP API expects: 7-15 digits, no leading zero, no leading +.
  *
- * Accepts: "+14155550123", "14155550123", "+1 (415) 555-1234", "+1-415-555-1234"
+ * Accepts: "+14155550123", "14155550123", "+1 (415) 555-0123", "+1-415-555-0123"
  * Rejects: empty strings, anything shorter than 7 digits, anything starting with 0,
  * anything longer than 15 digits.
  */

@@ -75,7 +75,7 @@ Edit your Claude Desktop config (`~/Library/Application Support/Claude/claude_de
 }
 ```
 
-Restart Claude Desktop. Ask the agent: *"Send a test OTP to my phone +1 415 555 1234."* It will call `generate_otp` and report the message_id.
+Restart Claude Desktop. Ask the agent: *"Send a test OTP to my phone +1 415 555 0123."* It will call `generate_otp` and report the message_id.
 
 ## Use it with Claude Code
 

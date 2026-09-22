@@ -37,7 +37,7 @@ describe("generate_otp — input validation", () => {
   });
 
   it("rejects a phone number with non-digit characters", () => {
-    const result = inputSchema.safeParse({ phone_number: "1-415-555-1234" });
+    const result = inputSchema.safeParse({ phone_number: "1-415-555-0123" });
     expect(result.success).toBe(false);
   });
 

@@ -123,7 +123,7 @@ Sends an OTP to the given number using your configured API key. Phone numbers ca
 ```bash
 npx @myotp/cli test +14155550123
 npx @myotp/cli test 14155550123
-npx @myotp/cli test "+1 (415) 555-1234"
+npx @myotp/cli test "+1 (415) 555-0123"
 ```
 
 Channel options:

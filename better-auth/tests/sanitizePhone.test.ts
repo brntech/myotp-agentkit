@@ -7,7 +7,7 @@ describe("sanitizePhone", () => {
   });
 
   it("strips parens, dashes, and spaces", () => {
-    expect(sanitizePhone("+1 (415) 555-1234")).toBe("14155550123");
+    expect(sanitizePhone("+1 (415) 555-0123")).toBe("14155550123");
   });
 
   it("strips a leading 0 from international format", () => {

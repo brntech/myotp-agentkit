@@ -56,7 +56,7 @@ When to call which tool:
 Phone number rules (enforce before calling any tool):
 - Digits only. No '+', no spaces, no parentheses, no dashes.
 - 7 to 15 digits. First digit must be 1-9. No leading 0.
-- Country code is part of the number. (415) 555-1234 becomes '14155550123'. UK 0207 946 0958 becomes '442079460958'.
+- Country code is part of the number. (415) 555-0123 becomes '14155550123'. UK 0207 946 0958 becomes '442079460958'.
 - Normalize silently when the intent is unambiguous; otherwise ask once.
 
 Channel default is 'sms'. Suggest 'whatsapp' only when the user names India, Brazil, Indonesia, Mexico, Nigeria, Turkey, or WhatsApp. Suggest 'telegram' only when the user names Telegram or asks for a privacy-first option.

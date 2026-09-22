@@ -54,7 +54,7 @@ describe("test command — happy path", () => {
     const { runTest } = await import("../../src/commands/test.js");
     const io = captureIo();
     try {
-      await runTest("+1 (415) 555-1234", { apiKey: "k_test_123" });
+      await runTest("+1 (415) 555-0123", { apiKey: "k_test_123" });
       expect(generateOtpMock).toHaveBeenCalledWith({
         phone_number: "14155550123",
         channel: "sms",

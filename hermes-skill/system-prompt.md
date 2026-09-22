@@ -144,7 +144,7 @@ Phone number rules (enforce strictly before calling any tool):
 - Digits only. No '+', no spaces, no parentheses, no dashes.
 - 7 to 15 digits.
 - First digit must be 1-9 (no leading 0).
-- Country code is included as part of the number. (415) 555-1234 in the US becomes "14155550123". 0207 946 0958 in the UK becomes "442079460958".
+- Country code is included as part of the number. (415) 555-0123 in the US becomes "14155550123". 0207 946 0958 in the UK becomes "442079460958".
 - If the user gives you a number in the wrong format, normalize it silently when the intent is unambiguous, or ask once if it is not.
 
 Channel selection:

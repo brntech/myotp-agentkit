@@ -58,7 +58,7 @@ Uninstalling removes the settings, the scheduled sweep, the counters, the pendin
 
 = What format do phone numbers need? =
 
-Country code first, digits only, no plus sign. 14155550123, not +1 (415) 555-1234. The plugin strips spaces, dashes and the plus sign before sending.
+Country code first, digits only, no plus sign. 14155550123, not +1 (415) 555-0123. The plugin strips spaces, dashes and the plus sign before sending.
 
 = Does it work with the WooCommerce block checkout? =
 

@@ -33,7 +33,7 @@ function check( string $name, $expected, $actual ): void {
 // ---------------------------------------------------------------- Part 1: pure helpers.
 
 check( 'strip plus', '14155550123', myotp_pv_normalize_phone( '+14155550123' ) );
-check( 'strip spaces, dashes, brackets, dots', '14155550123', myotp_pv_normalize_phone( '+1 (415) 555-12.34' ) );
+check( 'strip spaces, dashes, brackets, dots', '14155550123', myotp_pv_normalize_phone( '+1 (415) 555-01.23' ) );
 check( 'keep leading zeros', '0044123', myotp_pv_normalize_phone( '00 44 123' ) );
 check( 'array input is empty', '', myotp_pv_normalize_phone( array( '1' ) ) );
 check( 'valid 11 digits', true, myotp_pv_is_valid_phone( '14155550123' ) );
@@ -394,7 +394,7 @@ check( 'send: bad phone 400', 400, myotp_test_send( '+0 12' )->status );
 myotp_test_configure();
 $GLOBALS['myotp_test']['options']['myotp_pv_options']['otp_validity'] = 7200;
 myotp_test_http( 200, array( 'message_id' => 'msg-1', 'status' => 'accepted' ) );
-$r = myotp_test_send( '+1 (415) 555-1234' );
+$r = myotp_test_send( '+1 (415) 555-0123' );
 check( 'send: success', true, $r->success );
 check( 'send: X-API-Key header', 'abcdefghijklmnopqrstuvwxyz012345', $GLOBALS['myotp_test']['http_log'][0]['args']['headers']['X-API-Key'] );
 check( 'send: first attempt force_send false', false, myotp_test_last_body()['force_send'] );
@@ -656,7 +656,7 @@ MyOTP_PV_Session::set_verified( '14155550123', null );
 $_POST['myotp_pv_phone'] = '+1 415 555 9999';
 check( 'register: different submitted phone is a mismatch', array( 'myotp_pv_mismatch' ), myotp_test_register_validate()->get_error_codes() );
 check( 'register: mismatch did not claim', 'verified', myotp_test_vrec()['state'] );
-$_POST['myotp_pv_phone'] = '+1 (415) 555-1234';
+$_POST['myotp_pv_phone'] = '+1 (415) 555-0123';
 $errors                  = new WP_Error();
 $errors->add( 'username_exists', 'taken' );
 check( 'register: other error means no claim', 'verified', myotp_test_register_validate( $errors ) instanceof WP_Error ? myotp_test_vrec()['state'] : '' );
@@ -722,7 +722,7 @@ MyOTP_PV_Session::set_verified( '14155550123', null );
 check( 'checkout: different billing phone blocked', array( 'myotp_pv_mismatch' ), myotp_test_checkout_validate( '+1 415 555 0000' )->get_error_codes() );
 check( 'checkout: mismatch did not claim', 'verified', myotp_test_vrec()['state'] );
 MyOTP_PV_Session::$request_id = 'rid-A';
-check( 'checkout A: matching billing phone passes', array(), myotp_test_checkout_validate( '+1 (415) 555-1234' )->get_error_codes() );
+check( 'checkout A: matching billing phone passes', array(), myotp_test_checkout_validate( '+1 (415) 555-0123' )->get_error_codes() );
 check( 'checkout A: proof claimed', 'claiming:14155550123:rid-A', myotp_test_vrec()['state'] );
 MyOTP_PV_Session::$request_id = 'rid-B';
 check( 'checkout B: refused at validation', array( 'myotp_pv_claimed' ), myotp_test_checkout_validate( '+14155550123' )->get_error_codes() );

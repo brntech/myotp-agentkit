@@ -60,10 +60,10 @@ class MyOtp {
 // Demo (server-side or via your own proxy)
 void main() async {
   final myotp = MyOtp();
-  final sent = await myotp.generateOtp('14155551234');
+  final sent = await myotp.generateOtp('14155550123');
   print('message_id: ${sent['message_id']}');
 
-  final result = await myotp.verifyOtp('14155551234', '123456');
+  final result = await myotp.verifyOtp('14155550123', '123456');
   print(result['status'] == 'success' ? 'verified' : 'failed: ${result['reason']}');
 }
 ```

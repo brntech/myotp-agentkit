@@ -135,7 +135,7 @@ class MyOTP_PV_Widget {
 					<input type="tel" class="myotp-pv-phone" id="<?php echo esc_attr( $id ); ?>-phone"
 						name="myotp_pv_phone_display" autocomplete="tel" inputmode="tel"
 						value="<?php echo esc_attr( $value ); ?>"
-						placeholder="14155551234" <?php disabled( $verified ); ?> />
+						placeholder="14155550123" <?php disabled( $verified ); ?> />
 					<input type="hidden" class="myotp-pv-phone-hidden" name="myotp_pv_phone" value="<?php echo esc_attr( $value ); ?>" />
 				</p>
 			<?php endif; ?>

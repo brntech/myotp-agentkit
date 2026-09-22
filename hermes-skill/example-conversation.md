@@ -4,7 +4,7 @@ This walkthrough shows a Hermes-format multi-turn conversation between a develop
 
 The system message is the full block from `system-prompt.md`. It is omitted here for brevity; assume it is loaded.
 
-The phone number `14155551234` is a fictional US example used throughout. Replace it with the real recipient when you adapt this conversation.
+The phone number `14155550123` is a fictional US example used throughout. Replace it with the real recipient when you adapt this conversation.
 
 ---
 
@@ -67,7 +67,7 @@ Running the account check now.
 Auth is good (account: dev@example.com). Let me run a live send to a test number to confirm the flow end to end before I hand you the Express code. I'll use a placeholder US number for the demo; swap it for your own to actually receive the SMS.
 
 <tool_call>
-{"name": "generate_otp", "arguments": {"phone_number": "14155551234", "channel": "sms"}}
+{"name": "generate_otp", "arguments": {"phone_number": "14155550123", "channel": "sms"}}
 </tool_call>
 <|im_end|>
 ```

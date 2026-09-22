@@ -8,7 +8,7 @@ Pre-flight: `export MYOTP_API_KEY=your-32-char-key`.
 curl -sS -X POST https://api.myotp.app/generate_otp \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $MYOTP_API_KEY" \
-  -d '{"phone_number": "14155551234"}'
+  -d '{"phone_number": "14155550123"}'
 ```
 
 Response shape:
@@ -29,7 +29,7 @@ Response shape:
 curl -sS -X POST https://api.myotp.app/generate_otp \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $MYOTP_API_KEY" \
-  -d '{"phone_number": "14155551234", "channel": "whatsapp"}'
+  -d '{"phone_number": "14155550123", "channel": "whatsapp"}'
 ```
 
 ## Send via Telegram
@@ -39,7 +39,7 @@ curl -sS -X POST https://api.myotp.app/generate_otp \
 curl -sS -X POST https://api.myotp.app/generate_otp \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $MYOTP_API_KEY" \
-  -d '{"phone_number": "14155551234", "channel": "telegram"}'
+  -d '{"phone_number": "14155550123", "channel": "telegram"}'
 ```
 
 ## Verify the OTP the user typed
@@ -48,7 +48,7 @@ curl -sS -X POST https://api.myotp.app/generate_otp \
 curl -sS -X POST https://api.myotp.app/verify_otp \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $MYOTP_API_KEY" \
-  -d '{"phone_number": "14155551234", "otp": "123456"}'
+  -d '{"phone_number": "14155550123", "otp": "123456"}'
 ```
 
 Success: `{"status": "success", "message": "OTP verified"}`

@@ -69,7 +69,7 @@ describe("verify_otp — handler behavior", () => {
     client.post.mockResolvedValueOnce({ status: "success", message: "OTP matched" });
 
     const result = await verifyOtpTool.handler(
-      { otp: "123456", phone_number: "14155551234" },
+      { otp: "123456", phone_number: "14155550123" },
       { client: asMyOtpClient(client), apiKey: "k" }
     );
 
@@ -87,7 +87,7 @@ describe("verify_otp — handler behavior", () => {
     });
 
     const result = await verifyOtpTool.handler(
-      { otp: "123456", phone_number: "14155551234" },
+      { otp: "123456", phone_number: "14155550123" },
       { client: asMyOtpClient(client), apiKey: "k" }
     );
 
@@ -103,7 +103,7 @@ describe("verify_otp — handler behavior", () => {
     );
 
     const result = await verifyOtpTool.handler(
-      { otp: "123456", phone_number: "14155551234" },
+      { otp: "123456", phone_number: "14155550123" },
       { client: asMyOtpClient(client), apiKey: "k_top_secret_42" }
     );
 

@@ -15,14 +15,14 @@ Trigger on any request that involves verifying a phone number, sending one-time 
 
 Base URL: `https://api.myotp.app`
 Auth header: `X-API-Key: <32-char-key>` on every request.
-Phone format: 7-15 digits, no leading `+` or `0`. A US number like (415) 555-1234 becomes `"14155551234"`.
+Phone format: 7-15 digits, no leading `+` or `0`. A US number like (415) 555-1234 becomes `"14155550123"`.
 
 ### generate_otp
 
 ```
 POST /generate_otp
 {
-  "phone_number": "14155551234",
+  "phone_number": "14155550123",
   "channel": "sms"            // optional: "sms" (default) | "whatsapp" | "telegram"
 }
 ```
@@ -34,7 +34,7 @@ Returns `message_id`, `status`, `expires_at`, `cost`. Store the `message_id` in 
 ```
 POST /verify_otp
 {
-  "phone_number": "14155551234",
+  "phone_number": "14155550123",
   "otp": "123456"
 }
 ```

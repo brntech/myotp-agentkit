@@ -8,8 +8,8 @@ The official command line for [MyOTP.App](https://myotp.app). Send and verify OT
 
 ```bash
 npx @myotp/cli init
-npx @myotp/cli test +14155551234
-npx @myotp/cli verify +14155551234 123456
+npx @myotp/cli test +14155550123
+npx @myotp/cli verify +14155550123 123456
 ```
 
 ## Why this exists
@@ -47,10 +47,10 @@ Requires Node 20 or newer.
 npx @myotp/cli init
 
 # 2. Send a test OTP
-npx @myotp/cli test +14155551234
+npx @myotp/cli test +14155550123
 
 # 3. Verify the code that arrived
-npx @myotp/cli verify +14155551234 482917
+npx @myotp/cli verify +14155550123 482917
 
 # 4. Inspect your account
 npx @myotp/cli status
@@ -121,17 +121,17 @@ Already have a key in your environment? Skip `init` entirely — every subcomman
 Sends an OTP to the given number using your configured API key. Phone numbers can be entered in any of these formats and the CLI will normalize them:
 
 ```bash
-npx @myotp/cli test +14155551234
-npx @myotp/cli test 14155551234
+npx @myotp/cli test +14155550123
+npx @myotp/cli test 14155550123
 npx @myotp/cli test "+1 (415) 555-1234"
 ```
 
 Channel options:
 
 ```bash
-npx @myotp/cli test +14155551234                       # SMS (default)
-npx @myotp/cli test +14155551234 --channel whatsapp    # WhatsApp
-npx @myotp/cli test +14155551234 --channel telegram    # Telegram
+npx @myotp/cli test +14155550123                       # SMS (default)
+npx @myotp/cli test +14155550123 --channel whatsapp    # WhatsApp
+npx @myotp/cli test +14155550123 --channel telegram    # Telegram
 ```
 
 Useful flags:
@@ -152,7 +152,7 @@ Verifies the OTP that was sent. Exit codes:
 - `1` for any other error (network, auth, etc.).
 
 ```bash
-npx @myotp/cli verify +14155551234 482917
+npx @myotp/cli verify +14155550123 482917
 ```
 
 ### `myotp status`
@@ -187,7 +187,7 @@ The CLI looks for an API key in this order:
 The first one that is set wins. This makes it easy to override the saved key for a single call:
 
 ```bash
-MYOTP_API_KEY=YOUR_32_CHAR_KEY npx @myotp/cli test +14155551234
+MYOTP_API_KEY=YOUR_32_CHAR_KEY npx @myotp/cli test +14155550123
 ```
 
 ## JSON mode for agents
@@ -201,7 +201,7 @@ Successful response:
   "ok": true,
   "command": "test",
   "data": {
-    "phone": "14155551234",
+    "phone": "14155550123",
     "channel": "sms",
     "message_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "status": "accepted",
@@ -229,10 +229,10 @@ Failure response:
 Agent example:
 
 ```bash
-RESULT=$(npx @myotp/cli test +14155551234 --json)
+RESULT=$(npx @myotp/cli test +14155550123 --json)
 MESSAGE_ID=$(echo "$RESULT" | jq -r '.data.message_id')
 # ...prompt user for the code, then:
-npx @myotp/cli verify +14155551234 "$CODE" --json --message-id "$MESSAGE_ID"
+npx @myotp/cli verify +14155550123 "$CODE" --json --message-id "$MESSAGE_ID"
 ```
 
 In `--json` mode, `init` requires `--email`, `--phone`, and `--company` as flags so it can run non-interactively.

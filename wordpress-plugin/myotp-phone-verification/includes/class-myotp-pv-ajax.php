@@ -63,7 +63,7 @@ class MyOTP_PV_Ajax {
 
 		$phone = myotp_pv_normalize_phone( self::field( 'phone' ) );
 		if ( ! myotp_pv_is_valid_phone( $phone ) ) {
-			wp_send_json_error( array( 'message' => __( 'Enter the number with the country code, digits only, for example 14155551234.', 'myotp-phone-verification' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Enter the number with the country code, digits only, for example 14155550123.', 'myotp-phone-verification' ) ), 400 );
 		}
 
 		$cooldown = MyOTP_PV_Session::cooldown_remaining( $phone );
@@ -269,7 +269,7 @@ class MyOTP_PV_Ajax {
 
 		$phone = myotp_pv_normalize_phone( self::field( 'phone' ) );
 		if ( ! myotp_pv_is_valid_phone( $phone ) ) {
-			wp_send_json_error( array( 'message' => __( 'Enter the number with the country code, digits only, for example 14155551234.', 'myotp-phone-verification' ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Enter the number with the country code, digits only, for example 14155550123.', 'myotp-phone-verification' ) ), 400 );
 		}
 
 		$result = MyOTP_PV_Api::generate( $phone, true );

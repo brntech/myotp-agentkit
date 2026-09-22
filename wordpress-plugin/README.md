@@ -36,7 +36,7 @@ Requires WordPress 6.0+ and PHP 7.4+. WooCommerce is optional.
 
 ## Phone number format
 
-Country code first, digits only, no plus sign: `14155551234`. The plugin strips `+`, spaces, dashes, dots and brackets before sending, and keeps leading zeros untouched. The API rejects numbers that start with 0, so ask visitors for the international form.
+Country code first, digits only, no plus sign: `14155550123`. The plugin strips `+`, spaces, dashes, dots and brackets before sending, and keeps leading zeros untouched. The API rejects numbers that start with 0, so ask visitors for the international form.
 
 ## Layout
 
@@ -78,7 +78,7 @@ Put the widget on a page and react to it:
 ```html
 <script>
 document.addEventListener('myotp:verified', function (e) {
-  // e.detail.phone is digits only, e.g. "14155551234"
+  // e.detail.phone is digits only, e.g. "14155550123"
   document.querySelector('#continue').disabled = false;
 });
 </script>

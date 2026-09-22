@@ -31,10 +31,10 @@ async function verifyOtp(phoneNumber, otp) {
 }
 
 // Demo
-const sent = await generateOtp("14155551234");
+const sent = await generateOtp("14155550123");
 console.log("Sent:", sent.message_id);
 // ...later, after user submits the code...
-const result = await verifyOtp("14155551234", "123456");
+const result = await verifyOtp("14155550123", "123456");
 console.log(result.status === "success" ? "verified" : `failed: ${result.reason}`);
 ```
 

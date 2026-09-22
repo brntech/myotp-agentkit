@@ -17,7 +17,7 @@ const validResponse = {
 
 describe("generate_otp — input validation", () => {
   it("rejects a phone number with a leading + sign", () => {
-    const result = inputSchema.safeParse({ phone_number: "+14155551234" });
+    const result = inputSchema.safeParse({ phone_number: "+14155550123" });
     expect(result.success).toBe(false);
   });
 
@@ -47,18 +47,18 @@ describe("generate_otp — input validation", () => {
   });
 
   it("accepts a valid international phone number with no plus", () => {
-    const result = inputSchema.safeParse({ phone_number: "14155551234" });
+    const result = inputSchema.safeParse({ phone_number: "14155550123" });
     expect(result.success).toBe(true);
   });
 
   it("rejects unsupported channel values", () => {
-    const result = inputSchema.safeParse({ phone_number: "14155551234", channel: "voice" });
+    const result = inputSchema.safeParse({ phone_number: "14155550123", channel: "voice" });
     expect(result.success).toBe(false);
   });
 
   it("rejects otp_length outside the 3-8 range", () => {
-    expect(inputSchema.safeParse({ phone_number: "14155551234", otp_length: 2 }).success).toBe(false);
-    expect(inputSchema.safeParse({ phone_number: "14155551234", otp_length: 9 }).success).toBe(false);
+    expect(inputSchema.safeParse({ phone_number: "14155550123", otp_length: 2 }).success).toBe(false);
+    expect(inputSchema.safeParse({ phone_number: "14155550123", otp_length: 9 }).success).toBe(false);
   });
 });
 
@@ -68,7 +68,7 @@ describe("generate_otp — request shape", () => {
     client.post.mockResolvedValueOnce(validResponse);
 
     await generateOtpTool.handler(
-      { phone_number: "14155551234" },
+      { phone_number: "14155550123" },
       { client: asMyOtpClient(client), apiKey: "k_secret" }
     );
 
@@ -82,7 +82,7 @@ describe("generate_otp — request shape", () => {
     client.post.mockResolvedValueOnce(validResponse);
 
     await generateOtpTool.handler(
-      { phone_number: "14155551234", force_send: true, return_otp: false },
+      { phone_number: "14155550123", force_send: true, return_otp: false },
       { client: asMyOtpClient(client), apiKey: "k" }
     );
 
@@ -96,7 +96,7 @@ describe("generate_otp — request shape", () => {
     client.post.mockResolvedValueOnce(validResponse);
 
     await generateOtpTool.handler(
-      { phone_number: "14155551234" },
+      { phone_number: "14155550123" },
       { client: asMyOtpClient(client), apiKey: "k" }
     );
 
@@ -111,7 +111,7 @@ describe("generate_otp — request shape", () => {
 
     await generateOtpTool.handler(
       {
-        phone_number: "14155551234",
+        phone_number: "14155550123",
         channel: "whatsapp",
         otp_length: 6,
         otp_validity: 600,
@@ -123,7 +123,7 @@ describe("generate_otp — request shape", () => {
 
     const body = client.post.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(body).toMatchObject({
-      phone_number: "14155551234",
+      phone_number: "14155550123",
       channel: "whatsapp",
       otp_length: 6,
       otp_validity: 600,
@@ -139,7 +139,7 @@ describe("generate_otp — response mapping", () => {
     client.post.mockResolvedValueOnce(validResponse);
 
     const result = await generateOtpTool.handler(
-      { phone_number: "14155551234" },
+      { phone_number: "14155550123" },
       { client: asMyOtpClient(client), apiKey: "k" }
     );
 
@@ -154,7 +154,7 @@ describe("generate_otp — response mapping", () => {
     client.post.mockResolvedValueOnce({ ...validResponse, otp: "123456" });
 
     const result = await generateOtpTool.handler(
-      { phone_number: "14155551234", return_otp: true },
+      { phone_number: "14155550123", return_otp: true },
       { client: asMyOtpClient(client), apiKey: "k" }
     );
 
@@ -168,7 +168,7 @@ describe("generate_otp — response mapping", () => {
     );
 
     const result = await generateOtpTool.handler(
-      { phone_number: "14155551234" },
+      { phone_number: "14155550123" },
       { client: asMyOtpClient(client), apiKey: "k_secret_value" }
     );
 

@@ -30,7 +30,7 @@
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "Destination phone number, digits only, no leading + or 0. Example: 14155551234 for a US number.",
+          "description": "Destination phone number, digits only, no leading + or 0. Example: 14155550123 for a US number.",
           "pattern": "^[1-9][0-9]{6,14}$"
         },
         {

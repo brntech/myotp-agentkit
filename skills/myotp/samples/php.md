@@ -45,11 +45,11 @@ function verify_otp(string $phone, string $otp): array {
 }
 
 // Demo
-$sent = generate_otp("14155551234");
+$sent = generate_otp("14155550123");
 // Store the message_id from $sent in your session.
 print "message_id: " . $sent["body"]["message_id"] . PHP_EOL;
 
-$result = verify_otp("14155551234", "123456");
+$result = verify_otp("14155550123", "123456");
 if (($result["body"]["status"] ?? "") === "success") {
     print "verified" . PHP_EOL;
 } else {

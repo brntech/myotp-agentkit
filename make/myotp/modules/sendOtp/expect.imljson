@@ -3,7 +3,7 @@
     "name": "phone_number",
     "type": "text",
     "label": "Phone number",
-    "help": "Digits only, country code first, no plus sign and no leading zero. Example: 14155551234.",
+    "help": "Digits only, country code first, no plus sign and no leading zero. Example: 14155550123.",
     "required": true,
     "validate": {
       "pattern": "^[1-9][0-9]{6,14}$"

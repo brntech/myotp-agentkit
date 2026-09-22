@@ -3,11 +3,11 @@ import { sanitizePhone } from "../src/index.js";
 
 describe("sanitizePhone", () => {
   it("strips + sign", () => {
-    expect(sanitizePhone("+14155551234")).toBe("14155551234");
+    expect(sanitizePhone("+14155550123")).toBe("14155550123");
   });
 
   it("strips parens, dashes, and spaces", () => {
-    expect(sanitizePhone("+1 (415) 555-1234")).toBe("14155551234");
+    expect(sanitizePhone("+1 (415) 555-1234")).toBe("14155550123");
   });
 
   it("strips a leading 0 from international format", () => {

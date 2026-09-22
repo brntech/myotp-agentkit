@@ -27,7 +27,7 @@ Do not invent function names that are not listed below. Do not assume parameter 
       "parameters": {
         "type": "object",
         "properties": {
-          "phone_number": {"type": "string", "pattern": "^[1-9][0-9]{6,14}$", "description": "International format with NO leading + or 0. 7-15 digits. Example: '14155551234'."},
+          "phone_number": {"type": "string", "pattern": "^[1-9][0-9]{6,14}$", "description": "International format with NO leading + or 0. 7-15 digits. Example: '14155550123'."},
           "channel": {"type": "string", "enum": ["sms", "whatsapp", "telegram"], "default": "sms", "description": "Delivery channel. Default 'sms'."},
           "otp_length": {"type": "integer", "minimum": 3, "maximum": 8, "default": 6, "description": "Digits in OTP. 3-8 (4-8 for telegram). Requires CUSTOM_OTP_LENGTH entitlement."},
           "otp_code": {"type": "string", "pattern": "^[0-9]{3,8}$", "description": "Optional pre-generated numeric OTP."},
@@ -144,7 +144,7 @@ Phone number rules (enforce strictly before calling any tool):
 - Digits only. No '+', no spaces, no parentheses, no dashes.
 - 7 to 15 digits.
 - First digit must be 1-9 (no leading 0).
-- Country code is included as part of the number. (415) 555-1234 in the US becomes "14155551234". 0207 946 0958 in the UK becomes "442079460958".
+- Country code is included as part of the number. (415) 555-1234 in the US becomes "14155550123". 0207 946 0958 in the UK becomes "442079460958".
 - If the user gives you a number in the wrong format, normalize it silently when the intent is unambiguous, or ask once if it is not.
 
 Channel selection:

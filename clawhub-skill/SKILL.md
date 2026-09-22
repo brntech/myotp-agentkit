@@ -38,7 +38,7 @@ Base URL: `https://api.myotp.app`
 
 Auth header on every request: `X-API-Key: <32-char-key>`
 
-Phone format: 7 to 15 digits, no leading `+` or `0`. A US number `(415) 555-1234` becomes `"14155551234"`.
+Phone format: 7 to 15 digits, no leading `+` or `0`. A US number `(415) 555-1234` becomes `"14155550123"`.
 
 ### generate_otp
 
@@ -48,7 +48,7 @@ Content-Type: application/json
 X-API-Key: <key>
 
 {
-  "phone_number": "14155551234",
+  "phone_number": "14155550123",
   "channel": "sms"
 }
 ```
@@ -65,7 +65,7 @@ Content-Type: application/json
 X-API-Key: <key>
 
 {
-  "phone_number": "14155551234",
+  "phone_number": "14155550123",
   "otp": "123456"
 }
 ```

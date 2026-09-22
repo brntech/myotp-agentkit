@@ -56,7 +56,7 @@ describe("test command — happy path", () => {
     try {
       await runTest("+1 (415) 555-1234", { apiKey: "k_test_123" });
       expect(generateOtpMock).toHaveBeenCalledWith({
-        phone_number: "14155551234",
+        phone_number: "14155550123",
         channel: "sms",
       });
       expect(stdout(io)).toContain("OTP queued for delivery");
@@ -80,13 +80,13 @@ describe("test command — happy path", () => {
     const { runTest } = await import("../../src/commands/test.js");
     const io = captureIo();
     try {
-      await runTest("+14155551234", { apiKey: "k", json: true });
+      await runTest("+14155550123", { apiKey: "k", json: true });
       const out = stdout(io).trim();
       const parsed = JSON.parse(out);
       expect(parsed.ok).toBe(true);
       expect(parsed.command).toBe("test");
       expect(parsed.data.message_id).toBe("msg_2");
-      expect(parsed.data.phone).toBe("14155551234");
+      expect(parsed.data.phone).toBe("14155550123");
     } finally {
       io.restore();
     }
@@ -104,8 +104,8 @@ describe("test command — happy path", () => {
     const { runTest } = await import("../../src/commands/test.js");
     const io = captureIo();
     try {
-      await runTest("+14155551234", { apiKey: "k", verbose: true });
-      expect(stdout(io)).toContain("Sending sms OTP to 14155551234");
+      await runTest("+14155550123", { apiKey: "k", verbose: true });
+      expect(stdout(io)).toContain("Sending sms OTP to 14155550123");
     } finally {
       io.restore();
     }
@@ -123,7 +123,7 @@ describe("test command — happy path", () => {
     const { runTest } = await import("../../src/commands/test.js");
     const io = captureIo();
     try {
-      await runTest("+14155551234", { apiKey: "k", channel: "whatsapp" });
+      await runTest("+14155550123", { apiKey: "k", channel: "whatsapp" });
       expect(generateOtpMock.mock.calls[0]?.[0]).toMatchObject({ channel: "whatsapp" });
     } finally {
       io.restore();
@@ -136,7 +136,7 @@ describe("test command — failure modes", () => {
     const { runTest } = await import("../../src/commands/test.js");
     const io = captureIo();
     try {
-      await expect(runTest("+14155551234", {})).rejects.toBeInstanceOf(ExitError);
+      await expect(runTest("+14155550123", {})).rejects.toBeInstanceOf(ExitError);
       expect(io.exits[0]).toBe(1);
       expect(stderr(io)).toContain("No API key configured");
     } finally {
@@ -164,7 +164,7 @@ describe("test command — failure modes", () => {
     const io = captureIo();
     const SECRET = "k_super_secret_value_xyz";
     try {
-      await expect(runTest("+14155551234", { apiKey: SECRET })).rejects.toBeInstanceOf(ExitError);
+      await expect(runTest("+14155550123", { apiKey: SECRET })).rejects.toBeInstanceOf(ExitError);
       expect(stderr(io)).toContain("Insufficient balance");
       expect(stderr(io)).not.toContain(SECRET);
       expect(stdout(io)).not.toContain(SECRET);

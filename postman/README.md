@@ -16,7 +16,7 @@ Both JSON files are generated. Do not edit them by hand; edit the spec and rebui
 1. In Postman, press **Import** (top left of the workspace).
 2. Drop both JSON files in, or pick them with **files**.
 3. Select the **MyOTP.App** environment in the environment picker (top right).
-4. Open the environment, paste your API key into `api_key` and set `phone_number` to the number you want to test with. Digits only, country code first, no plus sign: `14155551234`.
+4. Open the environment, paste your API key into `api_key` and set `phone_number` to the number you want to test with. Digits only, country code first, no plus sign: `14155550123`.
 
 The collection sends `X-API-Key: {{api_key}}` on every request that needs it. The three unauthenticated endpoints (`/v1/topup/quote`, `/v1/agent/register`, `/v1/agent/verify-email`) are set to **No Auth**.
 
@@ -67,7 +67,7 @@ X-API-Key: <your key>
 Content-Type: application/json
 
 {
-  "phone_number": "14155551234",
+  "phone_number": "14155550123",
   "otp_length": 6,
   "otp_validity": 300,
   "channel": "sms",

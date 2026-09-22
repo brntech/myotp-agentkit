@@ -41,7 +41,7 @@ describe("verify command", () => {
     const { runVerify } = await import("../../src/commands/verify.js");
     const io = captureIo();
     try {
-      await runVerify("+14155551234", "123456", { apiKey: "k" });
+      await runVerify("+14155550123", "123456", { apiKey: "k" });
       expect(stdout(io)).toContain("OTP verified");
       expect(io.exits.length).toBe(0);
     } finally {
@@ -58,7 +58,7 @@ describe("verify command", () => {
     const { runVerify } = await import("../../src/commands/verify.js");
     const io = captureIo();
     try {
-      await expect(runVerify("+14155551234", "123456", { apiKey: "k" })).rejects.toBeInstanceOf(
+      await expect(runVerify("+14155550123", "123456", { apiKey: "k" })).rejects.toBeInstanceOf(
         ExitError
       );
       expect(io.exits[0]).toBe(2);
@@ -73,7 +73,7 @@ describe("verify command", () => {
     const { runVerify } = await import("../../src/commands/verify.js");
     const io = captureIo();
     try {
-      await expect(runVerify("+14155551234", "12", { apiKey: "k" })).rejects.toBeInstanceOf(
+      await expect(runVerify("+14155550123", "12", { apiKey: "k" })).rejects.toBeInstanceOf(
         ExitError
       );
       expect(io.exits[0]).toBe(1);
@@ -88,7 +88,7 @@ describe("verify command", () => {
     const { runVerify } = await import("../../src/commands/verify.js");
     const io = captureIo();
     try {
-      await runVerify("+14155551234", "123456", { apiKey: "k", messageId: "msg_42" });
+      await runVerify("+14155550123", "123456", { apiKey: "k", messageId: "msg_42" });
       expect(verifyOtpMock.mock.calls[0]?.[0]).toMatchObject({
         otp: "123456",
         message_id: "msg_42",
@@ -105,7 +105,7 @@ describe("verify command", () => {
     const { runVerify } = await import("../../src/commands/verify.js");
     const io = captureIo();
     try {
-      await runVerify("+14155551234", "123456", { apiKey: "k", json: true });
+      await runVerify("+14155550123", "123456", { apiKey: "k", json: true });
       const parsed = JSON.parse(stdout(io).trim());
       expect(parsed.ok).toBe(true);
       expect(parsed.data.verified).toBe(true);
@@ -122,7 +122,7 @@ describe("verify command", () => {
     const io = captureIo();
     const SECRET = "k_supersecret_dont_leak";
     try {
-      await expect(runVerify("+14155551234", "123456", { apiKey: SECRET })).rejects.toBeInstanceOf(
+      await expect(runVerify("+14155550123", "123456", { apiKey: SECRET })).rejects.toBeInstanceOf(
         ExitError
       );
       expect(stderr(io)).not.toContain(SECRET);

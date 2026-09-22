@@ -65,8 +65,8 @@ public class MyOtpClient
 
 // Demo
 var client = new MyOtpClient(new HttpClient());
-var sent = await client.GenerateAsync("14155551234");
+var sent = await client.GenerateAsync("14155550123");
 Console.WriteLine($"message_id: {sent.MessageId}");
-var result = await client.VerifyAsync("14155551234", "123456");
+var result = await client.VerifyAsync("14155550123", "123456");
 Console.WriteLine(result.Status == "success" ? "verified" : $"failed: {result.Reason}");
 ```

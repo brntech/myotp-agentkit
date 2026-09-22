@@ -71,13 +71,13 @@ func VerifyOTP(phone, otp string) (*VerifyResp, error) {
 }
 
 func main() {
-	sent, err := GenerateOTP("14155551234", "sms")
+	sent, err := GenerateOTP("14155550123", "sms")
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("message_id:", sent.MessageID)
 	// ... user enters code ...
-	v, _ := VerifyOTP("14155551234", "123456")
+	v, _ := VerifyOTP("14155550123", "123456")
 	if v.Status == "success" {
 		fmt.Println("verified")
 	} else {

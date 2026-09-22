@@ -53,7 +53,7 @@ globalOptions(
   program
     .command('test')
     .description('Send a test OTP to a phone number')
-    .argument('<phone>', 'destination phone number, e.g. +14155551234')
+    .argument('<phone>', 'destination phone number, e.g. +14155550123')
     .option('-c, --channel <channel>', 'sms | whatsapp | telegram', 'sms')
     .option('--brand <brand>', 'sender brand override')
     .option('--otp-length <n>', 'OTP length (3-8)')
@@ -67,7 +67,7 @@ globalOptions(
   program
     .command('verify')
     .description('Verify an OTP code that was sent to a phone number')
-    .argument('<phone>', 'destination phone number, e.g. +14155551234')
+    .argument('<phone>', 'destination phone number, e.g. +14155550123')
     .argument('<code>', 'the OTP code the recipient entered')
     .option('--message-id <id>', 'verify by message_id instead of phone_number')
     .action(async (phone: string, code: string, opts) => {
@@ -120,9 +120,9 @@ program.addHelpText(
   'after',
   `\nExamples:\n` +
     `  $ npx @myotp/cli init\n` +
-    `  $ npx @myotp/cli test +14155551234\n` +
-    `  $ npx @myotp/cli test +14155551234 --channel whatsapp\n` +
-    `  $ npx @myotp/cli verify +14155551234 123456\n` +
+    `  $ npx @myotp/cli test +14155550123\n` +
+    `  $ npx @myotp/cli test +14155550123 --channel whatsapp\n` +
+    `  $ npx @myotp/cli verify +14155550123 123456\n` +
     `  $ npx @myotp/cli status --json\n` +
     `  $ npx @myotp/cli config --reset\n` +
     `\nEnvironment variables:\n` +

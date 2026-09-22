@@ -3,17 +3,17 @@ import { normalizePhone, PhoneError } from "../../src/lib/phone.js";
 
 describe("normalizePhone — happy path", () => {
   it("strips a leading + sign", () => {
-    expect(normalizePhone("+14155551234")).toBe("14155551234");
+    expect(normalizePhone("+14155550123")).toBe("14155550123");
   });
 
   it("returns digits-only input unchanged when already valid", () => {
-    expect(normalizePhone("14155551234")).toBe("14155551234");
+    expect(normalizePhone("14155550123")).toBe("14155550123");
   });
 
   it("strips parentheses, dashes, dots, and spaces", () => {
-    expect(normalizePhone("+1 (415) 555-1234")).toBe("14155551234");
-    expect(normalizePhone("+1.415.555.1234")).toBe("14155551234");
-    expect(normalizePhone("  +1-415-555-1234  ")).toBe("14155551234");
+    expect(normalizePhone("+1 (415) 555-1234")).toBe("14155550123");
+    expect(normalizePhone("+1.415.555.1234")).toBe("14155550123");
+    expect(normalizePhone("  +1-415-555-1234  ")).toBe("14155550123");
   });
 
   it("handles a UK number with country code", () => {

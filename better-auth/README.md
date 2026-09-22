@@ -130,7 +130,7 @@ npx @myotp/cli init        # interactive
 node --input-type=module -e '
   import("@myotp/better-auth").then(({ myotpSendOtp }) =>
     myotpSendOtp({ apiKey: process.env.MYOTP_API_KEY })({
-      phoneNumber: "14155551234",
+      phoneNumber: "14155550123",
       code: "123456",
     }).then(() => console.log("delivered"))
   );

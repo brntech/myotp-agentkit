@@ -17,7 +17,7 @@ export default function PhoneForm() {
           type="tel"
           inputMode="numeric"
           required
-          placeholder="14155551234"
+          placeholder="14155550123"
           className="block w-full rounded-md border border-slate-300 px-3 py-2"
         />
       </label>

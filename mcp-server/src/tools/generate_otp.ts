@@ -18,7 +18,7 @@ const inputSchema = {
     .max(15)
     .regex(/^[1-9]\d{6,14}$/)
     .describe(
-      "Destination phone number in international format with NO leading + or 0. Must be 7-15 digits and start with a non-zero digit. Example: '14155551234' for a US number, '447911123456' for a UK number."
+      "Destination phone number in international format with NO leading + or 0. Must be 7-15 digits and start with a non-zero digit. Example: '14155550123' for a US number, '447911123456' for a UK number."
     ),
   channel: z
     .enum(["sms", "whatsapp", "telegram"])

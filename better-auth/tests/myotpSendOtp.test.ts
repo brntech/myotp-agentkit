@@ -25,7 +25,7 @@ describe("myotpSendOtp", () => {
   it("posts to /generate_otp with the correct shape", async () => {
     fetchMock.mockResolvedValueOnce(okResponse());
     const send = myotpSendOtp({ apiKey: "test-key", fetch: fetchMock });
-    await send({ phoneNumber: "+14155551234", code: "654321" });
+    await send({ phoneNumber: "+14155550123", code: "654321" });
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0]!;
@@ -35,7 +35,7 @@ describe("myotpSendOtp", () => {
     expect(init.headers["Content-Type"]).toBe("application/json");
 
     const body = JSON.parse(init.body);
-    expect(body.phone_number).toBe("14155551234");
+    expect(body.phone_number).toBe("14155550123");
     expect(body.channel).toBe("sms");
     expect(body.otp_code).toBe("654321");
     expect(body.otp_validity).toBe(300);
@@ -45,7 +45,7 @@ describe("myotpSendOtp", () => {
   it("respects channel option (whatsapp)", async () => {
     fetchMock.mockResolvedValueOnce(okResponse());
     const send = myotpSendOtp({ apiKey: "k", channel: "whatsapp", fetch: fetchMock });
-    await send({ phoneNumber: "14155551234", code: "111111" });
+    await send({ phoneNumber: "14155550123", code: "111111" });
 
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.channel).toBe("whatsapp");
@@ -54,7 +54,7 @@ describe("myotpSendOtp", () => {
   it("includes brand when provided", async () => {
     fetchMock.mockResolvedValueOnce(okResponse());
     const send = myotpSendOtp({ apiKey: "k", brand: "Acme", fetch: fetchMock });
-    await send({ phoneNumber: "14155551234", code: "111111" });
+    await send({ phoneNumber: "14155550123", code: "111111" });
 
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.brand).toBe("Acme");
@@ -63,7 +63,7 @@ describe("myotpSendOtp", () => {
   it("omits brand when undefined", async () => {
     fetchMock.mockResolvedValueOnce(okResponse());
     const send = myotpSendOtp({ apiKey: "k", fetch: fetchMock });
-    await send({ phoneNumber: "14155551234", code: "111111" });
+    await send({ phoneNumber: "14155550123", code: "111111" });
 
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.brand).toBeUndefined();
@@ -72,7 +72,7 @@ describe("myotpSendOtp", () => {
   it("uses custom validitySeconds", async () => {
     fetchMock.mockResolvedValueOnce(okResponse());
     const send = myotpSendOtp({ apiKey: "k", validitySeconds: 600, fetch: fetchMock });
-    await send({ phoneNumber: "14155551234", code: "111111" });
+    await send({ phoneNumber: "14155550123", code: "111111" });
 
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.otp_validity).toBe(600);
@@ -81,7 +81,7 @@ describe("myotpSendOtp", () => {
   it("uses custom baseUrl and strips trailing slash", async () => {
     fetchMock.mockResolvedValueOnce(okResponse());
     const send = myotpSendOtp({ apiKey: "k", baseUrl: "https://staging.example.com/", fetch: fetchMock });
-    await send({ phoneNumber: "14155551234", code: "111111" });
+    await send({ phoneNumber: "14155550123", code: "111111" });
 
     expect(fetchMock.mock.calls[0]![0]).toBe("https://staging.example.com/generate_otp");
   });
@@ -90,8 +90,8 @@ describe("myotpSendOtp", () => {
     // Response bodies are streams (consumed on first read) — return a fresh one per call.
     fetchMock.mockImplementation(() => errResponse(403, { message: "Insufficient balance" }));
     const send = myotpSendOtp({ apiKey: "k", fetch: fetchMock });
-    await expect(send({ phoneNumber: "14155551234", code: "111111" })).rejects.toThrow(MyotpDeliveryError);
-    await expect(send({ phoneNumber: "14155551234", code: "111111" })).rejects.toMatchObject({
+    await expect(send({ phoneNumber: "14155550123", code: "111111" })).rejects.toThrow(MyotpDeliveryError);
+    await expect(send({ phoneNumber: "14155550123", code: "111111" })).rejects.toMatchObject({
       status: 403,
     });
   });
@@ -101,13 +101,13 @@ describe("myotpSendOtp", () => {
       .mockResolvedValueOnce(errResponse(403, { message: "Insufficient balance" }))
       .mockResolvedValueOnce(errResponse(403, { message: "Insufficient balance" }));
     const send = myotpSendOtp({ apiKey: "k", fetch: fetchMock });
-    await expect(send({ phoneNumber: "14155551234", code: "111111" })).rejects.toThrow(/Insufficient balance/);
+    await expect(send({ phoneNumber: "14155550123", code: "111111" })).rejects.toThrow(/Insufficient balance/);
   });
 
   it("handles non-JSON error bodies", async () => {
     fetchMock.mockResolvedValueOnce(errResponse(502, "Bad Gateway"));
     const send = myotpSendOtp({ apiKey: "k", fetch: fetchMock });
-    await expect(send({ phoneNumber: "14155551234", code: "111111" })).rejects.toMatchObject({
+    await expect(send({ phoneNumber: "14155550123", code: "111111" })).rejects.toMatchObject({
       status: 502,
     });
   });
@@ -123,7 +123,7 @@ describe("myotpSendOtp", () => {
     fetchMock.mockResolvedValueOnce(errResponse(401, { message: "Unauthorized" }));
     const send = myotpSendOtp({ apiKey, fetch: fetchMock });
     try {
-      await send({ phoneNumber: "14155551234", code: "111111" });
+      await send({ phoneNumber: "14155550123", code: "111111" });
     } catch (err) {
       expect(String(err)).not.toContain(apiKey);
       if (err instanceof MyotpDeliveryError) {
@@ -145,7 +145,7 @@ describe("myotpSendOtp", () => {
       });
     });
     const send = myotpSendOtp({ apiKey: "k", fetch: fetchMock, timeoutMs: 25 });
-    await expect(send({ phoneNumber: "14155551234", code: "111111" })).rejects.toThrow(/timed out/);
+    await expect(send({ phoneNumber: "14155550123", code: "111111" })).rejects.toThrow(/timed out/);
     ctrl.abort();
   });
 });

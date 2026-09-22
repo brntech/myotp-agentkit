@@ -51,7 +51,7 @@ describe('MyOtp node', () => {
 	it('sendOtp calls the API through the myOtpApi credential', async () => {
 		const { ctx, request } = makeContext({
 			operation: 'sendOtp',
-			phoneNumber: '14155551234',
+			phoneNumber: '14155550123',
 			channel: 'sms',
 			additionalFields: { force_send: true, otp_length: 6 },
 		});
@@ -66,7 +66,7 @@ describe('MyOtp node', () => {
 		expect(options.url).toBe('https://api.myotp.app/generate_otp');
 		expect(options.json).toBe(true);
 		expect(options.body).toEqual({
-			phone_number: '14155551234',
+			phone_number: '14155550123',
 			channel: 'sms',
 			otp_length: 6,
 			force_send: 'true',

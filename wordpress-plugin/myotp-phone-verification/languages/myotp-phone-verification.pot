@@ -67,7 +67,7 @@ msgstr ""
 msgid "Enter the code you received."
 msgstr ""
 
-msgid "Enter the number with the country code, digits only, for example 14155551234."
+msgid "Enter the number with the country code, digits only, for example 14155550123."
 msgstr ""
 
 #. translators: %s: link to myotp.app sign-up

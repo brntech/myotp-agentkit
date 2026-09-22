@@ -75,7 +75,7 @@ describe("MyOtpClient — base URL", () => {
   it("appends path with no extra slashes", async () => {
     const { calls, fetchImpl } = captureFetch({ body: {} });
     const c = new MyOtpClient({ baseUrl: "https://api.example.com", apiKey: "k", fetchImpl });
-    await c.generateOtp({ phone_number: "14155551234" });
+    await c.generateOtp({ phone_number: "14155550123" });
     expect(calls[0]?.url).toBe("https://api.example.com/generate_otp");
   });
 });
@@ -108,7 +108,7 @@ describe("MyOtpClient — headers", () => {
     const { calls, fetchImpl } = captureFetch({ body: {} });
     const c = new MyOtpClient({ baseUrl: "https://api.example.com", apiKey: "k", fetchImpl });
     await c.me(); // GET
-    await c.generateOtp({ phone_number: "14155551234" }); // POST
+    await c.generateOtp({ phone_number: "14155550123" }); // POST
     expect(calls[0]?.headers["Content-Type"]).toBeUndefined();
     expect(calls[1]?.headers["Content-Type"]).toBe("application/json");
   });
@@ -233,11 +233,11 @@ describe("MyOtpClient — endpoint methods", () => {
       },
     });
     const c = new MyOtpClient({ baseUrl: "https://api.example.com", apiKey: "k", fetchImpl });
-    await c.generateOtp({ phone_number: "14155551234", channel: "sms" });
+    await c.generateOtp({ phone_number: "14155550123", channel: "sms" });
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.url.endsWith("/generate_otp")).toBe(true);
     expect(JSON.parse(calls[0]?.body ?? "{}")).toMatchObject({
-      phone_number: "14155551234",
+      phone_number: "14155550123",
       channel: "sms",
     });
   });
@@ -247,7 +247,7 @@ describe("MyOtpClient — endpoint methods", () => {
       body: { status: "success", message: "ok" },
     });
     const c = new MyOtpClient({ baseUrl: "https://api.example.com", apiKey: "k", fetchImpl });
-    await c.verifyOtp({ otp: "123456", phone_number: "14155551234" });
+    await c.verifyOtp({ otp: "123456", phone_number: "14155550123" });
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.url.endsWith("/verify_otp")).toBe(true);
   });

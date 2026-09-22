@@ -29,7 +29,7 @@ Where to get a key:
 - Humans: sign up at https://myotp.app/sign-up/ (15 free credits, email and phone verification). Keys live under **API Keys** in the dashboard.
 - Agents: `POST https://api.myotp.app/v1/agent/register` with `{"email": "..."}`. The 201 body carries the key once. The balance starts at zero. To buy credits, `POST /v1/topup` with `{"credits": N}` (25 to 50000, $0.02 each). The first call answers 402 with payment challenges (USDC or card); pay one and repeat the request. Details: https://myotp.app/developer-api/
 
-Phone numbers are digits only in E.164 order, country code first, no plus sign. `14155551234`, not `+1 987 654 3210`.
+Phone numbers are digits only in E.164 order, country code first, no plus sign. `14155550123`, not `+1 987 654 3210`.
 
 ## Operations
 
@@ -61,7 +61,7 @@ Import [`examples/webhook-send-otp.json`](examples/webhook-send-otp.json) (**Wor
 
 The workflow is five nodes:
 
-1. **Webhook** (`POST /webhook/send-otp`, Header Auth) receives `{"phone_number": "14155551234", "channel": "sms"}`.
+1. **Webhook** (`POST /webhook/send-otp`, Header Auth) receives `{"phone_number": "14155550123", "channel": "sms"}`.
 2. **IF** checks `phone_number` against `^[1-9][0-9]{6,14}$`. Anything else answers 400 without touching MyOTP.
 3. **MyOTP > Send OTP** with Phone Number from the body and Channel limited to `sms`, `whatsapp` or `telegram`.
 4. **Respond to Webhook** returns `{"message_id": ..., "expires_at": ...}` to the caller.
@@ -75,7 +75,7 @@ Test it:
 curl -X POST https://your-n8n.example.com/webhook/send-otp \
   -H "X-Webhook-Key: your-long-random-value" \
   -H "Content-Type: application/json" \
-  -d '{"phone_number": "14155551234", "channel": "sms"}'
+  -d '{"phone_number": "14155550123", "channel": "sms"}'
 ```
 
 Response:

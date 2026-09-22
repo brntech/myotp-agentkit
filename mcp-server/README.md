@@ -210,7 +210,7 @@ URL and send `X-API-Key: <your-key>` on authenticated tool requests.
 
 Once the server is wired up, you can ask the agent things like:
 
-- *"Send an OTP via WhatsApp to 14155551234."*
+- *"Send an OTP via WhatsApp to 14155550123."*
 - *"Use MyOTP to verify code 482913 for that phone number."*
 - *"Did the last OTP get delivered? Check status for message_id `a1b2…`."*
 - *"Show me my OTP usage for the last 7 days."*

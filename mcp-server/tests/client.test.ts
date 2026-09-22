@@ -70,8 +70,8 @@ describe("MyOtpClient — auth header and body", () => {
   it("serializes the body to JSON for POST requests", async () => {
     const { calls } = installMockFetch({ body: { ok: true } });
     const client = new MyOtpClient({ baseUrl: "https://api.example.com" });
-    await client.post("/generate_otp", { phone_number: "14155551234" }, VALID_KEY);
-    expect(calls()[0]?.body).toBe(JSON.stringify({ phone_number: "14155551234" }));
+    await client.post("/generate_otp", { phone_number: "14155550123" }, VALID_KEY);
+    expect(calls()[0]?.body).toBe(JSON.stringify({ phone_number: "14155550123" }));
   });
 
   it("does not send a body for GET requests", async () => {

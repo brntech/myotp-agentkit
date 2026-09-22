@@ -7,7 +7,7 @@
     @csrf
     <label>
       <span>Phone number</span>
-      <input name="phone" type="tel" inputmode="numeric" placeholder="14155551234" value="{{ old('phone') }}" required />
+      <input name="phone" type="tel" inputmode="numeric" placeholder="14155550123" value="{{ old('phone') }}" required />
     </label>
 
     <fieldset>

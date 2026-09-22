@@ -38,11 +38,11 @@ def verify_otp(phone_number, otp)
 end
 
 # Demo
-sent = generate_otp("14155551234")
+sent = generate_otp("14155550123")
 puts "message_id: #{sent[:body]["message_id"]}"
 
 # ... user types in the code ...
-result = verify_otp("14155551234", "123456")
+result = verify_otp("14155550123", "123456")
 if result[:body]["status"] == "success"
   puts "verified"
 else

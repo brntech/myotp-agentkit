@@ -37,10 +37,10 @@ def verify_otp(phone_number: str, otp: str) -> dict:
     return r.json()
 
 if __name__ == "__main__":
-    sent = generate_otp("14155551234")
+    sent = generate_otp("14155550123")
     print("message_id:", sent["message_id"])
     # ... wait for user to enter the code ...
-    result = verify_otp("14155551234", "123456")
+    result = verify_otp("14155550123", "123456")
     print("verified" if result["status"] == "success" else f"failed: {result.get('reason')}")
 ```
 

@@ -46,7 +46,7 @@ export const SERVER_INSTRUCTIONS: string =
   "Every tool except `create_account` needs a MyOTP API key. No key yet? Call `create_account` with an email address: " +
   "no phone step, the key is returned once, and the balance starts at zero. " +
   "Then `get_topup_quote` and `top_up_credits` buy credits with USDC or card before the first send. " +
-  "Phone numbers must be in international format with no leading + or 0 (e.g. '14155551234' for a US number).";
+  "Phone numbers must be in international format with no leading + or 0 (e.g. '14155550123' for a US number).";
 
 export function createServer(options: ServerOptions): McpServer {
   const client = options.client ?? new MyOtpClient();

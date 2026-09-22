@@ -76,12 +76,12 @@ describe("generate_otp outputSchema", () => {
       cost: 1,
       otp: "123456",
     });
-    expectSuccess(t, await t.handler({ phone_number: "14155551234", return_otp: true }, { client: asMyOtpClient(client), apiKey: API_KEY }));
+    expectSuccess(t, await t.handler({ phone_number: "14155550123", return_otp: true }, { client: asMyOtpClient(client), apiKey: API_KEY }));
   });
   it("returns the helper error shape on an API error", async () => {
     const client = makeFakeClient();
     client.post.mockRejectedValueOnce(apiError());
-    expectErrorShape(t, await t.handler({ phone_number: "14155551234" }, { client: asMyOtpClient(client), apiKey: API_KEY }));
+    expectErrorShape(t, await t.handler({ phone_number: "14155550123" }, { client: asMyOtpClient(client), apiKey: API_KEY }));
   });
 });
 
@@ -160,7 +160,7 @@ describe("get_usage_report outputSchema", () => {
           message_id: VALID_UUID,
           message_timestamp: "2026-04-28T10:00:00Z",
           message_type: 1,
-          phone_number: "14155551234",
+          phone_number: "14155550123",
           channel: "sms",
           country: "USA",
           force_send: false,

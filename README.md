@@ -67,7 +67,7 @@ open https://myotp.app/sign-up
 
 # Test with the CLI
 npx @myotp/cli init
-npx @myotp/cli test +14155551234
+npx @myotp/cli test +14155550123
 
 # Or wire MCP to Claude Desktop, Cursor, etc.
 # (see mcp-server/README.md for config snippets)

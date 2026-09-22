@@ -237,7 +237,7 @@ class MyOTP_PV_Settings {
 			<h2><?php esc_html_e( 'Send a test code', 'myotp-phone-verification' ); ?></h2>
 			<p><?php esc_html_e( 'Uses the saved settings above. Each test costs credits like a real send.', 'myotp-phone-verification' ); ?></p>
 			<p>
-				<input type="tel" id="myotp_pv_test_phone" class="regular-text" placeholder="14155551234" inputmode="tel" />
+				<input type="tel" id="myotp_pv_test_phone" class="regular-text" placeholder="14155550123" inputmode="tel" />
 				<button type="button" class="button button-secondary" id="myotp_pv_test_send" <?php disabled( '' === $o['api_key'] ); ?>>
 					<?php esc_html_e( 'Send test code', 'myotp-phone-verification' ); ?>
 				</button>

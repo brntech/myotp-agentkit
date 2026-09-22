@@ -48,10 +48,10 @@ public class MyOtp {
     }
 
     public static void main(String[] args) throws Exception {
-        String sent = generateOtp("14155551234", "sms");
+        String sent = generateOtp("14155550123", "sms");
         System.out.println("Sent: " + sent);
         // ... user enters code ...
-        String verified = verifyOtp("14155551234", "123456");
+        String verified = verifyOtp("14155550123", "123456");
         System.out.println("Verify: " + verified);
     }
 }

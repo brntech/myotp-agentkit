@@ -177,7 +177,7 @@ Rules: $0.02 per credit. Minimum 25 credits ($0.50). Maximum 50,000 per call. Ca
 
 - Digits only. No `+`. No spaces. No leading `0`.
 - 7 to 15 digits.
-- Country code is part of the number. US `(415) 555-1234` becomes `14155551234`. UK `0207 946 0958` becomes `442079460958`.
+- Country code is part of the number. US `(415) 555-1234` becomes `14155550123`. UK `0207 946 0958` becomes `442079460958`.
 
 The system prompt enforces this. The model normalizes obvious variations silently and asks when intent is ambiguous.
 

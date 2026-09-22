@@ -210,7 +210,7 @@
       { "name": "Business", "monthly_price_usd": 25 },
       { "name": "Enterprise", "monthly_price_usd": null, "note": "custom" }
     ],
-    "regions": "190+ countries via Broadnet direct carrier connections",
+    "regions": "158 countries via Broadnet direct carrier connections",
     "compliance": ["ISO_27001", "ISO_9001", "GDPR_compliant"]
   }
 }

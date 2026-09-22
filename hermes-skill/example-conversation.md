@@ -22,7 +22,7 @@ I want to add phone verification to my Express app. Right now signup is just ema
 <|im_start|>assistant
 Happy to help. A couple of quick questions so the integration matches your stack:
 
-1. Are your users mostly in one region, or worldwide? SMS is the safe default and works in 190+ countries; if you have heavy India, Brazil, Indonesia, Mexico, Nigeria, or Turkey traffic I would also expose a WhatsApp option.
+1. Are your users mostly in one region, or worldwide? SMS is the safe default and works in 158 countries; if you have heavy India, Brazil, Indonesia, Mexico, Nigeria, or Turkey traffic I would also expose a WhatsApp option.
 2. Do you already have a MyOTP.App API key, or do we need to set one up? Free trial is 15 credits, no card required.
 3. Where do you want me to wire this in: a fresh /auth/send-code and /auth/verify-code pair of routes, or alongside an existing /signup endpoint?
 

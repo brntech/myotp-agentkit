@@ -24,7 +24,7 @@ const inputSchema = {
     .enum(["sms", "whatsapp", "telegram"])
     .optional()
     .describe(
-      "Delivery channel. 'sms' (default) works in 190+ countries. 'whatsapp' is best for India/Brazil/Indonesia/Mexico/Nigeria/Turkey. 'telegram' is best for privacy-focused users. Same API for all three."
+      "Delivery channel. 'sms' (default) works in 158 countries. 'whatsapp' is best for India/Brazil/Indonesia/Mexico/Nigeria/Turkey. 'telegram' is best for privacy-focused users. Same API for all three."
     ),
   otp_length: z
     .number()

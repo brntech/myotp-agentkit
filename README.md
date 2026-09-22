@@ -76,7 +76,7 @@ npx @myotp/cli test +14155551234
 ## Compatibility
 
 - **Node.js**: 18+ (CLI / MCP server require 20+)
-- **Channels**: SMS (190+ countries), WhatsApp, Telegram
+- **Channels**: SMS (158 countries), WhatsApp, Telegram
 - **MyOTP API base**: `https://api.myotp.app`
 - **Auth**: single `X-API-Key` header
 

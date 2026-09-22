@@ -60,7 +60,7 @@
       },
       "id": "5f0a2c1e-7c3b-4d2a-9a61-1a2b3c4d5e02",
       "name": "Send OTP",
-      "type": "n8n-nodes-myotp.myOtp",
+      "type": "@myotp/n8n-nodes-myotp.myOtp",
       "typeVersion": 1,
       "position": [480, -100],
       "credentials": {

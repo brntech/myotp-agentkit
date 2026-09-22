@@ -26,7 +26,7 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 | [`@myotp/mcp`](mcp-server/) | Model Context Protocol server exposing 10 MyOTP tools to MCP clients (Claude Desktop, Cursor, Continue, etc.). Stdio + streamable HTTP. Hosted at [mcp.myotp.app](https://mcp.myotp.app), listed on [Smithery](https://smithery.ai/servers/broadnet/myotpapp). | `npx @myotp/mcp` |
 | [`@myotp/cli`](cli/) | CLI for testing OTP flows from a terminal. `init` saves a key locally, `test`/`verify`/`status` exercise the API. | `npx @myotp/cli init` |
 | [`@myotp/better-auth`](better-auth/) | Drop-in adapter for [Better Auth](https://www.better-auth.com)'s `phoneNumber()` plugin. Twilio-free SMS / WhatsApp / Telegram delivery. | `npm install @myotp/better-auth` |
-| [`n8n-nodes-myotp`](n8n/) | n8n community node: Send, Verify, Extend, Check Status, Account, Usage Report. Header-auth example workflow included. | n8n Settings > Community Nodes > `n8n-nodes-myotp` |
+| [`@myotp/n8n-nodes-myotp`](n8n/) | n8n community node: Send, Verify, Extend, Check Status, Account, Usage Report. Header-auth example workflow included. | n8n Settings > Community Nodes > `@myotp/n8n-nodes-myotp` |
 
 ## Integrations for other platforms
 

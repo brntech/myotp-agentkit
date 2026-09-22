@@ -25,7 +25,7 @@ function makeContext(
 			return name in map ? map[name] : fallback;
 		},
 		continueOnFail: () => opts.continueOnFail ?? false,
-		getNode: () => ({ name: 'MyOTP', type: 'n8n-nodes-myotp.myOtp', typeVersion: 1 }),
+		getNode: () => ({ name: 'MyOTP', type: '@myotp/n8n-nodes-myotp.myOtp', typeVersion: 1 }),
 		helpers: { httpRequestWithAuthentication: request },
 	};
 	return { ctx, request };

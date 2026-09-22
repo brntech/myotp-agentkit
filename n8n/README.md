@@ -1,4 +1,4 @@
-# n8n-nodes-myotp
+# @myotp/n8n-nodes-myotp
 
 An [n8n](https://n8n.io) community node for [MyOTP.App](https://myotp.app). Send one-time passcodes over SMS, WhatsApp and Telegram, verify the code the user typed, and check delivery, from inside a workflow.
 
@@ -8,14 +8,14 @@ One credential (your API key) and one node with six operations. No runtime depen
 
 Two routes, depending on how you run n8n:
 
-- **Self-hosted, as the instance owner or an admin:** go to **Settings > Community Nodes**, choose **Install**, enter `n8n-nodes-myotp` and confirm. The **MyOTP** node then appears in the node panel for everyone on the instance.
+- **Self-hosted, as the instance owner or an admin:** go to **Settings > Community Nodes**, choose **Install**, enter `@myotp/n8n-nodes-myotp` and confirm. The **MyOTP** node then appears in the node panel for everyone on the instance.
 - **n8n Cloud, or self-hosted with verified community nodes enabled:** once this package is verified by n8n, search for **MyOTP** in the node panel and install it from there. Until then, Cloud cannot install it.
 
 Self-hosted from the command line:
 
 ```bash
 cd ~/.n8n/nodes
-npm install n8n-nodes-myotp
+npm install @myotp/n8n-nodes-myotp
 ```
 
 Then restart n8n.

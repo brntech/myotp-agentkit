@@ -188,7 +188,7 @@ check( 'verified fresh', '14155550123', myotp_pv_verified_phone_from( array( 'ph
 check( 'verified claiming reads as unverified', '', myotp_pv_verified_phone_from( array( 'phone' => '1', 'at' => $now - 5, 'state' => 'claiming:1:r' ), $now, 1800 ) );
 $s = new MyOTP_Mem_Store();
 $s->set( 'ver', myotp_pv_json( array( 'phone' => '14155550123', 'at' => $now - 5, 'state' => 'verified' ) ), 1800 );
-check( 'claim with another phone refused', '', myotp_pv_claim_verified( $s, 'ver', '14155559999', 'rA', $now ) );
+check( 'claim with another phone refused', '', myotp_pv_claim_verified( $s, 'ver', '14155550199', 'rA', $now ) );
 check( 'claim with another phone left the record alone', 'verified', json_decode( $s->get( 'ver' ), true )['state'] );
 check( 'first claim wins', '14155550123', myotp_pv_claim_verified( $s, 'ver', '14155550123', 'rA', $now ) );
 check( 'second claim loses', '', myotp_pv_claim_verified( $s, 'ver', '14155550123', 'rB', $now ) );
@@ -199,7 +199,7 @@ check( 'consume twice loses', '', myotp_pv_consume_claim( $s, 'ver', '1415555012
 $s = new MyOTP_Mem_Store();
 $s->set( 'ver', myotp_pv_json( array( 'phone' => '14155550123', 'at' => $now - 5, 'state' => 'verified' ) ), 1800 );
 $s->before_cas = function ( $store ) use ( $now ) {
-	$store->set( 'ver', myotp_pv_json( array( 'phone' => '14155559999', 'at' => $now - 1, 'state' => 'verified' ) ), 1800 );
+	$store->set( 'ver', myotp_pv_json( array( 'phone' => '14155550199', 'at' => $now - 1, 'state' => 'verified' ) ), 1800 );
 };
 check( 'claim race: phone swapped under us, claim fails', '', myotp_pv_claim_verified( $s, 'ver', '14155550123', 'rA', $now ) );
 check( 'claim race: B record untouched', 'verified', json_decode( $s->get( 'ver' ), true )['state'] );
@@ -484,7 +484,7 @@ check( 'cooldown: send refused 429', 429, $r->status );
 check( 'cooldown: message names minutes', 'Too many wrong codes for this number. Try again in 15 minutes.', $r->data['message'] );
 check( 'cooldown: no HTTP call while cooling', 6, count( $GLOBALS['myotp_test']['http_log'] ) );
 myotp_test_http( 200, array( 'message_id' => 'msg-other' ) );
-check( 'cooldown: same visitor, other phone allowed', true, myotp_test_send( '14155550000' )->success );
+check( 'cooldown: same visitor, other phone allowed', true, myotp_test_send( '14155550100' )->success );
 $_COOKIE['myotp_pv_sid'] = str_repeat( 'f', 32 );
 $_SERVER['REMOTE_ADDR']  = '198.51.100.7';
 myotp_test_http( 200, array( 'message_id' => 'msg-victim' ) );
@@ -502,7 +502,7 @@ myotp_test_configure();
 myotp_test_http( 200, array( 'message_id' => 'msg-9' ) );
 myotp_test_send( '14155550123' );
 check( 'count: bad code shape 400', 400, myotp_test_verify( '12' )->status );
-check( 'count: changed number refused', 400, myotp_test_verify( '123456', '14155559999' )->status );
+check( 'count: changed number refused', 400, myotp_test_verify( '123456', '14155550199' )->status );
 check( 'count: mismatch did not consume', array( 0, 0 ), array( myotp_test_pending()['reserved'], myotp_test_pending()['failed'] ) );
 myotp_test_http( 'wp_error', null );
 myotp_test_verify( '123456' );
@@ -665,7 +665,7 @@ check( 'register: other error means no claim', 'verified', myotp_test_register_v
 check( 'register: matching phone passes', array(), myotp_test_register_validate()->get_error_codes() );
 check( 'register: validation claimed the proof', 'claiming:14155550123:' . MyOTP_PV_Session::$request_id, myotp_test_vrec()['state'] );
 $saved_post              = $_POST;
-$_POST['myotp_pv_phone'] = '14155550000';
+$_POST['myotp_pv_phone'] = '14155550100';
 myotp_test_do_action( 'register_new_user', 45 );
 check( 'register: other posted phone not stamped', '', get_user_meta( 45, 'myotp_verified_phone', true ) );
 $_POST = $saved_post;
@@ -760,7 +760,7 @@ check( 'checkout: third checkout on a consumed proof is told to verify again', a
 myotp_test_configure();
 MyOTP_PV_Session::set_verified( '14155550123', null );
 MyOTP_PV_Store::$instance->before_cas = function ( $store ) {
-	$store->set( 'verified_c_' . str_repeat( 'a', 32 ), myotp_pv_json( array( 'phone' => '14155559999', 'at' => time() - 1, 'state' => 'verified' ) ), 1800 );
+	$store->set( 'verified_c_' . str_repeat( 'a', 32 ), myotp_pv_json( array( 'phone' => '14155550199', 'at' => time() - 1, 'state' => 'verified' ) ), 1800 );
 };
 check( 'checkout claim race: phone swapped, validation refuses', array( 'myotp_pv_claimed' ), myotp_test_checkout_validate( '+14155550123' )->get_error_codes() );
 check( 'checkout claim race: other phone record untouched', 'verified', myotp_test_vrec()['state'] );
@@ -839,6 +839,9 @@ check( 'payload: telegram validity clamped to 3600', 3600, myotp_pv_generate_pay
 check( 'payload: validity below 60 raised', 60, myotp_pv_generate_payload( '1', array_merge( $d, array( 'otp_validity' => 10 ) ), false )['otp_validity'] );
 check( 'sanitize: validity above 14400 capped at 14400', 14400, myotp_pv_sanitize_options( array( 'otp_validity' => 86400 ), array() )['otp_validity'] );
 check( 'sanitize: validity below 60 falls back to 300', 300, myotp_pv_sanitize_options( array( 'otp_validity' => 10 ), array() )['otp_validity'] );
+check( 'sanitize: telegram 7200 saved as 3600', 3600, myotp_pv_sanitize_options( array( 'channel' => 'telegram', 'otp_validity' => 7200 ), array() )['otp_validity'] );
+check( 'sanitize: switching to telegram caps stored 7200', 3600, myotp_pv_sanitize_options( array( 'channel' => 'telegram' ), array( 'otp_validity' => 7200 ) )['otp_validity'] );
+check( 'sanitize: sms 7200 kept', 7200, myotp_pv_sanitize_options( array( 'channel' => 'sms', 'otp_validity' => 7200 ), array() )['otp_validity'] );
 // The pending record lives exactly as long as the validity that was sent.
 foreach ( array( array( 'telegram', 7200, 3600 ), array( 'sms', 86400, 14400 ), array( 'whatsapp', 600, 600 ) ) as $case ) {
 	myotp_test_configure();
@@ -857,6 +860,12 @@ ob_start();
 MyOTP_PV_Settings::render();
 $settings_html = ob_get_clean();
 check( 'settings: legacy validity shown capped', true, false !== strpos( $settings_html, '[otp_validity]" value="14400"' ) );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['channel']      = 'telegram';
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['otp_validity'] = 7200;
+ob_start();
+MyOTP_PV_Settings::render();
+$settings_html = ob_get_clean();
+check( 'settings: telegram 7200 shown as 3600', true, false !== strpos( $settings_html, '[otp_validity]" value="3600"' ) );
 check( 'sanitize: validity 14400 kept', 14400, myotp_pv_sanitize_options( array( 'otp_validity' => 14400 ), array() )['otp_validity'] );
 
 // WordPress.org directory rules: direct-access guard, readme headers.

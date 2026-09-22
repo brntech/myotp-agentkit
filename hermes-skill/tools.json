@@ -22,7 +22,7 @@
               "telegram"
             ],
             "default": "sms",
-            "description": "Delivery channel. 'sms' (default) works in 158 countries. 'whatsapp' is best for India, Brazil, Indonesia, Mexico, Nigeria, Turkey. 'telegram' suits privacy-focused users. Same API for all three."
+            "description": "Delivery channel. 'sms' (default) works in 190+ countries. 'whatsapp' is best for India, Brazil, Indonesia, Mexico, Nigeria, Turkey. 'telegram' suits privacy-focused users. Same API for all three."
           },
           "otp_length": {
             "type": "integer",

@@ -1,6 +1,6 @@
 {
   "name": "@myotp/n8n-nodes-myotp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "n8n community node for MyOTP.App. Send and verify one-time passcodes over SMS, WhatsApp and Telegram.",
   "license": "MIT",
   "homepage": "https://myotp.app",

@@ -83,18 +83,8 @@ class MyOTP_PV_Api {
 	 * @return array
 	 */
 	public static function generate( $phone, $force = false ) {
-		$options = myotp_pv_get_options();
-		$payload = array(
-			'phone_number' => $phone,
-			'otp_length'   => (int) $options['otp_length'],
-			'otp_validity' => (int) $options['otp_validity'],
-			'channel'      => $options['channel'],
-			'force_send'   => (bool) $force,
-		);
-		if ( '' !== $options['brand'] ) {
-			$payload['brand'] = $options['brand'];
-		}
-		$result = self::post( '/generate_otp', $payload );
+		$payload = myotp_pv_generate_payload( $phone, myotp_pv_get_options(), $force );
+		$result  = self::post( '/generate_otp', $payload );
 		if ( $result['ok'] && ! myotp_pv_is_send_body( $result['body'] ) ) {
 			$result['ok']      = false;
 			$result['message'] = __( 'The verification service gave an unexpected answer. Try again.', 'myotp-phone-verification' );

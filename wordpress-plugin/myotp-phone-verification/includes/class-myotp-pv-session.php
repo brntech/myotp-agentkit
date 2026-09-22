@@ -111,13 +111,12 @@ class MyOTP_PV_Session {
 	}
 
 	/**
-	 * Pending record lifetime: the configured code validity, capped at a day.
+	 * Pending record lifetime: the code validity sent to the API.
 	 *
 	 * @return int
 	 */
 	public static function pending_ttl() {
-		$o = myotp_pv_get_options();
-		return min( 86400, max( 60, (int) $o['otp_validity'] ) );
+		return myotp_pv_effective_validity( myotp_pv_get_options() );
 	}
 
 	/**

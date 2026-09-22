@@ -1,8 +1,8 @@
 === MyOTP Phone Verification ===
-Contributors: myotp
+Contributors: rayasoren
 Tags: otp, sms verification, phone verification, woocommerce, whatsapp
 Requires at least: 6.0
-Tested up to: 6.6
+Tested up to: 7.1
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPLv2 or later
@@ -40,7 +40,7 @@ This plugin sends the phone number a visitor enters to the MyOTP.App API at http
 = Data stored on your site =
 
 * A cookie `myotp_pv_sid` (random id, one day) so a guest's verification can be tied to their browser.
-* Rows in the options table (`myotp_pv_kv_` prefix, not autoloaded): rate-limit counters (a row lives for one window after the last send it counted: 10 minutes, site-wide 1 hour), the pending number with its code reference and attempt count (kept for the configured code validity, at most 24 hours), a 15-minute per-visitor cooldown row after five wrong codes, and the verified number (30 minutes). Expired rows are removed on the next read of that row and by a daily WP-Cron sweep (`myotp_pv_sweep`). WP-Cron runs on page visits, so on a quiet site the sweep can run later than scheduled.
+* Rows in the options table (`myotp_pv_kv_` prefix, not autoloaded): rate-limit counters (a row lives for one window after the last send it counted: 10 minutes, site-wide 1 hour), the pending number with its code reference and attempt count (kept for the configured code validity, at most 4 hours), a 15-minute per-visitor cooldown row after five wrong codes, and the verified number (30 minutes). Expired rows are removed on the next read of that row and by a daily WP-Cron sweep (`myotp_pv_sweep`). WP-Cron runs on page visits, so on a quiet site the sweep can run later than scheduled.
 * Order meta `_myotp_verified_phone` on each verified WooCommerce order.
 * User meta `myotp_verified_phone` on each account registered through the verified form.
 

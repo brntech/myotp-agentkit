@@ -398,6 +398,8 @@ $r = myotp_test_send( '+1 (415) 555-0123' );
 check( 'send: success', true, $r->success );
 check( 'send: X-API-Key header', 'abcdefghijklmnopqrstuvwxyz012345', $GLOBALS['myotp_test']['http_log'][0]['args']['headers']['X-API-Key'] );
 check( 'send: first attempt force_send false', false, myotp_test_last_body()['force_send'] );
+check( 'send: validity 7200 is sent', 7200, myotp_test_last_body()['otp_validity'] );
+check( 'send: default length is not sent', false, array_key_exists( 'otp_length', myotp_test_last_body() ) );
 check( 'send: pending stored with message id', 'msg-1', myotp_test_pending()['message_id'] );
 check( 'send: pending expiry equals validity', true, abs( myotp_test_pending()['exp'] - ( time() + 7200 ) ) < 5 );
 check( 'send: site counter taken', 1, myotp_test_counter( 'send_site' ) );
@@ -820,6 +822,56 @@ foreach ( array_merge( glob( $src_dir . '/*.php' ), glob( $src_dir . '/includes/
 	}
 }
 check( 'pot: every source string present', array(), array_values( array_unique( $missing ) ) );
+
+// generate_otp body: gated fields only when they differ from the API default.
+$d  = myotp_pv_default_options();
+$pl = myotp_pv_generate_payload( '14155550123', $d, false );
+check( 'payload: defaults send no otp_length', false, array_key_exists( 'otp_length', $pl ) );
+check( 'payload: defaults send no otp_validity', false, array_key_exists( 'otp_validity', $pl ) );
+check( 'payload: defaults send no brand', false, array_key_exists( 'brand', $pl ) );
+check( 'payload: phone, channel, force', array( '14155550123', 'sms', true ), array( $pl['phone_number'], $pl['channel'], myotp_pv_generate_payload( '14155550123', $d, true )['force_send'] ) );
+$pl = myotp_pv_generate_payload( '14155550123', array_merge( $d, array( 'otp_length' => 4, 'otp_validity' => 600, 'brand' => 'Shop' ) ), false );
+check( 'payload: custom length sent', 4, $pl['otp_length'] );
+check( 'payload: custom validity sent', 600, $pl['otp_validity'] );
+check( 'payload: brand sent', 'Shop', $pl['brand'] );
+check( 'payload: validity above API max clamped', 14400, myotp_pv_generate_payload( '1', array_merge( $d, array( 'otp_validity' => 86400 ) ), false )['otp_validity'] );
+check( 'payload: telegram validity clamped to 3600', 3600, myotp_pv_generate_payload( '1', array_merge( $d, array( 'channel' => 'telegram', 'otp_validity' => 7200 ) ), false )['otp_validity'] );
+check( 'payload: validity below 60 raised', 60, myotp_pv_generate_payload( '1', array_merge( $d, array( 'otp_validity' => 10 ) ), false )['otp_validity'] );
+check( 'sanitize: validity above 14400 falls back to 300', 300, myotp_pv_sanitize_options( array( 'otp_validity' => 86400 ), array() )['otp_validity'] );
+check( 'sanitize: validity 14400 kept', 14400, myotp_pv_sanitize_options( array( 'otp_validity' => 14400 ), array() )['otp_validity'] );
+
+// WordPress.org directory rules: direct-access guard, readme headers.
+$unguarded_files = array();
+foreach ( array_merge( glob( $src_dir . '/*.php' ), glob( $src_dir . '/includes/*.php' ) ) as $f ) {
+	$head = substr( file_get_contents( $f ), 0, 2000 );
+	if ( ! preg_match( "/if \\( ! defined\\( '(ABSPATH|WP_UNINSTALL_PLUGIN)' \\) \\) \\{\\s*exit;/", $head ) ) {
+		$unguarded_files[] = basename( $f );
+	}
+}
+check( 'wporg: every PHP file exits on direct access', array(), $unguarded_files );
+$all_src = '';
+foreach ( array_merge( glob( $src_dir . '/*.php' ), glob( $src_dir . '/includes/*.php' ) ) as $f ) {
+	$all_src .= file_get_contents( $f );
+}
+check( 'wporg: no load_plugin_textdomain call', false, (bool) preg_match( '/\bload_plugin_textdomain\s*\(/', $all_src ) );
+$readme = file_get_contents( $src_dir . '/readme.txt' );
+$rh     = function ( $name ) use ( $readme ) {
+	return preg_match( '/^' . preg_quote( $name, '/' ) . ':\s*(.+?)\s*$/mi', $readme, $mm ) ? $mm[1] : null;
+};
+preg_match( '/^\s*\*\s*Version:\s*(\S+)/m', $header, $mv );
+preg_match( '/^\s*\*\s*Requires PHP:\s*(\S+)/m', $header, $mp );
+preg_match( '/^\s*\*\s*Requires at least:\s*(\S+)/m', $header, $mr );
+check( 'readme: stable tag equals plugin version', $mv[1], $rh( 'Stable tag' ) );
+check( 'readme: plugin version equals MYOTP_PV_VERSION', MYOTP_PV_VERSION, $mv[1] );
+check( 'readme: contributors', 'rayasoren', $rh( 'Contributors' ) );
+check( 'readme: requires PHP matches header', $mp[1], $rh( 'Requires PHP' ) );
+check( 'readme: requires at least matches header', $mr[1], $rh( 'Requires at least' ) );
+check( 'readme: license', 'GPLv2 or later', $rh( 'License' ) );
+check( 'readme: tested up to is a version', true, (bool) preg_match( '/^\d+\.\d+(\.\d+)?$/', (string) $rh( 'Tested up to' ) ) );
+check( 'readme: at most 5 tags', true, count( array_filter( array_map( 'trim', explode( ',', (string) $rh( 'Tags' ) ) ) ) ) <= 5 );
+preg_match( '/^=== .+ ===\R(?:[^\r\n]+\R)+\R([^\r\n]+)/', $readme, $ms );
+check( 'readme: short description at most 150 chars', true, isset( $ms[1] ) && strlen( $ms[1] ) <= 150 );
+check( 'readme: changelog has the stable version', true, false !== strpos( $readme, '= ' . $mv[1] . ' =' ) );
 
 echo "\n$count checks, $failures failures\n";
 exit( $failures > 0 ? 1 : 0 );

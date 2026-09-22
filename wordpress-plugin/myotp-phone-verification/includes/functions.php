@@ -1,10 +1,14 @@
 <?php
 /**
  * Pure helper functions. No WordPress dependencies so tests/run.php can
- * load this file in plain PHP.
+ * load this file in plain PHP (the test stubs define ABSPATH).
  *
  * @package myotp-phone-verification
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 if ( ! defined( 'MYOTP_PV_KEY_MASK' ) ) {
 	define( 'MYOTP_PV_KEY_MASK', '********' );
@@ -548,6 +552,50 @@ function myotp_pv_is_send_body( $body ) {
 }
 
 /**
+ * Code validity in seconds as the API will accept it for the configured
+ * channel: 60 to 14400, and at most 3600 on Telegram.
+ *
+ * @param array $options Plugin options.
+ * @return int
+ */
+function myotp_pv_effective_validity( array $options ) {
+	$max = ( isset( $options['channel'] ) && 'telegram' === $options['channel'] ) ? 3600 : 14400;
+	$val = isset( $options['otp_validity'] ) ? (int) $options['otp_validity'] : 300;
+	return min( $max, max( 60, $val ) );
+}
+
+/**
+ * Body for POST /generate_otp. A custom code length or validity needs a
+ * plan feature on the MyOTP account, and the API refuses the field when it
+ * is present without one, so each is sent only when it differs from the
+ * API default (6 digits, 300 seconds).
+ *
+ * @param string $phone   Digits only.
+ * @param array  $options Plugin options.
+ * @param bool   $force   Pass force_send true.
+ * @return array
+ */
+function myotp_pv_generate_payload( $phone, array $options, $force ) {
+	$payload = array(
+		'phone_number' => (string) $phone,
+		'channel'      => isset( $options['channel'] ) ? (string) $options['channel'] : 'sms',
+		'force_send'   => (bool) $force,
+	);
+	$length = isset( $options['otp_length'] ) ? (int) $options['otp_length'] : 6;
+	if ( 6 !== $length ) {
+		$payload['otp_length'] = $length;
+	}
+	$validity = myotp_pv_effective_validity( $options );
+	if ( 300 !== $validity ) {
+		$payload['otp_validity'] = $validity;
+	}
+	if ( isset( $options['brand'] ) && '' !== $options['brand'] ) {
+		$payload['brand'] = (string) $options['brand'];
+	}
+	return $payload;
+}
+
+/**
  * Default option values.
  *
  * @return array
@@ -601,7 +649,7 @@ function myotp_pv_sanitize_options( $input, $current = array() ) {
 
 	if ( isset( $input['otp_validity'] ) ) {
 		$val                 = (int) $input['otp_validity'];
-		$out['otp_validity'] = ( $val >= 60 && $val <= 86400 ) ? $val : 300;
+		$out['otp_validity'] = ( $val >= 60 && $val <= 14400 ) ? $val : 300;
 	}
 
 	if ( array_key_exists( 'brand', $input ) ) {

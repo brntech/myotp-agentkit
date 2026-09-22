@@ -297,6 +297,12 @@ function check_ajax_referer( $action, $field ) {
 	return 1;
 }
 function current_user_can( $cap ) { return $GLOBALS['myotp_test']['can_manage']; }
+function settings_errors( $s = '' ) {}
+function settings_fields( $g ) {}
+function submit_button( $t = null ) { echo '<input type="submit" />'; }
+function selected( $a, $b = true, $echo = true ) { $r = ( (string) $a === (string) $b ) ? ' selected="selected"' : ''; if ( $echo ) { echo $r; } return $r; }
+function checked( $a, $b = true, $echo = true ) { $r = ( (string) $a === (string) $b ) ? ' checked="checked"' : ''; if ( $echo ) { echo $r; } return $r; }
+function disabled( $a, $b = true, $echo = true ) { $r = ( (string) $a === (string) $b ) ? ' disabled="disabled"' : ''; if ( $echo ) { echo $r; } return $r; }
 function is_user_logged_in() { return $GLOBALS['myotp_test']['logged_in']; }
 function get_current_user_id() { return $GLOBALS['myotp_test']['logged_in'] ? 7 : 0; }
 function wp_generate_password( $len, $special ) { return bin2hex( random_bytes( (int) ( $len / 2 ) ) ); }

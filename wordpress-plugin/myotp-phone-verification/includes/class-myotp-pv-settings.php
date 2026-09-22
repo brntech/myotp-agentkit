@@ -181,7 +181,7 @@ class MyOTP_PV_Settings {
 						<th scope="row"><label for="myotp_pv_otp_validity"><?php esc_html_e( 'Code validity (seconds)', 'myotp-phone-verification' ); ?></label></th>
 						<td>
 							<input type="number" id="myotp_pv_otp_validity" min="60" max="14400" step="1" class="small-text"
-								name="<?php echo esc_attr( $name ); ?>[otp_validity]" value="<?php echo esc_attr( $o['otp_validity'] ); ?>" />
+								name="<?php echo esc_attr( $name ); ?>[otp_validity]" value="<?php echo esc_attr( myotp_pv_effective_validity( $o ) ); ?>" />
 							<p class="description"><?php esc_html_e( '60 to 14400, at most 3600 on Telegram. A value other than 300 needs a MyOTP plan with custom code expiry.', 'myotp-phone-verification' ); ?></p>
 						</td>
 					</tr>

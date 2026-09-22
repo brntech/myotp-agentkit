@@ -837,7 +837,26 @@ check( 'payload: brand sent', 'Shop', $pl['brand'] );
 check( 'payload: validity above API max clamped', 14400, myotp_pv_generate_payload( '1', array_merge( $d, array( 'otp_validity' => 86400 ) ), false )['otp_validity'] );
 check( 'payload: telegram validity clamped to 3600', 3600, myotp_pv_generate_payload( '1', array_merge( $d, array( 'channel' => 'telegram', 'otp_validity' => 7200 ) ), false )['otp_validity'] );
 check( 'payload: validity below 60 raised', 60, myotp_pv_generate_payload( '1', array_merge( $d, array( 'otp_validity' => 10 ) ), false )['otp_validity'] );
-check( 'sanitize: validity above 14400 falls back to 300', 300, myotp_pv_sanitize_options( array( 'otp_validity' => 86400 ), array() )['otp_validity'] );
+check( 'sanitize: validity above 14400 capped at 14400', 14400, myotp_pv_sanitize_options( array( 'otp_validity' => 86400 ), array() )['otp_validity'] );
+check( 'sanitize: validity below 60 falls back to 300', 300, myotp_pv_sanitize_options( array( 'otp_validity' => 10 ), array() )['otp_validity'] );
+// The pending record lives exactly as long as the validity that was sent.
+foreach ( array( array( 'telegram', 7200, 3600 ), array( 'sms', 86400, 14400 ), array( 'whatsapp', 600, 600 ) ) as $case ) {
+	myotp_test_configure();
+	$GLOBALS['myotp_test']['options']['myotp_pv_options']['channel']      = $case[0];
+	$GLOBALS['myotp_test']['options']['myotp_pv_options']['otp_validity'] = $case[1];
+	myotp_test_http( 200, array( 'message_id' => 'msg-ttl', 'status' => 'accepted' ) );
+	myotp_test_send( '14155550123' );
+	check( "pending ttl: {$case[0]} {$case[1]} sent as {$case[2]}", $case[2], myotp_test_last_body()['otp_validity'] );
+	check( "pending ttl: {$case[0]} {$case[1]} expires after {$case[2]}", true, abs( myotp_test_pending()['exp'] - ( time() + $case[2] ) ) < 5 );
+}
+// A stored value above the new ceiling is shown as the value actually sent.
+myotp_test_configure();
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['otp_validity'] = 86400;
+$GLOBALS['myotp_test']['can_manage'] = true;
+ob_start();
+MyOTP_PV_Settings::render();
+$settings_html = ob_get_clean();
+check( 'settings: legacy validity shown capped', true, false !== strpos( $settings_html, '[otp_validity]" value="14400"' ) );
 check( 'sanitize: validity 14400 kept', 14400, myotp_pv_sanitize_options( array( 'otp_validity' => 14400 ), array() )['otp_validity'] );
 
 // WordPress.org directory rules: direct-access guard, readme headers.

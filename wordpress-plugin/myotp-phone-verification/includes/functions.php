@@ -649,7 +649,7 @@ function myotp_pv_sanitize_options( $input, $current = array() ) {
 
 	if ( isset( $input['otp_validity'] ) ) {
 		$val                 = (int) $input['otp_validity'];
-		$out['otp_validity'] = ( $val >= 60 && $val <= 14400 ) ? $val : 300;
+		$out['otp_validity'] = $val >= 60 ? min( 14400, $val ) : 300;
 	}
 
 	if ( array_key_exists( 'brand', $input ) ) {

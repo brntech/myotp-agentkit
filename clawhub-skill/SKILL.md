@@ -4,7 +4,7 @@ description: Add SMS, WhatsApp, or Telegram OTP / 2FA / MFA / phone verification
 license: MIT
 metadata:
   author: BroadNet Technologies
-  version: 1.0.4
+  version: 1.0.5
   homepage: https://myotp.app
   openclaw:
     requires:

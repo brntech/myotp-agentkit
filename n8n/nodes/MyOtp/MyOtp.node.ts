@@ -88,7 +88,7 @@ export class MyOtp implements INodeType {
 				type: 'string',
 				required: true,
 				default: '',
-				placeholder: '19876543210',
+				placeholder: '14155551234',
 				description:
 					'Destination number in E.164 order, digits only, country code first, no plus sign',
 				displayOptions: { show: { operation: ['sendOtp'] } },

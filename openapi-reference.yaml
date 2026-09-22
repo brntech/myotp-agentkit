@@ -44,7 +44,7 @@ paths:
               properties:
                 phone_number:
                   type: string
-                  default: 19876543210
+                  default: 14155551234
                   pattern: "^[1-9][0-9]{6,14}$"
                   description: Phone number to send the OTP to. E.164 format. Include country code without any prefixes.
                 otp_length:
@@ -1031,7 +1031,7 @@ components:
         message_id: 8f14e45f-ea0d-4d1b-9c6a-2b7c1f0a9e33
         status: delivered
         channel: sms
-        phone_number: "19876543210"
+        phone_number: "14155551234"
         country: USA
         occurred_at: "2026-09-02T03:02:01Z"
     AgentError:

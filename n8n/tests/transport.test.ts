@@ -8,20 +8,20 @@ const BASE_URL = 'https://api.myotp.app';
 describe('buildRequest', () => {
 	it('sendOtp: phone number and channel only, optional fields omitted', () => {
 		const req = buildRequest('sendOtp', {
-			phone_number: '19876543210',
+			phone_number: '14155551234',
 			channel: 'sms',
 			additionalFields: {},
 		});
 		expect(req).toEqual({
 			method: 'POST',
 			url: `${BASE_URL}/generate_otp`,
-			body: { phone_number: '19876543210', channel: 'sms' },
+			body: { phone_number: '14155551234', channel: 'sms' },
 		});
 	});
 
 	it('sendOtp: passes every optional field, force_send as a string, return_otp as a boolean', () => {
 		const req = buildRequest('sendOtp', {
-			phone_number: '19876543210',
+			phone_number: '14155551234',
 			channel: 'whatsapp',
 			additionalFields: {
 				otp_length: 4,
@@ -33,7 +33,7 @@ describe('buildRequest', () => {
 			},
 		});
 		expect(req.body).toEqual({
-			phone_number: '19876543210',
+			phone_number: '14155551234',
 			channel: 'whatsapp',
 			otp_length: 4,
 			otp_validity: 600,
@@ -46,7 +46,7 @@ describe('buildRequest', () => {
 
 	it('sendOtp: return_otp true stays a boolean', () => {
 		const req = buildRequest('sendOtp', {
-			phone_number: '19876543210',
+			phone_number: '14155551234',
 			additionalFields: { return_otp: true },
 		});
 		expect(req.body?.return_otp).toBe(true);
@@ -54,11 +54,11 @@ describe('buildRequest', () => {
 
 	it('sendOtp: drops empty strings so the API applies its defaults', () => {
 		const req = buildRequest('sendOtp', {
-			phone_number: '19876543210',
+			phone_number: '14155551234',
 			channel: 'telegram',
 			additionalFields: { brand: '', otp_length: 8 },
 		});
-		expect(req.body).toEqual({ phone_number: '19876543210', channel: 'telegram', otp_length: 8 });
+		expect(req.body).toEqual({ phone_number: '14155551234', channel: 'telegram', otp_length: 8 });
 	});
 
 	it('sendOtp: rejects a missing phone number with a ValidationError', () => {
@@ -75,9 +75,9 @@ describe('buildRequest', () => {
 		expect(
 			buildRequest('verifyOtp', {
 				otp: '123456',
-				additionalFields: { phone_number: '19876543210', message_id: 'abc' },
+				additionalFields: { phone_number: '14155551234', message_id: 'abc' },
 			}).body,
-		).toEqual({ otp: '123456', phone_number: '19876543210', message_id: 'abc' });
+		).toEqual({ otp: '123456', phone_number: '14155551234', message_id: 'abc' });
 	});
 
 	it('verifyOtp: rejects a missing otp', () => {

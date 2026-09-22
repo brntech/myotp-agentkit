@@ -245,7 +245,7 @@ export function buildCollection(spec) {
     variable: [
       { key: "base_url", value: baseUrl, type: "string" },
       { key: "api_key", value: "", type: "string" },
-      { key: "phone_number", value: "19876543210", type: "string" },
+      { key: "phone_number", value: "14155551234", type: "string" },
       { key: "message_id", value: "", type: "string" },
       { key: "otp", value: "", type: "string" },
     ],
@@ -260,7 +260,7 @@ export function buildEnvironment(spec) {
     values: [
       { key: "base_url", value: baseUrl, type: "default", enabled: true },
       { key: "api_key", value: "", type: "secret", enabled: true },
-      { key: "phone_number", value: "19876543210", type: "default", enabled: true },
+      { key: "phone_number", value: "14155551234", type: "default", enabled: true },
       // message_id and otp are deliberately absent: see SCRIPT_SET_VARIABLES.
     ],
     _postman_variable_scope: "environment",

@@ -256,11 +256,56 @@ test("date-time outputs are parsed and declared as date", () => {
     const api = loadJson(join(moduleDir(name), "api.imljson"));
     const iface = loadJson(join(moduleDir(name), "interface.imljson"));
     for (const f of fields) {
-      assert.match(api.response.output[f], /^\{\{if\(body\.\w+, parseDate\(body\.\w+, 'YYYY-MM-DDTHH:mm:ssZ'\), null\)\}\}$/, `${name}.${f}`);
+      assert.match(api.response.output[f], /^\{\{if\(body\.\w+, parseDate\(body\.\w+, 'YYYY-MM-DDTHH:mm:ss', 'UTC'\), null\)\}\}$/, `${name}.${f}`);
       assert.deepEqual(ifArities(api.response.output[f]), [3]);
       assert.equal(iface.find((x) => x.name === f).type, "date", `${name}.${f} interface type`);
     }
   }
+});
+
+test("gateway errors retry on read modules and never on Send OTP", () => {
+  const base = loadJson(join(APP_DIR, "base.imljson")).response.error;
+  for (const c of ["500", "502", "503", "504"]) assert.equal(base[c]?.type, "ConnectionError", `base ${c}`);
+  // A repeat is unsafe after a lost reply: a send may have gone out, a verified code is deleted,
+  // an extension adds twice, and the universal module can POST any of them.
+  for (const name of ["sendOtp", "verifyOtp", "extendOtp", "makeApiCall"]) {
+    const err = loadJson(join(moduleDir(name), "api.imljson")).response.error;
+    for (const c of ["500", "502", "503", "504"]) {
+      assert.equal(err?.[c]?.type, "RuntimeError", `${name} ${c}`);
+      assert.match(err[c].message, /does not retry/, `${name} ${c} message`);
+    }
+  }
+  for (const name of ["checkOtpStatus", "getAccount"]) {
+    assert.equal(loadJson(join(moduleDir(name), "api.imljson")).response?.error, undefined, `${name} keeps the base retry`);
+  }
+});
+
+test("verifyOtp outputs the failure reason", () => {
+  const api = loadJson(join(moduleDir("verifyOtp"), "api.imljson"));
+  assert.equal(api.response.output.reason, "{{body.reason}}");
+  assert.deepEqual(responseProps("/verify_otp").reason.enum, ["invalid", "expired", "not found"]);
+});
+
+test("module and parameter labels are sentence case", () => {
+  const sentence = (label, where) => {
+    for (const w of label.split(" ").slice(1)) assert.ok(w === w.toLowerCase() || /^(OTP|API|URL|ID)$/.test(w), `${where}: "${label}"`);
+  };
+  const walk = (params, where) => {
+    for (const p of params ?? []) {
+      sentence(p.label, `${where}.${p.name}`);
+      walk(p.spec, `${where}.${p.name}`);
+    }
+  };
+  for (const name of readdirSync(join(APP_DIR, "modules"))) {
+    sentence(loadJson(join(moduleDir(name), "metadata.json")).label, name);
+    walk(loadJson(join(moduleDir(name), "expect.imljson")), name);
+  }
+});
+
+test("sendOtp: otp_code pattern equals the spec", () => {
+  const p = loadJson(join(moduleDir("sendOtp"), "expect.imljson")).find((x) => x.name === "otp_code");
+  assert.equal(p.validate.pattern, requestProps("/generate_otp").properties.otp_code.pattern);
+  assert.ok(!p.required);
 });
 
 test("every module folder is listed in groups", () => {

@@ -8,16 +8,35 @@
     "otp_validity": "{{parameters.otp_validity}}",
     "template_order": "{{parameters.template_order}}",
     "brand": "{{parameters.brand}}",
+    "otp_code": "{{parameters.otp_code}}",
     "force_send": "{{parameters.force_send}}",
     "return_otp": "{{parameters.return_otp}}"
   },
   "response": {
+    "error": {
+      "500": {
+        "type": "RuntimeError",
+        "message": "[500] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The code may have gone out, so this module does not retry. Sending again to the same number without Force send answers 409 while the earlier code is unexpired."
+      },
+      "502": {
+        "type": "RuntimeError",
+        "message": "[502] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The code may have gone out, so this module does not retry. Sending again to the same number without Force send answers 409 while the earlier code is unexpired."
+      },
+      "503": {
+        "type": "RuntimeError",
+        "message": "[503] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The code may have gone out, so this module does not retry. Sending again to the same number without Force send answers 409 while the earlier code is unexpired."
+      },
+      "504": {
+        "type": "RuntimeError",
+        "message": "[504] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The code may have gone out, so this module does not retry. Sending again to the same number without Force send answers 409 while the earlier code is unexpired."
+      }
+    },
     "output": {
       "message_id": "{{body.message_id}}",
       "status": "{{body.status}}",
       "message": "{{body.message}}",
-      "date_sent": "{{if(body.date_sent, parseDate(body.date_sent, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}",
-      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}",
+      "date_sent": "{{if(body.date_sent, parseDate(body.date_sent, 'YYYY-MM-DDTHH:mm:ss', 'UTC'), null)}}",
+      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ss', 'UTC'), null)}}",
       "cost": "{{body.cost}}",
       "otp": "{{body.otp}}"
     }

@@ -18,6 +18,13 @@ info:
     HMAC-SHA256 with your base64-decoded signing secret, sent in the
     webhook-signature header as "v1,<base64>". Non-2xx responses are retried
     5 times at 5, 10, 20, 40 and 60 seconds. Endpoints must be https.
+
+
+    Rate limit: 100 requests a minute per client IP address, burst 100, counted
+    across every endpoint together. Over it the answer is 429 with Retry-After
+    set to 60. X-RateLimit-Limit on every response advertises the ceiling that
+    applies to you; write to support@myotp.app with your calling addresses and
+    your expected peak to have it raised.
 servers:
   - url: https://api.myotp.app
     description: Production
@@ -76,12 +83,13 @@ paths:
                   default: 1
                   minimum: 1
                   maximum: 99
-                  description: >
-                    Order of the template to be used for the OTP message, defaults to 1 (12 for WhatsApp).
-                    WhatsApp has four templates: 12 (English, 5-minute code), 13 (English, 10 minutes),
-                    14 (Spanish es_MX, 5 minutes) and 15 (Spanish es_MX, 10 minutes).
-                    On WhatsApp the template's own expiry overrides otp_validity.
-                    Requires the ACCESS_TO_TEMPLATES entitlement (Business plan and up).
+                  description: >-
+                    Order of the template to be used for the OTP message, defaults to 1
+                    (12 for WhatsApp). WhatsApp templates: 12 = English, 5-minute code;
+                    13 = English, 10 minutes; 14 = Spanish (es_MX), 5 minutes;
+                    15 = Spanish (es_MX), 10 minutes. The template's expiry overrides
+                    otp_validity on WhatsApp. Requires the ACCESS_TO_TEMPLATES
+                    entitlement (Business and Enterprise plans and the free trial).
                 otp_code:
                   type: string
                   pattern: "^[0-9]{3,8}$"
@@ -148,10 +156,17 @@ paths:
           description: Bad request due to invalid input parameters.
         '401':
           description: Unauthorized due to missing or invalid API key.
-        '402':
-          description: Low balance or payment is required.
+        '403':
+          description: >-
+            Refused. "Insufficient balance" when the balance cannot cover this send
+            (top up, then retry), "User is not active" when the subscription is
+            paused, the calling IP is not on your account's allowlist, or a
+            parameter your plan does not include (otp_length, otp_validity,
+            template_order: Business and Enterprise plans and the free trial).
         '409':
           description: Conflict, OTP already active.
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '500':
           description: Internal Server Error
 
@@ -205,8 +220,14 @@ paths:
                     enum:
                       - success
                       - failed
-                      - expired
                     description: Status of the OTP verification
+                  reason:
+                    type: string
+                    enum:
+                      - invalid
+                      - expired
+                      - not found
+                    description: Present when status is failed. An expired code answers status failed with reason expired.
                   message:
                     type: string
                     description: Message describing the status of the OTP verification
@@ -214,6 +235,13 @@ paths:
           description: Bad request
         '401':
           description: Unauthorized
+        '403':
+          description: >-
+            "User is not active" when the subscription is paused, or the calling IP
+            is not on your account's allowlist. Never refused for balance: codes
+            already sent verify at zero balance.
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '500':
           description: Internal Server Error
   /extend_otp:
@@ -272,6 +300,8 @@ paths:
           description: Unauthorized
         '404':
           description: OTP message_id not found
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /report:
     post:
       summary: Get Transactions Report
@@ -354,6 +384,8 @@ paths:
           description: Bad request
         '401':
           description: Unauthorized
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /check_otp_status:
     post:
       operationId: check_otp_status_endpoint
@@ -464,7 +496,9 @@ paths:
         '401':
           description: Unauthorized
         '403':
-          description: The calling IP is not on this key's allowlist
+          description: The calling IP is not on your account's allowlist
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /me:
     get:
@@ -493,7 +527,9 @@ paths:
         '401':
           description: Unauthorized due to missing or invalid API key.
         '403':
-          description: Calling IP address is not on this key's allowlist.
+          description: Calling IP address is not on your account's allowlist.
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v1/topup/quote:
     get:
@@ -540,6 +576,8 @@ paths:
                 error:
                   http_code: 400
                   message: credits must be an integer between 25 and 50000
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v1/topup:
     post:
@@ -694,6 +732,8 @@ paths:
                 challengeId: ch_01J9X2K4M6P8R0T2V4W6Y8Z0AB
         '403':
           description: The account is not active.
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '500':
           description: >
             The payment settled but crediting failed. Nothing is lost: write to
@@ -794,7 +834,22 @@ paths:
                   http_code: 409
                   message: an account with this email already exists
         '429':
-          description: Too many registrations from this IP address (5 per IP per 24 hours).
+          description: >
+            Too many requests. Either the registration limit (5 per IP address
+            per 24 hours) or the API-wide edge limit (100 requests a minute per
+            IP address, 500 for raised accounts). Retry-After carries the
+            seconds to wait.
+          headers:
+            Retry-After:
+              description: Seconds to wait before repeating the request.
+              schema:
+                type: integer
+                example: 60
+            X-RateLimit-Limit:
+              description: Requests per minute allowed from this IP address.
+              schema:
+                type: integer
+                example: 100
         '503':
           description: Account creation is temporarily unavailable. Retry later.
 
@@ -835,6 +890,8 @@ paths:
                 docs: https://myotp.app/developer-api/
         '401':
           description: Missing or invalid X-API-Key.
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v1/agent/resend-verification:
     post:
@@ -868,6 +925,8 @@ paths:
                 verification_email_sent: true
         '401':
           description: Missing or invalid X-API-Key.
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v1/agent/verify-email:
     get:
@@ -895,6 +954,8 @@ paths:
               schema:
                 type: string
               example: "<!doctype html><html>... <form method=\"post\"><button>Confirm</button></form> ...</html>"
+        '429':
+          $ref: '#/components/responses/RateLimited'
     post:
       summary: Confirm the email (browser-facing)
       description: >
@@ -925,8 +986,38 @@ paths:
               schema:
                 type: string
               example: "<!doctype html><html>... Email confirmed. Card top-ups are now available. ...</html>"
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
 components:
+  responses:
+    RateLimited:
+      description: >
+        Too many requests from this IP address. The edge allows 100 requests a
+        minute per client IP with a burst of 100, counted across every endpoint
+        together, so sends and status checks share one budget. Accounts that
+        ask for more are raised to 500 a minute; X-RateLimit-Limit on every
+        response tells you which ceiling applies to you. Wait the number of
+        seconds in Retry-After and repeat the request. Write to
+        support@myotp.app with the addresses you call from and the peak you are
+        designing for if you need a higher limit.
+      headers:
+        Retry-After:
+          description: Seconds to wait before repeating the request.
+          schema:
+            type: integer
+            example: 60
+        X-RateLimit-Limit:
+          description: >
+            Requests per minute allowed from this IP address. Sent on every
+            response, not only this one.
+          schema:
+            type: integer
+            example: 100
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
     Error:
       type: object

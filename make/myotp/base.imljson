@@ -39,6 +39,18 @@
       "500": {
         "type": "ConnectionError",
         "message": "[500] {{ifempty(body.error.message, ifempty(body.detail.message, 'Internal Server Error'))}}"
+      },
+      "502": {
+        "type": "ConnectionError",
+        "message": "[502] {{ifempty(body.error.message, ifempty(body.detail.message, 'Bad Gateway'))}}"
+      },
+      "503": {
+        "type": "ConnectionError",
+        "message": "[503] {{ifempty(body.error.message, ifempty(body.detail.message, 'Service Unavailable'))}}"
+      },
+      "504": {
+        "type": "ConnectionError",
+        "message": "[504] {{ifempty(body.error.message, ifempty(body.detail.message, 'Gateway Timeout'))}}"
       }
     }
   },

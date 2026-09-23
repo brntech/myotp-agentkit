@@ -6,10 +6,28 @@
     "duration": "{{parameters.duration}}"
   },
   "response": {
+    "error": {
+      "500": {
+        "type": "RuntimeError",
+        "message": "[500] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The extension may have been applied, so this module does not retry. Check OTP status shows the current expiry."
+      },
+      "502": {
+        "type": "RuntimeError",
+        "message": "[502] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The extension may have been applied, so this module does not retry. Check OTP status shows the current expiry."
+      },
+      "503": {
+        "type": "RuntimeError",
+        "message": "[503] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The extension may have been applied, so this module does not retry. Check OTP status shows the current expiry."
+      },
+      "504": {
+        "type": "RuntimeError",
+        "message": "[504] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The extension may have been applied, so this module does not retry. Check OTP status shows the current expiry."
+      }
+    },
     "output": {
       "status": "{{body.status}}",
       "message": "{{body.message}}",
-      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ssZ'), null)}}"
+      "expires_at": "{{if(body.expires_at, parseDate(body.expires_at, 'YYYY-MM-DDTHH:mm:ss', 'UTC'), null)}}"
     }
   }
 }

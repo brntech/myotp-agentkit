@@ -1,6 +1,6 @@
 {
   "name": "makeApiCall",
-  "label": "Make an API Call",
+  "label": "Make an API call",
   "description": "Performs an arbitrary authorized API call against https://api.myotp.app.",
   "type": "universal",
   "subtype": "rest",

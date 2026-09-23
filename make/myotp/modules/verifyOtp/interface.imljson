@@ -1,4 +1,5 @@
 [
-  { "name": "status", "type": "text", "label": "Status", "help": "success, failed or expired" },
+  { "name": "status", "type": "text", "label": "Status", "help": "success or failed" },
+  { "name": "reason", "type": "text", "label": "Reason", "help": "Why a check failed: invalid, expired or not found. Empty on success." },
   { "name": "message", "type": "text", "label": "Message" }
 ]

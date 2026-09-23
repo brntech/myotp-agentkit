@@ -1,15 +1,15 @@
 # MyOTP.App custom app for Make
 
-A [Make](https://www.make.com) custom app definition for the [MyOTP.App](https://myotp.app) API. One API key connection, five action modules and a Make an API Call module, all generated from `openapi-reference.yaml` and checked against it by tests.
+A [Make](https://www.make.com) custom app definition for the [MyOTP.App](https://myotp.app) API. One API key connection, five action modules and a Make an API call module, all generated from `openapi-reference.yaml` and checked against it by tests.
 
 | Module | Calls | Output |
 |---|---|---|
 | Send OTP | `POST /generate_otp` | message_id, status, message, date_sent, expires_at, cost, otp |
-| Verify OTP | `POST /verify_otp` | status (success, failed, expired), message |
+| Verify OTP | `POST /verify_otp` | status (success, failed), reason (invalid, expired, not found), message |
 | Extend OTP | `POST /extend_otp` | status, message, expires_at |
-| Check OTP Status | `POST /check_otp_status` | DLR, is_active, expires_at, message |
-| Get Account | `GET /me` | email |
-| Make an API Call | any path under `https://api.myotp.app` | body, headers, statusCode |
+| Check OTP status | `POST /check_otp_status` | DLR, is_active, expires_at, message |
+| Get account | `GET /me` | email |
+| Make an API call | any path under `https://api.myotp.app` | body, headers, statusCode |
 
 ## Layout
 
@@ -61,17 +61,21 @@ The Make CLI has `sdk-apps create`, `sdk-apps set-section`, `sdk-connections cre
 
 1. Create a MyOTP.App account at https://myotp.app/sign-up/ (15 free credits) and copy an API key from the dashboard.
 2. Add Make's egress IP addresses to that key's IP allowlist, or set the allowlist to `*` while testing. Without this every module answers 403.
-3. In a new scenario add **MyOTP.App > Get Account**, create the connection with the key, and run once. The connection is validated with `GET /me`, so a wrong key fails at connection time, not at run time.
+3. In a new scenario add **MyOTP.App > Get account**, create the connection with the key, and run once. The connection is validated with `GET /me`, so a wrong key fails at connection time, not at run time.
 4. Add **Send OTP** with your phone number (digits only, country code first, no plus sign) and run. Keep the `message_id`.
 5. Add **Verify OTP** mapped to the code that arrived and the `message_id`. Run. `status` is `success`.
-6. **Check OTP Status** with the same `message_id` shows the carrier delivery report a few seconds after the send.
+6. **Check OTP status** with the same `message_id` shows the carrier delivery report a few seconds after the send.
 7. For the public review, also run a scenario that fails on purpose (a wrong API key, or a phone number that is not a number) so the error handling shows up in the execution log.
 
 Errors come back as `[<http status>] <message>` using the `error.message` field every rejected MyOTP request carries, with fallbacks to the `detail.message` envelope of the agent endpoints and the RFC 9457 `detail` string of a 402. A 401 is typed `InvalidAccessTokenError` so Make prompts to fix the connection, a 403 is `InvalidConfigurationError` (the IP allowlist), a 429 is `RateLimitError` so Make retries. The API key is stripped from Make's logs by the `log.sanitize` rule, and so is the `otp` field of the Send OTP response.
 
-**Make an API Call** only reaches `https://api.myotp.app`. The path parameter is validated against an allowlist (a leading `/`, then URL path characters and an optional query; no backslash, no `//`, no scheme) and a value that fails it stops the module with "path must be relative to https://api.myotp.app". Before the request is built the value is also sanitised: backslashes become `/`, any scheme is removed, repeated slashes collapse to one, and a single `/` is prefixed, so the result can only ever be a path on the base host. The headers you add are merged with the connection's `X-API-Key` rather than replacing it. This is Make's security rule for universal modules.
+**Make an API call** only reaches `https://api.myotp.app`. The path parameter is validated against an allowlist (a leading `/`, then URL path characters and an optional query; no backslash, no `//`, no scheme) and a value that fails it stops the module with "path must be relative to https://api.myotp.app". Before the request is built the value is also sanitised: backslashes become `/`, any scheme is removed, repeated slashes collapse to one, and a single `/` is prefixed, so the result can only ever be a path on the base host. The headers you add are merged with the connection's `X-API-Key` rather than replacing it. This is Make's security rule for universal modules.
 
-Date-time outputs (`date_sent`, `expires_at`) are parsed with `parseDate` so they map as real dates in later modules.
+Date-time outputs (`date_sent`, `expires_at`) are parsed as UTC with `parseDate` so they map as real dates in later modules.
+
+Server errors (500, 502, 503, 504) are retried only by the read modules, Check OTP status and Get account. Send OTP, Verify OTP, Extend OTP and Make an API call stop instead, because the request may already have taken effect: a send may have reached the phone, a verified code is deleted, an extension would be added twice. Sending again to the same number without **Force send** answers 409 while the earlier code is unexpired.
+
+Send OTP takes **Your own code** (3 to 8 digits, 4 to 8 on Telegram) when another system already holds the code the user must type.
 
 ## Validate the definition
 

@@ -7,6 +7,24 @@
   "qs": "{{toCollection(parameters.qs, 'key', 'value')}}",
   "body": "{{parameters.body}}",
   "response": {
+    "error": {
+      "500": {
+        "type": "RuntimeError",
+        "message": "[500] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The request may have been processed, so this module does not retry."
+      },
+      "502": {
+        "type": "RuntimeError",
+        "message": "[502] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The request may have been processed, so this module does not retry."
+      },
+      "503": {
+        "type": "RuntimeError",
+        "message": "[503] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The request may have been processed, so this module does not retry."
+      },
+      "504": {
+        "type": "RuntimeError",
+        "message": "[504] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The request may have been processed, so this module does not retry."
+      }
+    },
     "output": {
       "body": "{{body}}",
       "headers": "{{headers}}",

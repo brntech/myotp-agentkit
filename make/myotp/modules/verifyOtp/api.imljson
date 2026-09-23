@@ -7,9 +7,28 @@
     "message_id": "{{parameters.message_id}}"
   },
   "response": {
+    "error": {
+      "500": {
+        "type": "RuntimeError",
+        "message": "[500] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The check may have gone through, so this module does not retry. A code that was verified cannot be verified again."
+      },
+      "502": {
+        "type": "RuntimeError",
+        "message": "[502] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The check may have gone through, so this module does not retry. A code that was verified cannot be verified again."
+      },
+      "503": {
+        "type": "RuntimeError",
+        "message": "[503] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The check may have gone through, so this module does not retry. A code that was verified cannot be verified again."
+      },
+      "504": {
+        "type": "RuntimeError",
+        "message": "[504] {{ifempty(body.error.message, ifempty(body.detail.message, 'Server error'))}}. The check may have gone through, so this module does not retry. A code that was verified cannot be verified again."
+      }
+    },
     "output": {
       "status": "{{body.status}}",
-      "message": "{{body.message}}"
+      "message": "{{body.message}}",
+      "reason": "{{body.reason}}"
     }
   }
 }

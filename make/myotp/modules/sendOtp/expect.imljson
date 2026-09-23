@@ -40,7 +40,7 @@
     "name": "template_order",
     "type": "uinteger",
     "label": "Template",
-    "help": "Which message template to use. Defaults to 1 (12 for WhatsApp: 12 English 5 minutes, 13 English 10 minutes, 14 Spanish 5 minutes, 15 Spanish 10 minutes).",
+    "help": "Which message template to use. Defaults to 1 (12 for WhatsApp: 12 English 5 minutes, 13 English 10 minutes, 14 Spanish 5 minutes, 15 Spanish 10 minutes). Business and Enterprise plans and the free trial.",
     "advanced": true,
     "validate": { "min": 1, "max": 99 }
   },
@@ -52,6 +52,16 @@
     "advanced": true,
     "validate": {
       "pattern": "^[a-zA-Z0-9.]{3,16}$"
+    }
+  },
+  {
+    "name": "otp_code",
+    "type": "text",
+    "label": "Your own code",
+    "help": "3 to 8 digits (4 to 8 on Telegram). MyOTP sends this code instead of generating one, and OTP length is ignored. Use it when another system already holds the code.",
+    "advanced": true,
+    "validate": {
+      "pattern": "^[0-9]{3,8}$"
     }
   },
   {

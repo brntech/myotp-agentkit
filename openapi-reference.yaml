@@ -50,15 +50,15 @@ paths:
                 otp_length:
                   type: integer
                   default: 6
-                  minimum: 4
+                  minimum: 3
                   maximum: 8
-                  description: Length of the OTP, defaults to 6.
+                  description: Length of the OTP, defaults to 6. 3 to 8 digits (4 to 8 on Telegram).
                 otp_validity:
                   type: integer
                   default: 300
-                  minimum: 60
-                  maximum: 86400
-                  description: Validity of the OTP in seconds, defaults to 300. SMS only.
+                  minimum: 30
+                  maximum: 14400
+                  description: Seconds the OTP stays valid, defaults to 300. 30 to 14400 (up to 3600 on Telegram). On WhatsApp the template's expiry applies instead.
                 channel:
                   type: string
                   enum:

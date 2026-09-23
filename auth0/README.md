@@ -95,7 +95,7 @@ Auth0 does not tell the end user whether the message was sent. Failures show up 
 
 | Log reason | Cause | Fix |
 |---|---|---|
-| `MyOTP responded 403: Access from this IP not allowed` | The MyOTP account has an IP allowlist and the Auth0 Actions egress IP is not on it. | In the MyOTP dashboard, either add Auth0's outbound IP addresses for your tenant region to the key's allowlist, or set the allowlist open. Auth0 publishes its outbound IPs per region in the Dashboard under **Settings > Advanced > Outbound IP addresses**. |
+| `MyOTP responded 403: Access from this IP not allowed` | The MyOTP account has an IP allowlist and the Auth0 Actions egress IP is not on it. | In the MyOTP dashboard, either add Auth0's outbound IP addresses for your tenant region to your account's allowlist, or set the allowlist open. Auth0 publishes its outbound IPs per region in the Dashboard under **Settings > Advanced > Outbound IP addresses**. |
 | `MyOTP responded 401: ...` | Wrong or missing API key. | Check the `MYOTP_API_KEY` secret. Keys are 32 characters. |
 | `MyOTP responded 400: Service not available ...` or any 400 naming the country | The destination country is not priced on your account. | Email sales@myotp.app with the country and channel. |
 | `MyOTP responded 402: ...` | No credits. | Top up at https://myotp.app/dashboard/. |

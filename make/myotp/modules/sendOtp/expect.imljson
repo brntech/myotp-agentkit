@@ -24,25 +24,25 @@
     "name": "otp_length",
     "type": "uinteger",
     "label": "OTP length",
-    "help": "4 to 8 digits. Defaults to 6.",
+    "help": "3 to 8 digits (4 to 8 on Telegram). Defaults to 6. Business and Enterprise plans and the free trial.",
     "advanced": true,
-    "validate": { "min": 4, "max": 8 }
+    "validate": { "min": 3, "max": 8 }
   },
   {
     "name": "otp_validity",
     "type": "uinteger",
     "label": "Validity (seconds)",
-    "help": "60 to 86400 seconds. Defaults to 300. SMS only.",
+    "help": "30 to 14400 seconds (up to 3600 on Telegram). Defaults to 300. On WhatsApp the template's expiry applies instead. Business and Enterprise plans and the free trial.",
     "advanced": true,
-    "validate": { "min": 60, "max": 86400 }
+    "validate": { "min": 30, "max": 14400 }
   },
   {
     "name": "template_order",
     "type": "uinteger",
     "label": "Template",
-    "help": "Which of your message templates to use, 1 to 5. Defaults to 1.",
+    "help": "Which message template to use. Defaults to 1 (12 for WhatsApp: 12 English 5 minutes, 13 English 10 minutes, 14 Spanish 5 minutes, 15 Spanish 10 minutes).",
     "advanced": true,
-    "validate": { "min": 1, "max": 5 }
+    "validate": { "min": 1, "max": 99 }
   },
   {
     "name": "brand",

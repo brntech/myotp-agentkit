@@ -14,7 +14,7 @@
       },
       "403": {
         "type": "InvalidConfigurationError",
-        "message": "[403] {{ifempty(body.error.message, 'The calling IP is not on this API key allowlist')}}"
+        "message": "[403] {{ifempty(body.error.message, 'The calling IP is not on the account allowlist')}}"
       }
     },
     "metadata": {

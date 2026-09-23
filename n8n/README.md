@@ -22,7 +22,7 @@ Then restart n8n.
 
 ## Credentials
 
-The node uses one credential, **MyOTP API**, with a single field: the API key. It is sent as the `X-API-Key` header on every request. The credential test calls `GET /me`, so a wrong key or an IP that is not on the key's allowlist fails right there.
+The node uses one credential, **MyOTP API**, with a single field: the API key. It is sent as the `X-API-Key` header on every request. The credential test calls `GET /me`, so a wrong key or an IP that is not on your account's allowlist fails right there.
 
 Where to get a key:
 
@@ -50,7 +50,7 @@ The node runs once per input item and keeps the paired item, so you can map fiel
 
 Every rejected MyOTP request carries `{"error": {"http_code": N, "message": "..."}}`. The node reads that message and raises it as the n8n error, with the HTTP code attached. With **Continue on Fail** switched on, the item is output as `{ "error": "...", "http_code": "..." }` instead.
 
-Common codes: `400` bad input, `401` wrong key, `402` no balance, `403` calling IP not on the key's allowlist, `409` an unexpired OTP already exists for that number (set Force Send to override).
+Common codes: `400` bad input, `401` wrong key, `403` insufficient balance, a paused account, or a calling IP not on your account's allowlist, `409` an unexpired OTP already exists for that number (set Force Send to override).
 
 ## Example: webhook, send OTP, respond
 

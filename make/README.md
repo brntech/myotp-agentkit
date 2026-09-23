@@ -90,7 +90,7 @@ docker run --rm -v "$PWD:/w" -w /w/make node:22-alpine \
 |---|---|
 | Name | `myotp` |
 | Label | MyOTP.App |
-| Description (under 200 characters) | Send and verify one-time passcodes over SMS, WhatsApp and Telegram with one API key. Pay per message, no monthly minimum. |
+| Description (under 200 characters) | Send and verify one-time passcodes over SMS, WhatsApp and Telegram with one API key. No per-verification fee. |
 | Theme colour | `#1d4ed8` |
 | Service URL | https://myotp.app |
 | API documentation | https://myotp.app/developer-api/ |

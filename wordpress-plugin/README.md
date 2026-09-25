@@ -19,6 +19,10 @@ Expired counter, pending and verified rows are removed on the next read and by a
 
 Sign up at [myotp.app/sign-up](https://myotp.app/sign-up/) (15 free trial credits, no card). Copy a key from User API Keys in the dashboard.
 
+## Install from the plugin directory
+
+The plugin is on wordpress.org: [MyOTP Phone Verification](https://wordpress.org/plugins/myotp-phone-verification/). In WordPress: Plugins > Add New, search for "MyOTP Phone Verification", install, activate, and open Settings > MyOTP to paste the key.
+
 ## Install from zip
 
 Build the zip from this folder:

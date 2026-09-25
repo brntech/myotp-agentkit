@@ -35,7 +35,7 @@ If you're building an app by hand, the [examples](examples/) are runnable starti
 | [`auth0/`](auth0/) | Auth0 | Custom Phone Provider Action: Auth0's own code delivered by MyOTP over SMS, WhatsApp or Telegram. Tests, setup guide, Marketplace listing draft |
 | [`make/`](make/) | Make.com | Custom app definition (connection + 5 action modules + universal call), validated against the spec |
 | [`postman/`](postman/) | Postman | Collection v2.1 + environment generated from `openapi-reference.yaml`; `npm run build` in `postman/` regenerates it |
-| [`wordpress-plugin/`](wordpress-plugin/) | WordPress / WooCommerce | Phone verification at checkout, registration and via shortcode (`myotp-phone-verification`) |
+| [`wordpress-plugin/`](wordpress-plugin/) | WordPress / WooCommerce | Phone verification at checkout, registration and via shortcode ([`myotp-phone-verification` on wordpress.org](https://wordpress.org/plugins/myotp-phone-verification/)) |
 
 ## Skills (drop into your agent's config)
 

@@ -10,6 +10,7 @@ Per-country pricing is at https://myotp.app/pricing/.
 |---|---|
 | `action/send-phone-message.js` | The Action. Paste it into the Auth0 editor. No npm dependencies. |
 | `action/send-phone-message.test.js` | Tests with a mocked `fetch`, run with Node's built-in test runner. |
+| `marketplace/` | The same delivery packaged for the Auth0 Marketplace (Send Phone Message flow, MFA): `integration/` in Auth0's template layout, `media/` for the listing. |
 
 ## How it works
 
@@ -34,7 +35,7 @@ The whole exchange, response body included, is capped at 8 seconds to stay insid
 
 ## Prerequisites
 
-- A MyOTP.App account and API key: https://myotp.app/dashboard/user-api-keys/
+- A MyOTP.App account and API key: https://myotp.app/user-api-keys/
 - Credits on the account. Each send is billed at the destination country's rate.
 - An Auth0 tenant. If it does not yet have Passwordless SMS or SMS MFA enabled, Auth0's Unified Phone Experience setup guide walks through turning them on.
 
@@ -95,10 +96,10 @@ Auth0 does not tell the end user whether the message was sent. Failures show up 
 
 | Log reason | Cause | Fix |
 |---|---|---|
-| `MyOTP responded 403: Access from this IP not allowed` | The MyOTP account has an IP allowlist and the Auth0 Actions egress IP is not on it. | In the MyOTP dashboard, either add Auth0's outbound IP addresses for your tenant region to your account's allowlist, or set the allowlist open. Auth0 publishes its outbound IPs per region in the Dashboard under **Settings > Advanced > Outbound IP addresses**. |
+| `MyOTP responded 403: Access from this IP address is not allowed` | The MyOTP account has an IP allowlist and the Auth0 Actions egress IP is not on it. The message names the address Auth0 called from. | Add Auth0's addresses for your tenant's region, listed in [Auth0's IP addresses for allow lists](https://auth0.com/docs/secure/security-guidance/data-security/allowlist), on the [IP Whitelist](https://myotp.app/ip-whitelist/) page of the MyOTP dashboard. |
 | `MyOTP responded 401: ...` | Wrong or missing API key. | Check the `MYOTP_API_KEY` secret. Keys are 32 characters. |
-| `MyOTP responded 400: Service not available ...` or any 400 naming the country | The destination country is not priced on your account. | Email sales@myotp.app with the country and channel. |
-| `MyOTP responded 402: ...` | No credits. | Top up at https://myotp.app/dashboard/. |
+| `MyOTP responded 400: We don't currently have ... pricing enabled for <country> on your plan ...` | That channel is not enabled for the destination country on your plan. | Email sales@myotp.app with the country and channel. |
+| `MyOTP responded 403: Insufficient balance` | No credits. | Top up at https://myotp.app/sms-dashboard/. |
 | `MyOTP responded 429: ...` | Rate limited by MyOTP's edge rate limiter before the request reached the application. Nothing was sent or charged, so Auth0 retries automatically. | Nothing, unless it repeats. |
 | `MyOTP responded 5xx: ...`, `MyOTP request failed: timed out ...`, `MyOTP response body read failed: ...` | MyOTP or the network did not answer cleanly. The message may or may not have gone out, so it is not retried. | The user presses resend. If it persists, contact support@myotp.app. |
 | `MyOTP request failed: ...` with retry | DNS or connection failure before anything was sent. Auth0 retries up to 5 times. | Nothing, unless it persists. |

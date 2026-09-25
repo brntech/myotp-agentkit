@@ -1,0 +1,32 @@
+{
+  "secrets": [
+    {
+      "name": "MYOTP_API_KEY",
+      "label": "MyOTP API key",
+      "description": "Your MyOTP.App API key, from User API Keys at https://myotp.app/user-api-keys/"
+    }
+  ],
+  "configuration": [
+    {
+      "name": "MYOTP_CHANNEL",
+      "label": "Delivery channel",
+      "description": "How MyOTP delivers the code to the user's phone number.",
+      "default_value": "sms",
+      "options": [
+        {
+          "value": "sms",
+          "label": "SMS"
+        },
+        {
+          "value": "whatsapp",
+          "label": "WhatsApp"
+        },
+        {
+          "value": "telegram",
+          "label": "Telegram"
+        }
+      ]
+    }
+  ],
+  "dependencies": []
+}

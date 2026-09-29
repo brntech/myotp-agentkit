@@ -88,6 +88,18 @@ class MyOTP_PV_Order_Verify {
 	}
 
 	/**
+	 * True when the shopper may verify now: the order is waiting and still
+	 * pending or on hold. A cancelled, failed or refunded order, or one the
+	 * shop released by hand, shows no box and takes no code.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return bool
+	 */
+	private static function can_verify( $order ) {
+		return self::is_awaiting( $order ) && method_exists( $order, 'has_status' ) && $order->has_status( array( 'pending', 'on-hold' ) );
+	}
+
+	/**
 	 * Payment reported for a waiting order: record the status the gateway
 	 * asked for and hold the order instead.
 	 *
@@ -154,7 +166,7 @@ class MyOTP_PV_Order_Verify {
 	 */
 	public static function thankyou_box( $order_id ) {
 		$order = self::order( $order_id );
-		if ( null === $order || ! self::is_awaiting( $order ) ) {
+		if ( null === $order || ! self::can_verify( $order ) ) {
 			return;
 		}
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- the order key is the authorisation, as on the order-received page itself.
@@ -172,7 +184,7 @@ class MyOTP_PV_Order_Verify {
 	 */
 	public static function view_order_box( $order_id ) {
 		$order = self::order( $order_id );
-		if ( null === $order || ! self::is_awaiting( $order ) ) {
+		if ( null === $order || ! self::can_verify( $order ) ) {
 			return;
 		}
 		$customer = (int) $order->get_customer_id();
@@ -371,7 +383,7 @@ class MyOTP_PV_Order_Verify {
 		check_ajax_referer( 'myotp_pv_order_' . $id, 'nonce' );
 		$key   = isset( $_POST['key'] ) && is_string( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : '';
 		$order = $id > 0 ? self::order( $id ) : null;
-		if ( null === $order || ! self::key_matches( $order, $key ) || ! self::owner_ok( $order ) || ! self::is_awaiting( $order ) ) {
+		if ( null === $order || ! self::key_matches( $order, $key ) || ! self::owner_ok( $order ) || ! self::can_verify( $order ) ) {
 			wp_send_json_error( array( 'message' => __( 'This order cannot be verified here.', 'myotp-phone-verification' ) ), 403 );
 		}
 		return $order;

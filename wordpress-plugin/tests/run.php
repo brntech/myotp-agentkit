@@ -1301,6 +1301,18 @@ for ( $i = 0; $i < 5; $i++ ) {
 check( 'order cooldown: challenge dropped after five wrong codes', null, MyOTP_PV_Store::$instance->get( 'order_pending_860' ) );
 check( 'order cooldown: send refused 429', 429, myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '860', 'key' => 'wc_order_k860' ) )->status );
 check( 'order cooldown: still on hold', 'on-hold', $o->status );
+// Cancelled, or released by the shop: no box, no code.
+$o = myotp_test_held_order( 875 );
+$o->payment_complete();
+$o->status   = 'cancelled';
+$_GET['key'] = 'wc_order_k875';
+ob_start();
+myotp_test_do_action( 'woocommerce_thankyou', 875 );
+check( 'cancelled held order: no box', '', ob_get_clean() );
+$r = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '875', 'key' => 'wc_order_k875' ) );
+check( 'cancelled held order: send refused with the same answer', array( 403, $generic ), array( $r->status, $r->data['message'] ) );
+$o->status = 'processing';
+check( 'released by the shop: send refused', 403, myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '875', 'key' => 'wc_order_k875' ) )->status );
 // Account order: key alone is not enough without the customer logged in.
 $o              = myotp_test_held_order( 870 );
 $o->customer_id = 7;

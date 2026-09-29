@@ -4,7 +4,7 @@ A WordPress plugin that verifies phone numbers with a one-time code over SMS, Wh
 
 ## What it does
 
-- **WooCommerce checkout.** A Send code button under the billing phone. The order is blocked with a notice until the billing number is verified. Optionally only for guests. Works on the classic (shortcode) checkout and on the block checkout (Store API); the block checkout's phone field must be shown.
+- **WooCommerce checkout.** A Send code button under the billing phone. The order is blocked with a notice until the billing number is verified. Optionally only for guests. Works on the classic (shortcode) checkout and on the block checkout (Store API); the block checkout's phone field must be shown. Express wallet orders (Apple Pay, Google Pay, Link, Amazon Pay from WooPayments or WooCommerce Stripe Payment Gateway) follow one setting: allow without a code (default), hold after payment until the shopper verifies the order's phone, or block. A wallet order is recognised only when a wallet gateway is the chosen payment method and the request carries that gateway's own wallet marker (`myotp_pv_express_wallet_type()`, filterable).
 - **WordPress registration.** A phone field on `wp-login.php?action=register` with the same flow. The verified number is saved as user meta `myotp_verified_phone`.
 - **Shortcode.** `[myotp_verify]` renders the widget anywhere. On success it fires `myotp:verified` on `document` with `event.detail.phone`.
 - **Settings page.** Settings > MyOTP: API key (masked), channel, code length (4 to 8), validity in seconds, optional brand, and a Send test code button.
@@ -57,6 +57,7 @@ myotp-phone-verification/
   includes/class-myotp-pv-shortcode.php    [myotp_verify]
   includes/class-myotp-pv-registration.php wp-login.php?action=register
   includes/class-myotp-pv-woocommerce.php  classic and block checkout
+  includes/class-myotp-pv-order-verify.php express wallet orders held until the shopper verifies after payment
   assets/js, assets/css, languages/, readme.txt, uninstall.php
 tests/run.php                     plain PHP tests: pure helpers, then every hook and flow against tests/wp-stubs.php
 bin/make-pot.php                  regenerates languages/*.pot from the sources

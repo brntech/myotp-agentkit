@@ -19,6 +19,15 @@
  * same phone. So a stamp that survives a failed rollback is not a false
  * stamp; the rollback and its notes are best effort and stay as they are.
  *
+ * Express wallet orders (Apple Pay, Google Pay and similar buttons that
+ * place the order without the checkout form) are recognised by
+ * myotp_pv_express_wallet_type(): the chosen gateway must be a wallet
+ * gateway and the request must carry that gateway's own wallet marker.
+ * The "wc_express" setting then decides: allow (no code, order note),
+ * after (MyOTP_PV_Order_Verify holds the paid order until the shopper
+ * verifies) or block (the gate below applies unchanged). A wallet order
+ * never claims or stamps a checkout proof.
+ *
  * @package myotp-phone-verification
  */
 
@@ -48,6 +57,21 @@ class MyOTP_PV_WooCommerce {
 	 * @var bool
 	 */
 	private static $pay_existing = false;
+
+	/**
+	 * Wallet type when this request is an express wallet order that the
+	 * setting lets through without a code (allow or after), empty otherwise.
+	 *
+	 * @var string
+	 */
+	private static $express = '';
+
+	/**
+	 * Setting in force when $express was set (allow or after).
+	 *
+	 * @var string
+	 */
+	private static $express_mode = '';
 
 	/**
 	 * Hook registration.
@@ -81,6 +105,101 @@ class MyOTP_PV_WooCommerce {
 	}
 
 	/**
+	 * The express wallet setting: allow, after or block. A stored value
+	 * outside the three choices is treated as block, the strictest.
+	 *
+	 * @return string
+	 */
+	public static function express_mode() {
+		$o    = myotp_pv_get_options();
+		$mode = isset( $o['wc_express'] ) && is_string( $o['wc_express'] ) ? $o['wc_express'] : 'allow';
+		return in_array( $mode, myotp_pv_express_modes(), true ) ? $mode : 'block';
+	}
+
+	/**
+	 * When this request is an express wallet order and the setting does not
+	 * block it, remember the wallet type for order creation and return true
+	 * (the code gate is skipped). Otherwise return false and the gate applies.
+	 *
+	 * @param mixed $payment_method Gateway id from the request.
+	 * @param array $fields         Wallet marker fields from the request.
+	 * @return bool
+	 */
+	private static function take_express( $payment_method, array $fields ) {
+		$mode = self::express_mode();
+		if ( 'block' === $mode ) {
+			return false;
+		}
+		$type = myotp_pv_express_wallet_type( $payment_method, $fields );
+		if ( '' === $type ) {
+			return false;
+		}
+		self::$express      = $type;
+		self::$express_mode = $mode;
+		return true;
+	}
+
+	/**
+	 * Wallet marker fields posted with the classic checkout form. Only the
+	 * marker keys are read, as plain strings.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function classic_marker_fields() {
+		$fields = array();
+		foreach ( myotp_pv_express_marker_keys() as $key ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce verified the checkout nonce before this hook.
+			if ( isset( $_POST[ $key ] ) && is_string( $_POST[ $key ] ) ) {
+				$fields[ $key ] = sanitize_text_field( wp_unslash( $_POST[ $key ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			}
+		}
+		return $fields;
+	}
+
+	/**
+	 * A value read from the Store API request, or null.
+	 *
+	 * @param object $request Request.
+	 * @param string $key     Parameter.
+	 * @return mixed
+	 */
+	private static function request_param( $request, $key ) {
+		if ( is_object( $request ) && method_exists( $request, 'get_param' ) ) {
+			return $request->get_param( $key );
+		}
+		return null;
+	}
+
+	/**
+	 * Handle an express wallet order once it exists: a note for "allow",
+	 * the held-until-verified marker for "after". Never stamps the order as
+	 * verified.
+	 *
+	 * @param WC_Order $order The created order.
+	 */
+	private static function express_order( $order ) {
+		$type = self::$express;
+		$mode = self::$express_mode;
+
+		self::$express      = '';
+		self::$express_mode = '';
+		if ( ! is_object( $order ) || '' === $type ) {
+			return;
+		}
+		if ( 'after' === $mode ) {
+			MyOTP_PV_Order_Verify::mark( $order, $type );
+			return;
+		}
+		$order->add_order_note(
+			sprintf(
+				/* translators: %s: wallet name, e.g. Apple Pay */
+				__( 'MyOTP: express wallet payment (%s) placed without phone verification.', 'myotp-phone-verification' ),
+				myotp_pv_wallet_label( $type )
+			)
+		);
+	}
+
+	/**
 	 * Output the widget under the billing fields, bound to #billing_phone.
 	 */
 	public static function widget() {
@@ -105,8 +224,14 @@ class MyOTP_PV_WooCommerce {
 	 * @param WP_Error $errors Errors collected so far.
 	 */
 	public static function validate( $data, $errors ) {
-		self::$claimed = '';
+		self::$claimed      = '';
+		self::$express      = '';
+		self::$express_mode = '';
 		if ( ! self::required() ) {
+			return;
+		}
+		$payment_method = is_array( $data ) && isset( $data['payment_method'] ) ? $data['payment_method'] : '';
+		if ( self::take_express( $payment_method, self::classic_marker_fields() ) ) {
 			return;
 		}
 		$failure = self::check( isset( $data['billing_phone'] ) ? $data['billing_phone'] : '' );
@@ -126,6 +251,8 @@ class MyOTP_PV_WooCommerce {
 	 */
 	public static function validate_block( $order, $request = null ) {
 		self::$claimed                  = '';
+		self::$express                  = '';
+		self::$express_mode             = '';
 		MyOTP_PV_Session::$key_override = '';
 		self::$pay_existing             = is_object( $request ) && method_exists( $request, 'get_route' ) && 1 === preg_match( '#/checkout/\d+/?$#', (string) $request->get_route() );
 		if ( self::$pay_existing ) {
@@ -135,6 +262,10 @@ class MyOTP_PV_WooCommerce {
 			return;
 		}
 		if ( ! self::required() ) {
+			return;
+		}
+		$fields = myotp_pv_payment_data_fields( self::request_param( $request, 'payment_data' ) );
+		if ( self::take_express( self::request_param( $request, 'payment_method' ), $fields ) ) {
 			return;
 		}
 		// Pin the visitor key so order processing finds the same proof even if the account is created in between.
@@ -162,6 +293,11 @@ class MyOTP_PV_WooCommerce {
 	 */
 	public static function consume_block( $order ) {
 		self::$claimed = '';
+		if ( '' !== self::$express && ! self::$pay_existing ) {
+			self::express_order( $order );
+			return;
+		}
+		self::$express = '';
 		// Only an order that was gated at validation (which pinned the key) is consumed here.
 		if ( self::$pay_existing || '' === MyOTP_PV_Session::$key_override ) {
 			return;
@@ -258,6 +394,10 @@ class MyOTP_PV_WooCommerce {
 	 * @param WC_Order $order The created order.
 	 */
 	public static function consume( $order ) {
+		if ( '' !== self::$express ) {
+			self::express_order( $order );
+			return;
+		}
 		if ( ( ! self::required() && '' === MyOTP_PV_Session::$key_override ) || ! is_object( $order ) || '' === self::$claimed ) {
 			return;
 		}

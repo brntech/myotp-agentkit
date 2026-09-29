@@ -609,9 +609,140 @@ function myotp_pv_default_options() {
 		'brand'            => '',
 		'wc_enabled'       => 1,
 		'wc_guests_only'   => 0,
+		'wc_express'       => 'allow',
 		'register_enabled' => 0,
 		'site_hourly_cap'  => 100,
 	);
+}
+
+/**
+ * The three choices for express wallet orders (Apple Pay, Google Pay and
+ * similar buttons that place the order without the checkout form):
+ * allow (no code, order note), after (hold the paid order until the
+ * shopper verifies on the order page), block (the gate applies as for any
+ * other order, which refuses a wallet order that carries no verification).
+ *
+ * @return string[]
+ */
+function myotp_pv_express_modes() {
+	return array( 'allow', 'after', 'block' );
+}
+
+/**
+ * Default map of gateways that offer express wallets, the request fields
+ * that mark a wallet order, and the wallet types those fields carry. Each
+ * entry was read from the gateway's public source:
+ *
+ * WooPayments (github.com/Automattic/woocommerce-payments, tag 11.1.0):
+ * - Store API order from the wallet button: payment_method
+ *   "woocommerce_payments" (client/express-checkout/transformers/stripe-to-wc.js:78)
+ *   with payment_data key "express_payment_type" = the wallet's
+ *   expressPaymentType (same file, :95-96), posted to /wc/store/v1/checkout
+ *   with the X-WooPayments-Tokenized-Cart header (client/express-checkout/cart-api.js:112-114).
+ * - The gateway reads the same key back from $_POST during payment
+ *   (includes/woopay/services/class-checkout-service.php:67); the Store API
+ *   copies payment_data into $_POST for gateways (woocommerce
+ *   src/StoreApi/Legacy.php, process_legacy_payment).
+ * - Older releases sent payment_data key "payment_request_type"
+ *   (tag 10.0.0, includes/express-checkout/class-wc-payments-express-checkout-ajax-handler.php:178)
+ *   and placed the order through wc-ajax=wcpay_ece_create_order, which
+ *   runs the classic process_checkout (tag 9.0.0, same file :42 and :96).
+ *
+ * WooCommerce Stripe Payment Gateway (github.com/woocommerce/woocommerce-gateway-stripe, tag 11.0.0):
+ * - Store API order: payment_method "stripe" (client/express-checkout/utils/normalize.js:441)
+ *   with payment_data key "express_payment_type" (same file, :73), posted with the
+ *   X-WCSTRIPE-EXPRESS-CHECKOUT header (client/api/index.js:662); read back from
+ *   $_POST in includes/payment-methods/class-wc-stripe-upe-payment-gateway.php:3889-3894.
+ * - Classic form post: field "express_checkout_type" added by
+ *   client/express-checkout/payment-flow.js:332-344 and read on
+ *   woocommerce_checkout_order_processed for payment_method "stripe"
+ *   (includes/payment-methods/class-wc-stripe-express-checkout-element.php:117 and :572).
+ * - Wallet types it treats as express: amazon_pay, google_pay, apple_pay, link
+ *   (includes/constants/class-wc-stripe-payment-methods.php:59-64).
+ * - Older releases placed the order through wc-ajax=wc_stripe_create_order, the
+ *   classic process_checkout, with $_POST "payment_request_type" = apple_pay,
+ *   google_pay or payment_request_api (tag 10.0.0,
+ *   includes/payment-methods/class-wc-stripe-payment-request.php:244, :568-582, :1748).
+ *
+ * @return array{gateways: array<string, string[]>, types: string[]}
+ */
+function myotp_pv_express_wallet_defaults() {
+	return array(
+		'gateways' => array(
+			'woocommerce_payments' => array( 'express_payment_type', 'payment_request_type' ),
+			'stripe'               => array( 'express_payment_type', 'express_checkout_type', 'payment_request_type' ),
+		),
+		'types'    => array( 'apple_pay', 'google_pay', 'link', 'amazon_pay', 'payment_request_api' ),
+	);
+}
+
+/**
+ * Pure matcher: the wallet type when the payment method is one of the
+ * wallet gateways AND one of that gateway's own marker fields holds a known
+ * wallet type; empty otherwise. A marker on any other gateway (cash on
+ * delivery, bank transfer, a card-only gateway) never matches, so forging
+ * it there changes nothing.
+ *
+ * @param mixed $payment_method Chosen gateway id from the request.
+ * @param array $fields         Request fields, key => value.
+ * @param array $gateways       Gateway id => list of marker keys.
+ * @param array $types          Accepted wallet types.
+ * @return string
+ */
+function myotp_pv_match_express_wallet( $payment_method, array $fields, array $gateways, array $types ) {
+	if ( ! is_string( $payment_method ) || '' === $payment_method || ! isset( $gateways[ $payment_method ] ) || ! is_array( $gateways[ $payment_method ] ) ) {
+		return '';
+	}
+	foreach ( $gateways[ $payment_method ] as $marker ) {
+		if ( ! is_string( $marker ) || ! isset( $fields[ $marker ] ) || ! is_string( $fields[ $marker ] ) ) {
+			continue;
+		}
+		$value = strtolower( trim( $fields[ $marker ] ) );
+		if ( '' !== $value && in_array( $value, $types, true ) ) {
+			return $value;
+		}
+	}
+	return '';
+}
+
+/**
+ * Flatten Store API payment_data (a list of array( key, value )) into
+ * key => string. Non-scalar values are dropped.
+ *
+ * @param mixed $payment_data Raw payment_data from the request.
+ * @return array<string, string>
+ */
+function myotp_pv_payment_data_fields( $payment_data ) {
+	$out = array();
+	if ( ! is_array( $payment_data ) ) {
+		return $out;
+	}
+	foreach ( $payment_data as $item ) {
+		if ( ! is_array( $item ) || ! isset( $item['key'] ) || ! is_string( $item['key'] ) || ! array_key_exists( 'value', $item ) ) {
+			continue;
+		}
+		if ( is_scalar( $item['value'] ) ) {
+			$out[ $item['key'] ] = is_bool( $item['value'] ) ? ( $item['value'] ? '1' : '' ) : (string) $item['value'];
+		}
+	}
+	return $out;
+}
+
+/**
+ * Readable name of a wallet type for order notes.
+ *
+ * @param string $type Wallet type from the allowlist.
+ * @return string
+ */
+function myotp_pv_wallet_label( $type ) {
+	$labels = array(
+		'apple_pay'           => 'Apple Pay',
+		'google_pay'          => 'Google Pay',
+		'link'                => 'Link',
+		'amazon_pay'          => 'Amazon Pay',
+		'payment_request_api' => 'Payment Request',
+	);
+	return isset( $labels[ $type ] ) ? $labels[ $type ] : 'express wallet';
 }
 
 /**
@@ -654,6 +785,11 @@ function myotp_pv_sanitize_options( $input, $current = array() ) {
 	// Store what will be sent: capped at 14400, and at 3600 on Telegram.
 	if ( isset( $input['otp_validity'] ) || isset( $input['channel'] ) ) {
 		$out['otp_validity'] = myotp_pv_effective_validity( $out );
+	}
+
+	if ( isset( $input['wc_express'] ) ) {
+		$mode              = is_string( $input['wc_express'] ) ? strtolower( trim( $input['wc_express'] ) ) : '';
+		$out['wc_express'] = in_array( $mode, myotp_pv_express_modes(), true ) ? $mode : ( in_array( $current['wc_express'], myotp_pv_express_modes(), true ) ? $current['wc_express'] : 'allow' );
 	}
 
 	if ( array_key_exists( 'brand', $input ) ) {

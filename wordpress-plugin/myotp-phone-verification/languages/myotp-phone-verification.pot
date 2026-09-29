@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: MyOTP Phone Verification 1.1.0\n"
 "Report-Msgid-Bugs-To: https://github.com/brntech/myotp-agentkit/issues\n"
-"POT-Creation-Date: 2026-09-29 06:38+0000\n"
+"POT-Creation-Date: 2026-09-29 16:35+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -40,6 +40,27 @@ msgstr ""
 msgid "Add a verified phone field to wp-login.php?action=register"
 msgstr ""
 
+msgid "Allow without a code"
+msgstr ""
+
+msgid "Allow without a code: the wallet has already confirmed the payer and the order is paid. The order is placed as usual, is not marked as verified, and gets an order note."
+msgstr ""
+
+msgid "Apple Pay / Google Pay and other express wallet orders"
+msgstr ""
+
+msgid "Ask for the code after payment"
+msgstr ""
+
+msgid "Ask for the code after payment: the paid order goes on hold. The shopper verifies the order's billing phone on the order confirmation page (or under My account, View order), and the order then moves on as paid. An order that is never verified stays on hold for you to review."
+msgstr ""
+
+msgid "Block"
+msgstr ""
+
+msgid "Block: wallet orders are refused unless the shopper already verified the same phone at checkout, as before 1.1.0."
+msgstr ""
+
 msgid "Brand (optional)"
 msgstr ""
 
@@ -50,6 +71,9 @@ msgid "Checking..."
 msgstr ""
 
 msgid "Code length"
+msgstr ""
+
+msgid "Code sent to the phone number on this order. Enter it below."
 msgstr ""
 
 msgid "Code sent. Enter it below."
@@ -73,6 +97,9 @@ msgstr ""
 msgid "Enter your phone number and verify it before placing the order. Use the Send code button under the phone field."
 msgstr ""
 
+msgid "Express wallet buttons (Apple Pay, Google Pay, Link, Amazon Pay from WooPayments or WooCommerce Stripe Payment Gateway) place the order without the checkout form, so the shopper never sees the code box."
+msgstr ""
+
 #. translators: %s: link to myotp.app sign-up
 msgid "Get an API key at %s (15 free trial credits, no card). Dashboard: User API Keys."
 msgstr ""
@@ -84,6 +111,29 @@ msgid "MyOTP"
 msgstr ""
 
 msgid "MyOTP Phone Verification"
+msgstr ""
+
+msgid "MyOTP: billing phone verified by the shopper after the express wallet payment."
+msgstr ""
+
+#. translators: %s: wallet name, e.g. Apple Pay
+msgid "MyOTP: express wallet payment (%s) placed without phone verification."
+msgstr ""
+
+#. translators: %s: wallet name, e.g. Apple Pay
+msgid "MyOTP: express wallet payment (%s). Once paid, the order is held on-hold until the shopper verifies the billing phone on the order confirmation page."
+msgstr ""
+
+msgid "MyOTP: held until the shopper verifies the billing phone."
+msgstr ""
+
+msgid "MyOTP: payment received. The order is on hold until the shopper verifies the billing phone."
+msgstr ""
+
+msgid "MyOTP: released after phone verification."
+msgstr ""
+
+msgid "MyOTP: the billing phone on this order cannot receive a code. Contact the customer before releasing it."
 msgstr ""
 
 msgid "MyOTP: the phone verification claimed at checkout could not be consumed for this order (it changed or expired in between). Billing phone is unverified."
@@ -111,6 +161,9 @@ msgid "Phone number (with country code)"
 msgstr ""
 
 msgid "Phone number verified."
+msgstr ""
+
+msgid "Phone number verified. Thank you, the shop can now process your order."
 msgstr ""
 
 msgid "Phone verification is not configured on this site yet."
@@ -174,10 +227,25 @@ msgstr ""
 msgid "The phone number changed after verification. Verify it again."
 msgstr ""
 
+msgid "The phone number on this order cannot receive a code. The shop will contact you."
+msgstr ""
+
+msgid "The phone number on this order changed. Send a new code."
+msgstr ""
+
 msgid "The verification service gave an unexpected answer. Try again."
 msgstr ""
 
 msgid "The verification service returned an error."
+msgstr ""
+
+msgid "This order cannot be verified here."
+msgstr ""
+
+msgid "This order is already verified."
+msgstr ""
+
+msgid "This order is on hold until the phone number on it is verified, but that number cannot receive a code. The shop will contact you."
 msgstr ""
 
 msgid "This phone verification was already used by another checkout. Verify your number again."
@@ -218,6 +286,9 @@ msgstr ""
 msgid "Verify your billing phone number before placing the order. Use the Send code button under the billing details."
 msgstr ""
 
+msgid "Verify your phone number"
+msgstr ""
+
 msgid "Verify your phone number before registering."
 msgstr ""
 
@@ -236,7 +307,10 @@ msgstr ""
 msgid "WordPress registration"
 msgstr ""
 
-msgid "Works with the classic (shortcode) checkout and the block checkout. Keep the phone field visible in the checkout block. Express payment buttons (Apple Pay, Google Pay) that skip the checkout page are not supported for guests."
+msgid "Works with the classic (shortcode) checkout and the block checkout. Keep the phone field visible in the checkout block."
+msgstr ""
+
+msgid "Your payment went through. The shop will process your order once you verify the phone number on it."
 msgstr ""
 
 msgid "renders the widget on any page. On success it fires a myotp:verified event on document with the number in event.detail.phone."

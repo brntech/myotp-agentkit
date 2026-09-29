@@ -40,6 +40,7 @@ require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-settings.php';
 require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-shortcode.php';
 require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-registration.php';
 require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-woocommerce.php';
+require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-order-verify.php';
 
 /**
  * Read plugin options merged with defaults.
@@ -49,6 +50,67 @@ require_once MYOTP_PV_DIR . 'includes/class-myotp-pv-woocommerce.php';
 function myotp_pv_get_options() {
 	$stored = get_option( MYOTP_PV_OPTION, array() );
 	return array_merge( myotp_pv_default_options(), is_array( $stored ) ? $stored : array() );
+}
+
+/**
+ * Express wallet detector. Returns the wallet type (apple_pay, google_pay,
+ * link, amazon_pay, payment_request_api) when the chosen payment method is a
+ * gateway that offers express wallets and the request carries that
+ * gateway's wallet marker; empty string otherwise, and the checkout gate
+ * then applies as usual. Sources for every marker: myotp_pv_express_wallet_defaults().
+ *
+ * Every field here comes from the shopper's browser. The gateway id is the
+ * real guard: a marker sent with cash on delivery, bank transfer or any
+ * gateway not in the map is ignored. A shopper who sends the marker with a
+ * wallet gateway has still paid through that gateway.
+ *
+ * Filters:
+ * - myotp_pv_express_wallet_gateways: gateway id => list of marker field names.
+ * - myotp_pv_express_wallet_types: accepted wallet type values.
+ * - myotp_pv_express_wallet_type: the final answer, with the payment method and fields.
+ *
+ * @param mixed $payment_method Gateway id from the request.
+ * @param array $fields         Request fields (classic: $_POST; Store API: payment_data).
+ * @return string
+ */
+function myotp_pv_express_wallet_type( $payment_method, array $fields ) {
+	$defaults = myotp_pv_express_wallet_defaults();
+	$gateways = apply_filters( 'myotp_pv_express_wallet_gateways', $defaults['gateways'] );
+	$types    = apply_filters( 'myotp_pv_express_wallet_types', $defaults['types'] );
+	$type     = myotp_pv_match_express_wallet( $payment_method, $fields, is_array( $gateways ) ? $gateways : array(), is_array( $types ) ? $types : array() );
+	$type     = apply_filters( 'myotp_pv_express_wallet_type', $type, $payment_method, $fields );
+	return is_string( $type ) ? sanitize_key( $type ) : '';
+}
+
+/**
+ * True when the request is an express wallet order (see myotp_pv_express_wallet_type()).
+ *
+ * @param mixed $payment_method Gateway id from the request.
+ * @param array $fields         Request fields.
+ * @return bool
+ */
+function myotp_pv_is_express_wallet_request( $payment_method, array $fields ) {
+	return '' !== myotp_pv_express_wallet_type( $payment_method, $fields );
+}
+
+/**
+ * Marker field names across every configured wallet gateway, so the
+ * classic checkout reads only those keys from the posted form.
+ *
+ * @return string[]
+ */
+function myotp_pv_express_marker_keys() {
+	$defaults = myotp_pv_express_wallet_defaults();
+	$gateways = apply_filters( 'myotp_pv_express_wallet_gateways', $defaults['gateways'] );
+	$keys     = array();
+	foreach ( is_array( $gateways ) ? $gateways : array() as $markers ) {
+		foreach ( is_array( $markers ) ? $markers : array() as $marker ) {
+			if ( is_string( $marker ) && '' !== $marker ) {
+				$keys[ $marker ] = true;
+			}
+		}
+	}
+	return array_keys( $keys );
 }
 
 /**
@@ -63,6 +125,8 @@ function myotp_pv_init() {
 	MyOTP_PV_Registration::init();
 	if ( class_exists( 'WooCommerce' ) ) {
 		MyOTP_PV_WooCommerce::init();
+		// Always on with WooCommerce: orders held earlier must stay verifiable after a settings change.
+		MyOTP_PV_Order_Verify::init();
 	}
 }
 add_action( 'plugins_loaded', 'myotp_pv_init' );

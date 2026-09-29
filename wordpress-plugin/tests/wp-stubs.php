@@ -130,15 +130,20 @@ class_alias( 'MyOTP_Fake_RouteException', 'Automattic\WooCommerce\StoreApi\Excep
 class MyOTP_Fake_Request {
 	public $method;
 	public $route;
-	public function __construct( $method, $route = '/wc/store/v1/checkout' ) {
+	public $params = array();
+	public function __construct( $method, $route = '/wc/store/v1/checkout', array $params = array() ) {
 		$this->method = $method;
 		$this->route  = $route;
+		$this->params = $params;
 	}
 	public function get_route() {
 		return $this->route;
 	}
 	public function get_method() {
 		return $this->method;
+	}
+	public function get_param( $key ) {
+		return isset( $this->params[ $key ] ) ? $this->params[ $key ] : null;
 	}
 }
 
@@ -174,6 +179,50 @@ class MyOTP_Fake_Order {
 	public function add_order_note( $note ) {
 		$this->notes[] = $note;
 	}
+	public function get_meta( $k, $single = true ) {
+		return isset( $this->meta[ $k ] ) ? $this->meta[ $k ] : '';
+	}
+	public $status           = 'pending';
+	public $order_key        = 'wc_order_testkey';
+	public $customer_id      = 0;
+	public $needs_processing = true;
+	public $status_log       = array();
+	public function get_order_key() {
+		return $this->order_key;
+	}
+	public function get_customer_id() {
+		return $this->customer_id;
+	}
+	public function get_status() {
+		return $this->status;
+	}
+	public function has_status( $s ) {
+		return is_array( $s ) ? in_array( $this->status, $s, true ) : $this->status === $s;
+	}
+	/** Like WC_Order::update_status: set, note, save, then fire woocommerce_order_status_changed. */
+	public function update_status( $to, $note = '' ) {
+		$from         = $this->status;
+		$this->status = $to;
+		if ( '' !== $note ) {
+			$this->notes[] = $note;
+		}
+		$this->save();
+		$this->status_log[] = $to;
+		if ( $from !== $to && myotp_test_has_hook( 'woocommerce_order_status_changed' ) ) {
+			myotp_test_do_action( 'woocommerce_order_status_changed', $this->id, $from, $to, $this );
+		}
+		return true;
+	}
+	/** Like WC_Order::payment_complete: the filtered status, then save. */
+	public function payment_complete() {
+		$to = apply_filters( 'woocommerce_payment_complete_order_status', $this->needs_processing ? 'processing' : 'completed', $this->id, $this );
+		return $this->update_status( $to );
+	}
+}
+
+/** Orders by id for wc_get_order(). */
+function wc_get_order( $id ) {
+	return isset( $GLOBALS['myotp_test']['orders'][ $id ] ) ? $GLOBALS['myotp_test']['orders'][ $id ] : false;
 }
 
 $GLOBALS['myotp_test'] = array(
@@ -206,6 +255,9 @@ function myotp_test_reset() {
 	$GLOBALS['myotp_test']['single']      = array();
 	$GLOBALS['myotp_test']['meta_fail']   = false;
 	$GLOBALS['myotp_test']['delete_meta_fail'] = false;
+	$GLOBALS['myotp_test']['orders']      = array();
+	$GLOBALS['myotp_test']['can_edit_orders'] = false;
+	$_GET                                 = array();
 	MyOTP_PV_Store::$instance             = new MyOTP_Mem_Store();
 	MyOTP_PV_Session::$request_id         = 'rid-' . bin2hex( random_bytes( 4 ) );
 }
@@ -322,12 +374,20 @@ function wp_json_encode( $v ) { return json_encode( $v ); }
 
 // Auth.
 function check_ajax_referer( $action, $field ) {
+	$GLOBALS['myotp_test']['nonce_action'] = $action;
 	if ( ! $GLOBALS['myotp_test']['nonce_ok'] ) {
 		throw new MyOTP_Test_Exit( false, array( 'message' => 'bad nonce' ), 403 );
 	}
 	return 1;
 }
-function current_user_can( $cap ) { return $GLOBALS['myotp_test']['can_manage']; }
+function current_user_can( $cap ) {
+	if ( 'edit_shop_orders' === $cap ) {
+		return ! empty( $GLOBALS['myotp_test']['can_edit_orders'] );
+	}
+	return $GLOBALS['myotp_test']['can_manage'];
+}
+function wp_create_nonce( $action = -1 ) { return 'nonce-' . md5( (string) $action ); }
+function absint( $v ) { return abs( (int) $v ); }
 function settings_errors( $s = '' ) {}
 function settings_fields( $g ) {}
 function submit_button( $t = null ) { echo '<input type="submit" />'; }

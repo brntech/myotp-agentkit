@@ -136,16 +136,20 @@ class MyOTP_PV_Session {
 	 * Take a send slot on visitor, IP, destination and the whole site.
 	 *
 	 * @param string $phone Destination digits.
+	 * @param array  $extra More dimensions, each array( key, max[, window] ), taken first.
 	 * @return array{allowed: bool, retry_after: int, denied: string, taken: array}
 	 */
-	public static function take_send( $phone ) {
+	public static function take_send( $phone, array $extra = array() ) {
 		return myotp_pv_take_send_slots(
 			MyOTP_PV_Store::instance(),
-			array(
-				array( 'send_v_' . self::visitor_key(), self::MAX_VISITOR ),
-				array( self::ip_key(), self::MAX_IP ),
-				array( 'send_p_' . $phone, self::MAX_PHONE ),
-				array( self::SITE_KEY, self::site_hourly_cap(), self::SITE_WINDOW ),
+			array_merge(
+				$extra,
+				array(
+					array( 'send_v_' . self::visitor_key(), self::MAX_VISITOR ),
+					array( self::ip_key(), self::MAX_IP ),
+					array( 'send_p_' . $phone, self::MAX_PHONE ),
+					array( self::SITE_KEY, self::site_hourly_cap(), self::SITE_WINDOW ),
+				)
 			),
 			time(),
 			MYOTP_PV_RATE_WINDOW

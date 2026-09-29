@@ -6,10 +6,10 @@
 		return;
 	}
 
-	function post(action, fields) {
+	function post(action, fields, nonce) {
 		var body = new FormData();
 		body.append('action', action);
-		body.append('nonce', myotpPv.nonce);
+		body.append('nonce', nonce || myotpPv.nonce);
 		Object.keys(fields).forEach(function (k) {
 			body.append(k, fields[k]);
 		});
@@ -54,6 +54,10 @@
 		var codeRow = root.querySelector('.myotp-pv-code-row');
 		var codeInput = root.querySelector('.myotp-pv-code');
 		var sentTo = '';
+		// Held order after an express wallet payment: the server takes the phone from the order.
+		var orderId = root.getAttribute('data-order') || '';
+		var orderFields = orderId ? { order_id: orderId, key: root.getAttribute('data-order-key') || '' } : null;
+		var orderNonce = orderId ? root.getAttribute('data-nonce') || '' : '';
 
 		function lock(el, on) {
 			if (el) {
@@ -77,7 +81,8 @@
 			}
 			lock(sendBtn, true);
 			setStatus(root, myotpPv.i18n.sending, true);
-			post('myotp_pv_send', { phone: phone }).then(function (res) {
+			var sending = orderFields ? post('myotp_pv_order_send', orderFields, orderNonce) : post('myotp_pv_send', { phone: phone });
+			sending.then(function (res) {
 				lock(sendBtn, false);
 				if (res && res.success) {
 					sentTo = res.data.phone || phone;
@@ -107,13 +112,16 @@
 			var phone = digits(input ? input.value : '') || sentTo;
 			lock(verifyBtn, true);
 			setStatus(root, myotpPv.i18n.checking, true);
-			post('myotp_pv_verify', { phone: phone, otp: otp }).then(function (res) {
+			var checking = orderFields
+				? post('myotp_pv_order_verify', Object.assign({ otp: otp }, orderFields), orderNonce)
+				: post('myotp_pv_verify', { phone: phone, otp: otp });
+			checking.then(function (res) {
 				lock(verifyBtn, false);
 				if (res && res.success) {
 					root.setAttribute('data-verified', '1');
 					codeRow.hidden = true;
 					lock(sendBtn, true);
-					if (input && !root.getAttribute('data-phone-selector')) {
+					if (input && !root.getAttribute('data-phone-selector') && !orderFields) {
 						input.value = res.data.phone || phone;
 						input.disabled = true;
 					}

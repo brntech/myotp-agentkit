@@ -312,6 +312,14 @@ foreach ( array(
 	'woocommerce_checkout_order_created',
 	'woocommerce_store_api_checkout_update_order_from_request',
 	'woocommerce_store_api_checkout_order_processed',
+	'woocommerce_payment_complete_order_status',
+	'woocommerce_order_status_changed',
+	'woocommerce_thankyou',
+	'woocommerce_view_order',
+	'wp_ajax_myotp_pv_order_send',
+	'wp_ajax_nopriv_myotp_pv_order_send',
+	'wp_ajax_myotp_pv_order_verify',
+	'wp_ajax_nopriv_myotp_pv_order_verify',
 	'wp_footer',
 	'registration_errors',
 	'register_new_user',
@@ -920,6 +928,380 @@ check( 'block widget: template emitted with the widget', true, false !== strpos(
 check( 'block widget: bound to the block checkout phone field', true, false !== strpos( $footer, 'data-phone-selector="#billing-phone"' ) );
 check( 'block widget: injector script enqueued', true, in_array( 'myotp-pv-block', $GLOBALS['myotp_test']['enqueued'], true ) );
 $GLOBALS['myotp_test']['has_block'] = array();
+
+// ---------------------------------------------------------------- Express wallet orders (Apple Pay, Google Pay, ...).
+
+// Detector: gateway id AND that gateway's own marker AND a known wallet type.
+$gw = myotp_pv_express_wallet_defaults();
+check( 'wallet: WooPayments Store API marker', 'apple_pay', myotp_pv_match_express_wallet( 'woocommerce_payments', array( 'express_payment_type' => 'apple_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: WooPayments legacy payment_request_type', 'google_pay', myotp_pv_match_express_wallet( 'woocommerce_payments', array( 'payment_request_type' => 'google_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: Stripe Store API marker', 'google_pay', myotp_pv_match_express_wallet( 'stripe', array( 'express_payment_type' => 'google_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: Stripe classic express_checkout_type', 'apple_pay', myotp_pv_match_express_wallet( 'stripe', array( 'express_checkout_type' => 'Apple_Pay ' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: Stripe legacy payment_request_api', 'payment_request_api', myotp_pv_match_express_wallet( 'stripe', array( 'payment_request_type' => 'payment_request_api' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: forged marker on cod ignored', '', myotp_pv_match_express_wallet( 'cod', array( 'express_payment_type' => 'apple_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: forged marker on bacs ignored', '', myotp_pv_match_express_wallet( 'bacs', array( 'express_payment_type' => 'apple_pay', 'express_checkout_type' => 'apple_pay', 'payment_request_type' => 'apple_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: another gateway\'s marker does not count (WooPayments has no express_checkout_type)', '', myotp_pv_match_express_wallet( 'woocommerce_payments', array( 'express_checkout_type' => 'apple_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: unknown wallet value ignored', '', myotp_pv_match_express_wallet( 'stripe', array( 'express_payment_type' => 'card' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: empty value ignored', '', myotp_pv_match_express_wallet( 'stripe', array( 'express_payment_type' => '' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: array value ignored', '', myotp_pv_match_express_wallet( 'stripe', array( 'express_payment_type' => array( 'apple_pay' ) ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: non-string gateway ignored', '', myotp_pv_match_express_wallet( array( 'stripe' ), array( 'express_payment_type' => 'apple_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: marker without gateway ignored', '', myotp_pv_match_express_wallet( '', array( 'express_payment_type' => 'apple_pay' ), $gw['gateways'], $gw['types'] ) );
+check( 'wallet: payment_data flattened', array( 'payment_method' => 'card', 'express_payment_type' => 'apple_pay', 'wc-stripe-is-deferred-intent' => '1' ), myotp_pv_payment_data_fields( array( array( 'key' => 'payment_method', 'value' => 'card' ), array( 'key' => 'express_payment_type', 'value' => 'apple_pay' ), array( 'key' => 'wc-stripe-is-deferred-intent', 'value' => true ), array( 'key' => 'x', 'value' => array( 1 ) ), 'junk', array( 'value' => 'no key' ) ) ) );
+check( 'wallet: payment_data non-array is empty', array(), myotp_pv_payment_data_fields( 'express_payment_type=apple_pay' ) );
+check( 'wallet: bool detector', true, myotp_pv_is_express_wallet_request( 'woocommerce_payments', array( 'express_payment_type' => 'google_pay' ) ) );
+// Filterable: another gateway can be added, and the added gateway still needs its marker.
+add_filter(
+	'myotp_pv_express_wallet_gateways',
+	function ( $g ) {
+		$g['acme_wallet'] = array( 'acme_express' );
+		return $g;
+	}
+);
+check( 'wallet filter: added gateway detected', 'apple_pay', myotp_pv_express_wallet_type( 'acme_wallet', array( 'acme_express' => 'apple_pay' ) ) );
+check( 'wallet filter: added gateway without its marker', '', myotp_pv_express_wallet_type( 'acme_wallet', array( 'express_payment_type' => 'apple_pay' ) ) );
+check( 'wallet filter: marker keys include the added one', true, in_array( 'acme_express', myotp_pv_express_marker_keys(), true ) );
+unset( $GLOBALS['myotp_test']['hooks']['myotp_pv_express_wallet_gateways'] );
+check( 'wallet filter: removed again', '', myotp_pv_express_wallet_type( 'acme_wallet', array( 'acme_express' => 'apple_pay' ) ) );
+
+// Setting: default "allow" for new installs and for 1.0.0 options without the key; sanitised to the three choices.
+check( 'express setting: default is allow', 'allow', myotp_pv_default_options()['wc_express'] );
+myotp_test_configure();
+$GLOBALS['myotp_test']['options']['myotp_pv_options'] = array( 'api_key' => $key, 'channel' => 'sms', 'otp_length' => 6, 'otp_validity' => 300, 'brand' => '', 'wc_enabled' => 1, 'wc_guests_only' => 0, 'register_enabled' => 0, 'site_hourly_cap' => 100 );
+check( 'express setting: upgrade from 1.0.0 options reads allow', 'allow', myotp_pv_get_options()['wc_express'] );
+check( 'express setting: upgrade mode is allow', 'allow', MyOTP_PV_WooCommerce::express_mode() );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_express'] = 'sideways';
+check( 'express setting: garbage stored value is treated as block', 'block', MyOTP_PV_WooCommerce::express_mode() );
+check( 'express setting: sanitize keeps after', 'after', myotp_pv_sanitize_options( array( 'wc_express' => 'after' ), array() )['wc_express'] );
+check( 'express setting: sanitize keeps block', 'block', myotp_pv_sanitize_options( array( 'wc_express' => 'BLOCK' ), array() )['wc_express'] );
+check( 'express setting: sanitize refuses unknown, keeps current', 'after', myotp_pv_sanitize_options( array( 'wc_express' => '<script>' ), array( 'wc_express' => 'after' ) )['wc_express'] );
+check( 'express setting: sanitize refuses array', 'allow', myotp_pv_sanitize_options( array( 'wc_express' => array( 'after' ) ), array() )['wc_express'] );
+check( 'express setting: absent field keeps current', 'block', myotp_pv_sanitize_options( array( 'otp_length' => 6 ), array( 'wc_express' => 'block' ) )['wc_express'] );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_express'] = 'after';
+$GLOBALS['myotp_test']['can_manage']                               = true;
+ob_start();
+MyOTP_PV_Settings::render();
+$settings_html = ob_get_clean();
+check( 'express setting: row label on the settings page', true, false !== strpos( $settings_html, 'Apple Pay / Google Pay and other express wallet orders' ) );
+check( 'express setting: three choices', 3, preg_match_all( '/<option value="(allow|after|block)"/', $settings_html ) );
+check( 'express setting: stored choice selected', true, (bool) preg_match( '/<option value="after"\s+selected="selected"/', $settings_html ) );
+
+function myotp_test_set_express( string $mode ): void {
+	$GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_express'] = $mode;
+}
+/** Classic checkout: validation with posted wallet markers, then order creation. */
+function myotp_test_classic_wallet( string $mode, string $gateway, array $markers, int $order_id = 601 ): array {
+	myotp_test_configure();
+	myotp_test_set_express( $mode );
+	$_POST  = $markers;
+	$errors = new WP_Error();
+	myotp_test_do_action( 'woocommerce_after_checkout_validation', array( 'billing_phone' => '+14155550123', 'payment_method' => $gateway ), $errors );
+	$order                = new MyOTP_Fake_Order( $order_id );
+	$order->billing_phone = '+14155550123';
+	if ( array() === $errors->get_error_codes() ) {
+		myotp_test_do_action( 'woocommerce_checkout_order_created', $order );
+	}
+	return array( $errors->get_error_codes(), $order );
+}
+/** Block checkout: Store API POST with payment_method and payment_data, then order processing. */
+function myotp_test_block_wallet( string $mode, string $gateway, array $payment_data, int $order_id = 701 ): array {
+	myotp_test_configure();
+	myotp_test_set_express( $mode );
+	$order                = new MyOTP_Fake_Order( $order_id );
+	$order->billing_phone = '+14155550123';
+	$data                 = array();
+	foreach ( $payment_data as $k => $v ) {
+		$data[] = array( 'key' => $k, 'value' => $v );
+	}
+	$request = new MyOTP_Fake_Request( 'POST', '/wc/store/v1/checkout', array( 'payment_method' => $gateway, 'payment_data' => $data ) );
+	try {
+		myotp_test_do_action( 'woocommerce_store_api_checkout_update_order_from_request', $order, $request );
+		myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $order );
+	} catch ( Exception $e ) {
+		return array( $e instanceof MyOTP_Fake_RouteException ? $e->error_code : get_class( $e ), $order );
+	}
+	return array( null, $order );
+}
+function myotp_test_has_note( MyOTP_Fake_Order $order, string $needle ): bool {
+	foreach ( $order->notes as $n ) {
+		if ( false !== strpos( $n, $needle ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Classic checkout, each mode.
+list( $codes, $o ) = myotp_test_classic_wallet( 'allow', 'woocommerce_payments', array( 'express_payment_type' => 'apple_pay' ) );
+check( 'classic allow: wallet order passes without a code', array(), $codes );
+check( 'classic allow: order note says placed without phone verification', true, myotp_test_has_note( $o, 'express wallet payment (Apple Pay) placed without phone verification' ) );
+check( 'classic allow: not stamped as verified', false, isset( $o->meta['_myotp_verified_phone'] ) );
+check( 'classic allow: not held', false, isset( $o->meta['_myotp_pv_awaiting'] ) );
+list( $codes, $o ) = myotp_test_classic_wallet( 'allow', 'stripe', array( 'express_checkout_type' => 'google_pay' ) );
+check( 'classic allow: Stripe classic field passes', array(), $codes );
+check( 'classic allow: Stripe note names Google Pay', true, myotp_test_has_note( $o, '(Google Pay)' ) );
+list( $codes, $o ) = myotp_test_classic_wallet( 'after', 'stripe', array( 'payment_request_type' => 'apple_pay' ) );
+check( 'classic after: wallet order passes validation', array(), $codes );
+check( 'classic after: order marked as awaiting verification', 'apple_pay', $o->meta['_myotp_pv_awaiting'] ?? null );
+check( 'classic after: note about the hold', true, myotp_test_has_note( $o, 'held on-hold until the shopper verifies' ) );
+check( 'classic after: not stamped', false, isset( $o->meta['_myotp_verified_phone'] ) );
+list( $codes, $o ) = myotp_test_classic_wallet( 'block', 'woocommerce_payments', array( 'express_payment_type' => 'apple_pay' ) );
+check( 'classic block: wallet order refused like before', array( 'myotp_pv_unverified' ), $codes );
+list( $codes, $o ) = myotp_test_classic_wallet( 'allow', 'cod', array( 'express_payment_type' => 'apple_pay', 'express_checkout_type' => 'apple_pay', 'payment_request_type' => 'apple_pay' ) );
+check( 'classic forged: wallet marker on cash on delivery still gated', array( 'myotp_pv_unverified' ), $codes );
+list( $codes, $o ) = myotp_test_classic_wallet( 'after', 'bacs', array( 'express_payment_type' => 'google_pay' ) );
+check( 'classic forged: wallet marker on bank transfer still gated (after mode)', array( 'myotp_pv_unverified' ), $codes );
+list( $codes, $o ) = myotp_test_classic_wallet( 'allow', 'stripe', array( 'express_payment_type' => 'card' ) );
+check( 'classic: Stripe card order (no wallet type) still gated', array( 'myotp_pv_unverified' ), $codes );
+list( $codes, $o ) = myotp_test_classic_wallet( 'allow', 'stripe', array() );
+check( 'classic: Stripe without any marker still gated', array( 'myotp_pv_unverified' ), $codes );
+// A wallet order never claims the visitor's proof, and a following normal order is gated again.
+myotp_test_configure();
+myotp_test_set_express( 'allow' );
+MyOTP_PV_Session::set_verified( '14155550123', null );
+$_POST  = array( 'express_payment_type' => 'apple_pay' );
+$errors = new WP_Error();
+myotp_test_do_action( 'woocommerce_after_checkout_validation', array( 'billing_phone' => '+14155550123', 'payment_method' => 'woocommerce_payments' ), $errors );
+check( 'classic allow: proof left unclaimed', 'verified', myotp_test_vrec()['state'] );
+$_POST = array();
+check( 'classic: next normal order in the same process goes through the gate', array(), myotp_test_checkout_validate( '+14155550123' )->get_error_codes() );
+check( 'classic: next normal order claimed the proof', 0, strpos( myotp_test_vrec()['state'], 'claiming:' ) );
+// Guests only: a logged-in customer's wallet order is untouched (no note, no hold).
+myotp_test_configure();
+myotp_test_set_express( 'after' );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_guests_only'] = 1;
+$GLOBALS['myotp_test']['logged_in'] = true;
+$_POST                              = array( 'express_payment_type' => 'apple_pay' );
+$errors                             = new WP_Error();
+myotp_test_do_action( 'woocommerce_after_checkout_validation', array( 'billing_phone' => '+14155550123', 'payment_method' => 'woocommerce_payments' ), $errors );
+$o = new MyOTP_Fake_Order( 650 );
+myotp_test_do_action( 'woocommerce_checkout_order_created', $o );
+check( 'classic guests-only: logged-in wallet order not held', false, isset( $o->meta['_myotp_pv_awaiting'] ) );
+
+// Store API (block checkout and every express button's order), each mode.
+list( $err, $o ) = myotp_test_block_wallet( 'allow', 'woocommerce_payments', array( 'payment_method' => 'card', 'express_payment_type' => 'apple_pay' ) );
+check( 'store api allow: WooPayments wallet order passes', null, $err );
+check( 'store api allow: note', true, myotp_test_has_note( $o, 'express wallet payment (Apple Pay) placed without phone verification' ) );
+check( 'store api allow: not stamped', false, isset( $o->meta['_myotp_verified_phone'] ) );
+check( 'store api allow: no key pin left behind', '', MyOTP_PV_Session::$key_override );
+list( $err, $o ) = myotp_test_block_wallet( 'allow', 'stripe', array( 'payment_method' => 'stripe', 'express_payment_type' => 'google_pay', 'wc-stripe-is-deferred-intent' => true ) );
+check( 'store api allow: Stripe wallet order passes', null, $err );
+list( $err, $o ) = myotp_test_block_wallet( 'after', 'stripe', array( 'express_payment_type' => 'link' ) );
+check( 'store api after: passes', null, $err );
+check( 'store api after: marked awaiting', 'link', $o->meta['_myotp_pv_awaiting'] ?? null );
+check( 'store api after: not stamped', false, isset( $o->meta['_myotp_verified_phone'] ) );
+list( $err, $o ) = myotp_test_block_wallet( 'block', 'woocommerce_payments', array( 'express_payment_type' => 'apple_pay' ) );
+check( 'store api block: wallet order refused', 'myotp_pv_unverified', $err );
+list( $err, $o ) = myotp_test_block_wallet( 'allow', 'cod', array( 'express_payment_type' => 'apple_pay' ) );
+check( 'store api forged: marker on cod still gated', 'myotp_pv_unverified', $err );
+check( 'store api forged: no note on the refused order', array(), $o->notes );
+list( $err, $o ) = myotp_test_block_wallet( 'after', 'bacs', array( 'express_payment_type' => 'apple_pay', 'payment_request_type' => 'google_pay' ) );
+check( 'store api forged: marker on bacs still gated (after mode)', 'myotp_pv_unverified', $err );
+list( $err, $o ) = myotp_test_block_wallet( 'allow', 'woocommerce_payments', array( 'payment_method' => 'card' ) );
+check( 'store api: WooPayments card order (no marker) still gated', 'myotp_pv_unverified', $err );
+// A wallet request followed by a normal one in the same process: the normal one is gated.
+myotp_test_block_wallet( 'allow', 'woocommerce_payments', array( 'express_payment_type' => 'apple_pay' ) );
+check( 'store api: normal order after a wallet order is gated', 'myotp_pv_unverified', myotp_test_block_validate( '+14155550123' )->error_code );
+
+// After payment: held, verified by the shopper on the order page, released.
+function myotp_test_held_order( int $id = 801, string $wallet = 'apple_pay' ): MyOTP_Fake_Order {
+	list( , $o ) = myotp_test_block_wallet( 'after', 'woocommerce_payments', array( 'express_payment_type' => $wallet ), $id );
+	$o->order_key = 'wc_order_k' . $id;
+	$GLOBALS['myotp_test']['orders'][ $id ] = $o;
+	return $o;
+}
+function myotp_test_order_ajax( string $action, array $post ): MyOTP_Test_Exit {
+	$_POST = array_merge( array( 'nonce' => 'x' ), $post );
+	return myotp_test_ajax( 'wp_ajax_nopriv_' . $action );
+}
+$o = myotp_test_held_order();
+check( 'after: order still pending before payment', 'pending', $o->status );
+$o->payment_complete();
+check( 'after: paid order goes on-hold, not processing', 'on-hold', $o->status );
+check( 'after: never passed through processing', array( 'on-hold' ), $o->status_log );
+check( 'after: status to restore recorded', 'processing', $o->meta['_myotp_pv_restore_status'] ?? null );
+check( 'after: hold note', true, myotp_test_has_note( $o, 'payment received. The order is on hold' ) );
+$o2                   = myotp_test_held_order( 802 );
+$o2->needs_processing = false;
+$o2->payment_complete();
+check( 'after: virtual order held too', 'on-hold', $o2->status );
+check( 'after: virtual order will be restored to completed', 'completed', $o2->meta['_myotp_pv_restore_status'] ?? null );
+// Safety net: a gateway that sets processing directly is put back on hold; a shop manager may release by hand.
+$o3 = myotp_test_held_order( 803 );
+$o3->update_status( 'processing' );
+check( 'after: direct processing by a gateway is put back on hold', 'on-hold', $o3->status );
+check( 'after: restore status from the direct change', 'processing', $o3->meta['_myotp_pv_restore_status'] ?? null );
+$o4 = myotp_test_held_order( 804 );
+$o4->payment_complete();
+$GLOBALS['myotp_test']['can_edit_orders'] = true;
+$o4->update_status( 'processing', 'released by the shop' );
+check( 'after: shop manager can release a held order by hand', 'processing', $o4->status );
+$GLOBALS['myotp_test']['can_edit_orders'] = false;
+// An ordinary order is never touched by the payment filter.
+myotp_test_configure();
+$plain = new MyOTP_Fake_Order( 805 );
+$plain->payment_complete();
+check( 'after: order without the marker goes to processing', 'processing', $plain->status );
+
+// Order-received page: box only with the order's own key.
+$o = myotp_test_held_order( 810 );
+$o->payment_complete();
+ob_start();
+myotp_test_do_action( 'woocommerce_thankyou', 810 );
+check( 'thank-you: no key in the URL, no box', '', ob_get_clean() );
+$_GET['key'] = 'wc_order_wrong';
+ob_start();
+myotp_test_do_action( 'woocommerce_thankyou', 810 );
+check( 'thank-you: wrong key, no box', '', ob_get_clean() );
+$_GET['key'] = 'wc_order_k810';
+ob_start();
+myotp_test_do_action( 'woocommerce_thankyou', 810 );
+$box = ob_get_clean();
+check( 'thank-you: box with the right key', true, false !== strpos( $box, 'data-order="810"' ) && false !== strpos( $box, 'myotp-pv-send' ) && false !== strpos( $box, 'myotp-pv-verify' ) );
+check( 'thank-you: box shows the order phone, read-only', true, false !== strpos( $box, 'value="14155550123" readonly' ) );
+check( 'thank-you: box carries an order-bound nonce', true, false !== strpos( $box, 'data-nonce="' . wp_create_nonce( 'myotp_pv_order_810' ) . '"' ) );
+ob_start();
+myotp_test_do_action( 'woocommerce_thankyou', 999 );
+check( 'thank-you: unknown order, nothing', '', ob_get_clean() );
+$o->customer_id = 9; // an account order, viewed by someone else holding the key
+ob_start();
+myotp_test_do_action( 'woocommerce_thankyou', 810 );
+check( 'thank-you: account order, not that customer, no box', '', ob_get_clean() );
+// View order (My account): owner only.
+$o->customer_id = 7;
+ob_start();
+myotp_test_do_action( 'woocommerce_view_order', 810 );
+check( 'view order: logged out, no box', '', ob_get_clean() );
+$GLOBALS['myotp_test']['logged_in'] = true;
+ob_start();
+myotp_test_do_action( 'woocommerce_view_order', 810 );
+check( 'view order: owner sees the box', true, false !== strpos( ob_get_clean(), 'data-order-key="wc_order_k810"' ) );
+$GLOBALS['myotp_test']['logged_in'] = false;
+$o->customer_id                     = 0;
+$plain                              = new MyOTP_Fake_Order( 811 );
+$GLOBALS['myotp_test']['orders'][811] = $plain;
+$_GET['key']                        = $plain->order_key;
+ob_start();
+myotp_test_do_action( 'woocommerce_thankyou', 811 );
+check( 'thank-you: an order that is not held shows nothing', '', ob_get_clean() );
+
+// Send: order key must match; one answer for every refusal; the phone comes from the order.
+$o = myotp_test_held_order( 820 );
+$o->payment_complete();
+$GLOBALS['myotp_test']['orders'][811] = $plain;
+$r = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '820', 'key' => 'wc_order_wrong', 'phone' => '14155550999' ) );
+check( 'order send: wrong key refused 403', 403, $r->status );
+$generic = $r->data['message'];
+check( 'order send: nonce is bound to the order', 'myotp_pv_order_820', $GLOBALS['myotp_test']['nonce_action'] );
+$r = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '99999', 'key' => 'wc_order_k820' ) );
+check( 'order send: unknown order gets the same answer', array( 403, $generic ), array( $r->status, $r->data['message'] ) );
+$r = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '811', 'key' => $plain->order_key ) );
+check( 'order send: order that is not held gets the same answer', array( 403, $generic ), array( $r->status, $r->data['message'] ) );
+$r = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => array( '820' ), 'key' => 'wc_order_k820' ) );
+check( 'order send: array order id refused', 403, $r->status );
+$r = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '820' ) );
+check( 'order send: missing key refused', 403, $r->status );
+check( 'order send: no provider call on any refusal', 0, count( $GLOBALS['myotp_test']['http_log'] ) );
+$GLOBALS['myotp_test']['nonce_ok'] = false;
+check( 'order send: bad nonce refused', 403, myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '820', 'key' => 'wc_order_k820' ) )->status );
+$GLOBALS['myotp_test']['nonce_ok'] = true;
+myotp_test_http( 200, array( 'message_id' => 'om-1' ) );
+$r = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '820', 'key' => 'wc_order_k820', 'phone' => '14155550999' ) );
+check( 'order send: success', true, $r->success );
+check( 'order send: code goes to the order phone, not a posted one', '14155550123', myotp_test_last_body()['phone_number'] );
+check( 'order send: pending stored per order', 'om-1', json_decode( MyOTP_PV_Store::$instance->get( 'order_pending_820' ), true )['message_id'] );
+check( 'order send: counted against the phone limit', 1, myotp_test_counter( 'send_p_14155550123' ) );
+check( 'order send: counted against the order limit', 1, myotp_test_counter( 'send_o_820' ) );
+for ( $i = 2; $i <= 3; $i++ ) {
+	myotp_test_http( 200, array( 'message_id' => "om-$i" ) );
+	myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '820', 'key' => 'wc_order_k820' ) );
+}
+$calls = count( $GLOBALS['myotp_test']['http_log'] );
+$r     = myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '820', 'key' => 'wc_order_k820' ) );
+check( 'order send: fourth send refused 429', 429, $r->status );
+check( 'order send: refused send made no provider call', $calls, count( $GLOBALS['myotp_test']['http_log'] ) );
+
+// Verify: wrong phone, wrong key, wrong code, success, replay.
+$o = myotp_test_held_order( 830 );
+$o->payment_complete();
+myotp_test_http( 200, array( 'message_id' => 'ov-1' ) );
+myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '830', 'key' => 'wc_order_k830' ) );
+$calls = count( $GLOBALS['myotp_test']['http_log'] );
+$r     = myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '830', 'key' => 'wc_order_k810', 'otp' => '123456' ) );
+check( 'order verify: another order\'s key refused 403', 403, $r->status );
+check( 'order verify: same answer as any refusal', $generic, $r->data['message'] );
+$o->billing_phone = '+44 7700 900123';
+$r                = myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '830', 'key' => 'wc_order_k830', 'otp' => '123456', 'phone' => '14155550123' ) );
+check( 'order verify: code sent to another number than the order holds is refused', 400, $r->status );
+check( 'order verify: refused without asking the provider', $calls, count( $GLOBALS['myotp_test']['http_log'] ) );
+$o->billing_phone = '+14155550123';
+myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
+$r = myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '830', 'key' => 'wc_order_k830', 'otp' => '000000' ) );
+check( 'order verify: wrong code refused', false, $r->success );
+check( 'order verify: wrong code counted', 1, json_decode( MyOTP_PV_Store::$instance->get( 'order_pending_830' ), true )['failed'] );
+check( 'order verify: still on hold after a wrong code', 'on-hold', $o->status );
+check( 'order verify: provider checked the order phone and challenge', array( '14155550123', 'ov-1' ), array( myotp_test_last_body()['phone_number'], myotp_test_last_body()['message_id'] ) );
+myotp_test_http( 200, array( 'status' => 'success', 'message' => 'OK' ) );
+$r = myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '830', 'key' => 'wc_order_k830', 'otp' => '482917' ) );
+check( 'order verify: success', true, $r->success );
+check( 'order verify: stamped like a verified order', '14155550123', $o->meta['_myotp_verified_phone'] ?? null );
+check( 'order verify: back to the status the gateway set', 'processing', $o->status );
+check( 'order verify: hold marker cleared', false, isset( $o->meta['_myotp_pv_awaiting'] ) || isset( $o->meta['_myotp_pv_restore_status'] ) );
+check( 'order verify: verified note', true, myotp_test_has_note( $o, 'billing phone verified by the shopper' ) );
+check( 'order verify: pending challenge cleared', null, MyOTP_PV_Store::$instance->get( 'order_pending_830' ) );
+$notes = count( $o->notes );
+$calls = count( $GLOBALS['myotp_test']['http_log'] );
+$r     = myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '830', 'key' => 'wc_order_k830', 'otp' => '482917' ) );
+check( 'order verify: replay refused', array( false, 403 ), array( $r->success, $r->status ) );
+check( 'order verify: replay made no provider call', $calls, count( $GLOBALS['myotp_test']['http_log'] ) );
+check( 'order verify: replay added no note', $notes, count( $o->notes ) );
+check( 'order verify: replay left the status alone', 'processing', $o->status );
+check( 'order verify: replayed send refused too', 403, myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '830', 'key' => 'wc_order_k830' ) )->status );
+// Two requests with the same right code: the second loses the one-time marker and stamps nothing twice.
+$o = myotp_test_held_order( 840 );
+$o->payment_complete();
+myotp_test_http( 200, array( 'message_id' => 'ow-1' ) );
+myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '840', 'key' => 'wc_order_k840' ) );
+MyOTP_PV_Store::$instance->set( 'order_done_840', '1', 60 );
+myotp_test_http( 200, array( 'status' => 'success', 'message' => 'OK' ) );
+$r = myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '840', 'key' => 'wc_order_k840', 'otp' => '482917' ) );
+check( 'order verify race: loser refused 409', 409, $r->status );
+check( 'order verify race: loser stamped nothing', false, isset( $o->meta['_myotp_verified_phone'] ) );
+check( 'order verify race: loser changed no status', 'on-hold', $o->status );
+// Verified before the payment came in: stamped now, and the later payment is not held.
+$o = myotp_test_held_order( 850 );
+myotp_test_http( 200, array( 'message_id' => 'op-1' ) );
+myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '850', 'key' => 'wc_order_k850' ) );
+myotp_test_http( 200, array( 'status' => 'success', 'message' => 'OK' ) );
+myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '850', 'key' => 'wc_order_k850', 'otp' => '482917' ) );
+check( 'order verify early: stamped', '14155550123', $o->meta['_myotp_verified_phone'] ?? null );
+check( 'order verify early: status untouched while unpaid', 'pending', $o->status );
+$o->payment_complete();
+check( 'order verify early: payment then goes to processing', 'processing', $o->status );
+// Five wrong codes cool the order down (keyed on the order, not the phone alone).
+$o = myotp_test_held_order( 860 );
+$o->payment_complete();
+myotp_test_http( 200, array( 'message_id' => 'oc-1' ) );
+myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '860', 'key' => 'wc_order_k860' ) );
+for ( $i = 0; $i < 5; $i++ ) {
+	myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
+	$r = myotp_test_order_ajax( 'myotp_pv_order_verify', array( 'order_id' => '860', 'key' => 'wc_order_k860', 'otp' => '000000' ) );
+}
+check( 'order cooldown: challenge dropped after five wrong codes', null, MyOTP_PV_Store::$instance->get( 'order_pending_860' ) );
+check( 'order cooldown: send refused 429', 429, myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '860', 'key' => 'wc_order_k860' ) )->status );
+check( 'order cooldown: still on hold', 'on-hold', $o->status );
+// Account order: key alone is not enough without the customer logged in.
+$o              = myotp_test_held_order( 870 );
+$o->customer_id = 7;
+check( 'order send: account order needs its customer logged in', 403, myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '870', 'key' => 'wc_order_k870' ) )->status );
+$GLOBALS['myotp_test']['logged_in'] = true;
+myotp_test_http( 200, array( 'message_id' => 'oa-1' ) );
+check( 'order send: account order with its customer', true, myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '870', 'key' => 'wc_order_k870' ) )->success );
+$GLOBALS['myotp_test']['logged_in'] = false;
+// An order whose billing phone cannot receive a code: a note for the shop.
+$o                = new MyOTP_Fake_Order( 880 );
+$o->billing_phone = '';
+MyOTP_PV_Order_Verify::mark( $o, 'google_pay' );
+check( 'after: unusable phone gets a note for the shop', true, myotp_test_has_note( $o, 'cannot receive a code' ) );
 
 // Privacy text, header, .pot.
 myotp_test_configure();

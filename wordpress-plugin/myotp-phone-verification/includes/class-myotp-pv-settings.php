@@ -216,9 +216,29 @@ class MyOTP_PV_Settings {
 								<?php if ( ! $has_wc ) : ?>
 									<p class="description"><?php esc_html_e( 'WooCommerce is not active.', 'myotp-phone-verification' ); ?></p>
 								<?php else : ?>
-									<p class="description"><?php esc_html_e( 'Works with the classic (shortcode) checkout and the block checkout. Keep the phone field visible in the checkout block. Express payment buttons (Apple Pay, Google Pay) that skip the checkout page are not supported for guests.', 'myotp-phone-verification' ); ?></p>
+									<p class="description"><?php esc_html_e( 'Works with the classic (shortcode) checkout and the block checkout. Keep the phone field visible in the checkout block.', 'myotp-phone-verification' ); ?></p>
 								<?php endif; ?>
 							</fieldset>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="myotp_pv_wc_express"><?php esc_html_e( 'Apple Pay / Google Pay and other express wallet orders', 'myotp-phone-verification' ); ?></label></th>
+						<td>
+							<select id="myotp_pv_wc_express" name="<?php echo esc_attr( $name ); ?>[wc_express]" <?php disabled( ! $has_wc ); ?>>
+								<?php
+								foreach ( array(
+									'allow' => __( 'Allow without a code', 'myotp-phone-verification' ),
+									'after' => __( 'Ask for the code after payment', 'myotp-phone-verification' ),
+									'block' => __( 'Block', 'myotp-phone-verification' ),
+								) as $value => $label ) :
+									?>
+									<option value="<?php echo esc_attr( $value ); ?>" <?php selected( MyOTP_PV_WooCommerce::express_mode(), $value ); ?>><?php echo esc_html( $label ); ?></option>
+								<?php endforeach; ?>
+							</select>
+							<p class="description"><?php esc_html_e( 'Express wallet buttons (Apple Pay, Google Pay, Link, Amazon Pay from WooPayments or WooCommerce Stripe Payment Gateway) place the order without the checkout form, so the shopper never sees the code box.', 'myotp-phone-verification' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Allow without a code: the wallet has already confirmed the payer and the order is paid. The order is placed as usual, is not marked as verified, and gets an order note.', 'myotp-phone-verification' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Ask for the code after payment: the paid order goes on hold. The shopper verifies the order\'s billing phone on the order confirmation page (or under My account, View order), and the order then moves on as paid. An order that is never verified stays on hold for you to review.', 'myotp-phone-verification' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Block: wallet orders are refused unless the shopper already verified the same phone at checkout, as before 1.1.0.', 'myotp-phone-verification' ); ?></p>
 						</td>
 					</tr>
 					<tr>

@@ -71,7 +71,7 @@ Country code first, digits only, no plus sign. 14155550123, not +1 (415) 555-012
 
 = Does it work with the WooCommerce block checkout? =
 
-Yes, from 1.1.0. The Send code button appears under the phone field and the order is refused until that number is verified, same as the classic `[woocommerce_checkout]` page. For a returning shopper whose saved address is shown as a card with an Edit link, the Send code button sits right under that card and sends to the saved phone number. Keep the phone field visible in the checkout block; with it hidden there is nothing to verify.
+Yes, from 1.1.0. The Send code button appears under the phone field and the order is refused until that number is verified, same as the classic `[woocommerce_checkout]` page. For a returning shopper whose saved address is shown as a card with an Edit link, the Send code button sits right under that card and sends to the saved phone number. If the saved address has no phone number, pressing Send code (or a refused Place order) opens the address form at the phone field. Keep the phone field visible in the checkout block; with it hidden there is nothing to verify.
 
 = Can shoppers pay with Apple Pay or Google Pay? =
 

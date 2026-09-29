@@ -938,6 +938,8 @@ $footer = ob_get_clean();
 check( 'block widget: template emitted with the widget', true, false !== strpos( $footer, '<template id="myotp-pv-block-template">' ) && false !== strpos( $footer, 'myotp-pv-send' ) );
 check( 'block widget: bound to the block checkout phone field', true, false !== strpos( $footer, 'data-phone-selector="#billing-phone"' ) );
 check( 'block widget: injector script enqueued', true, in_array( 'myotp-pv-block', $GLOBALS['myotp_test']['enqueued'], true ) );
+check( 'block widget: the script gets the exact refusal texts it watches for', array( 'Add a phone number to your address, then verify it with the Send code button before placing the order.', 'Verify your phone number before placing the order. Use the Send code button under your address.' ), $GLOBALS['myotp_test']['localized']['myotpPvBlock']['refusals'] ?? null );
+check( 'block widget: refusal texts are the ones the gate throws', array( MyOTP_PV_WooCommerce::no_phone_message(), MyOTP_PV_WooCommerce::unverified_message() ), $GLOBALS['myotp_test']['localized']['myotpPvBlock']['refusals'] ?? null );
 $GLOBALS['myotp_test']['has_block'] = array();
 
 // ---------------------------------------------------------------- Express wallet orders (Apple Pay, Google Pay, ...).

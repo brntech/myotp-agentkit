@@ -305,7 +305,7 @@ class MyOTP_PV_WooCommerce {
 		MyOTP_PV_Session::$key_override = MyOTP_PV_Session::visitor_key();
 		$phone                          = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
 		if ( '' === myotp_pv_normalize_phone( $phone ) ) {
-			$failure = array( 'myotp_pv_no_phone', __( 'Add a phone number to your address, then verify it with the Send code button before placing the order.', 'myotp-phone-verification' ) );
+			$failure = array( 'myotp_pv_no_phone', self::no_phone_message() );
 		} else {
 			$failure = self::check( $phone, false );
 		}
@@ -337,7 +337,7 @@ class MyOTP_PV_WooCommerce {
 		}
 		try {
 			$phone   = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
-			$failure = '' === myotp_pv_normalize_phone( $phone ) ? array( 'myotp_pv_no_phone', __( 'Add a phone number to your address, then verify it with the Send code button before placing the order.', 'myotp-phone-verification' ) ) : self::check( $phone );
+			$failure = '' === myotp_pv_normalize_phone( $phone ) ? array( 'myotp_pv_no_phone', self::no_phone_message() ) : self::check( $phone );
 			if ( null !== $failure ) {
 				self::refuse( $failure );
 			}
@@ -345,6 +345,24 @@ class MyOTP_PV_WooCommerce {
 		} finally {
 			MyOTP_PV_Session::$key_override = '';
 		}
+	}
+
+	/**
+	 * Refusal when the order has no phone number.
+	 *
+	 * @return string
+	 */
+	public static function no_phone_message() {
+		return __( 'Add a phone number to your address, then verify it with the Send code button before placing the order.', 'myotp-phone-verification' );
+	}
+
+	/**
+	 * Refusal when the phone number was not verified.
+	 *
+	 * @return string
+	 */
+	public static function unverified_message() {
+		return __( 'Verify your phone number before placing the order. Use the Send code button under your address.', 'myotp-phone-verification' );
 	}
 
 	/**
@@ -377,7 +395,7 @@ class MyOTP_PV_WooCommerce {
 			if ( MyOTP_PV_Session::verified_is_used() ) {
 				return array( 'myotp_pv_claimed', __( 'Please verify your phone number again for this order.', 'myotp-phone-verification' ) );
 			}
-			return array( 'myotp_pv_unverified', __( 'Verify your phone number before placing the order. Use the Send code button under your address.', 'myotp-phone-verification' ) );
+			return array( 'myotp_pv_unverified', self::unverified_message() );
 		}
 		if ( $billing !== $verified ) {
 			return array( 'myotp_pv_mismatch', __( 'The billing phone number does not match the number you verified. Verify the new number or change it back.', 'myotp-phone-verification' ) );
@@ -409,6 +427,15 @@ class MyOTP_PV_WooCommerce {
 			return;
 		}
 		wp_enqueue_script( 'myotp-pv-block', MYOTP_PV_URL . 'assets/js/myotp-block-checkout.js', array( 'myotp-pv' ), MYOTP_PV_VERSION, true );
+		// The script opens a collapsed address when one of these refusals shows and there is no phone to verify.
+		wp_localize_script(
+			'myotp-pv-block',
+			'myotpPvBlock',
+			array(
+				'refusals' => array( self::no_phone_message(), self::unverified_message() ),
+				'addPhone' => __( 'Add a phone number to your address first.', 'myotp-phone-verification' ),
+			)
+		);
 		$html = MyOTP_PV_Widget::render(
 			array(
 				'context'        => 'checkout',

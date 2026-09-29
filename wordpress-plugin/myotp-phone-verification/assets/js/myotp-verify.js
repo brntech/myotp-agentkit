@@ -99,7 +99,10 @@
 			}
 			if (!phone) {
 				setStatus(root, myotpPv.i18n.needPhone, false);
-				if (input) {
+				// The block checkout script takes this over when the phone field is in a
+				// collapsed address (it opens the form); never focus a field nobody can see.
+				var need = new CustomEvent('myotp:need-phone', { bubbles: true, cancelable: true });
+				if (root.dispatchEvent(need) && input && input.getClientRects().length > 0) {
 					input.focus();
 				}
 				return;

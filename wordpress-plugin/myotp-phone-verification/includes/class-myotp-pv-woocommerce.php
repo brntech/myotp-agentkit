@@ -54,7 +54,7 @@ class MyOTP_PV_WooCommerce {
 		// Block checkout (Store API). The update hook also fires on draft updates,
 		// so validate_block() only acts on the POST that places the order.
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'validate_block' ), 10, 2 );
-		add_action( 'woocommerce_store_api_checkout_order_processed', array( __CLASS__, 'consume' ) );
+		add_action( 'woocommerce_store_api_checkout_order_processed', array( __CLASS__, 'consume_block' ) );
 		add_action( 'wp_footer', array( __CLASS__, 'block_widget' ) );
 	}
 
@@ -127,11 +127,43 @@ class MyOTP_PV_WooCommerce {
 		if ( '' === myotp_pv_normalize_phone( $phone ) ) {
 			$failure = array( 'myotp_pv_no_phone', __( 'Enter your phone number and verify it before placing the order. Use the Send code button under the phone field.', 'myotp-phone-verification' ) );
 		} else {
-			$failure = self::check( $phone );
+			$failure = self::check( $phone, false );
 		}
 		if ( null === $failure ) {
 			return;
 		}
+		self::refuse( $failure );
+	}
+
+	/**
+	 * Block checkout: claim the proof only now, after every other validation
+	 * (fields, stock, coupons) has passed, so an unrelated failure earlier in
+	 * the request does not burn the shopper's verification. Then stamp and
+	 * consume as the classic path does.
+	 *
+	 * @param WC_Order $order The order about to be paid.
+	 * @throws Exception Route exception when the proof cannot be claimed.
+	 */
+	public static function consume_block( $order ) {
+		self::$claimed = '';
+		if ( ! self::required() ) {
+			return;
+		}
+		$phone   = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
+		$failure = '' === myotp_pv_normalize_phone( $phone ) ? array( 'myotp_pv_no_phone', __( 'Enter your phone number and verify it before placing the order. Use the Send code button under the phone field.', 'myotp-phone-verification' ) ) : self::check( $phone );
+		if ( null !== $failure ) {
+			self::refuse( $failure );
+		}
+		self::consume( $order );
+	}
+
+	/**
+	 * Refuse the order the way the Store API expects.
+	 *
+	 * @param array $failure Array( error code, message ).
+	 * @throws Exception Always.
+	 */
+	private static function refuse( $failure ) {
 		if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
 			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( $failure[0], $failure[1], 400 );
 		}
@@ -143,9 +175,10 @@ class MyOTP_PV_WooCommerce {
 	 * for this request. Sets $claimed on success.
 	 *
 	 * @param string $billing_phone Billing phone as entered.
+	 * @param bool   $claim         False to compare only, without claiming.
 	 * @return array|null Array( error code, message ) on failure, null on success.
 	 */
-	private static function check( $billing_phone ) {
+	private static function check( $billing_phone, $claim = true ) {
 		$billing  = myotp_pv_normalize_phone( $billing_phone );
 		$verified = MyOTP_PV_Session::verified_phone();
 
@@ -157,6 +190,9 @@ class MyOTP_PV_WooCommerce {
 		}
 		if ( $billing !== $verified ) {
 			return array( 'myotp_pv_mismatch', __( 'The billing phone number does not match the number you verified. Verify the new number or change it back.', 'myotp-phone-verification' ) );
+		}
+		if ( ! $claim ) {
+			return null;
 		}
 		$claimed = MyOTP_PV_Session::claim_verified( $billing );
 		if ( $claimed !== $billing ) {

@@ -827,19 +827,57 @@ check( 'block: mismatch did not claim', 'verified', myotp_test_vrec()['state'] )
 check( 'block: draft update (PUT) is not validated', null, myotp_test_block_validate( '+1 415 555 0000', 'PUT' ) );
 check( 'block: draft update (PUT) did not claim', 'verified', myotp_test_vrec()['state'] );
 MyOTP_PV_Session::$request_id = 'rid-blk-A';
-check( 'block: matching phone passes', null, myotp_test_block_validate( '+1 (415) 555-0123' ) );
-check( 'block: proof claimed', 'claiming:14155550123:rid-blk-A', myotp_test_vrec()['state'] );
-MyOTP_PV_Session::$request_id = 'rid-blk-B';
-check( 'block: second checkout on the same proof refused', 'myotp_pv_claimed', myotp_test_block_validate( '+14155550123' )->error_code );
-MyOTP_PV_Session::$request_id = 'rid-blk-A';
-$wc_claimed->setValue( null, '14155550123' ); // the claim made by request A (each request is its own PHP process)
-$order_blk = new MyOTP_Fake_Order( 201 );
+check( 'block: matching phone passes validation', null, myotp_test_block_validate( '+1 (415) 555-0123' ) );
+check( 'block: validation alone does not claim (a later failure must not burn the proof)', 'verified', myotp_test_vrec()['state'] );
+// Claim, stamp and consume happen together once the order is processed.
+$order_blk                = new MyOTP_Fake_Order( 201 );
+$order_blk->billing_phone = '+1 (415) 555-0123';
 myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $order_blk );
 check( 'block: order stamped', '14155550123', $order_blk->meta['_myotp_verified_phone'] );
 check( 'block: record consumed by order', 'consumed:order:201', myotp_test_vrec()['state'] );
-$order_blk2 = new MyOTP_Fake_Order( 202 );
-myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $order_blk2 );
-check( 'block: processing an order without a claim stamps nothing', false, isset( $order_blk2->meta['_myotp_verified_phone'] ) );
+// A second order on the consumed proof is refused at validation and at processing.
+check( 'block: consumed proof refused at validation', 'myotp_pv_claimed', myotp_test_block_validate( '+14155550123' )->error_code );
+$order_x                = new MyOTP_Fake_Order( 203 );
+$order_x->billing_phone = '+14155550123';
+try {
+	myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $order_x );
+	$thrown = null;
+} catch ( Exception $e ) {
+	$thrown = $e->error_code;
+}
+check( 'block: consumed proof refused at processing', 'myotp_pv_claimed', $thrown );
+check( 'block: refused order not stamped', false, isset( $order_x->meta['_myotp_verified_phone'] ) );
+// Two orders racing on one proof: the first to reach processing wins.
+myotp_test_configure();
+MyOTP_PV_Session::set_verified( '14155550123', null );
+MyOTP_PV_Session::$request_id = 'rid-blk-B1';
+check( 'block race: both pass validation', array( null, null ), array( myotp_test_block_validate( '+14155550123' ), myotp_test_block_validate( '+14155550123' ) ) );
+$o1                = new MyOTP_Fake_Order( 301 );
+$o1->billing_phone = '+14155550123';
+myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $o1 );
+MyOTP_PV_Session::$request_id = 'rid-blk-B2';
+$o2                = new MyOTP_Fake_Order( 302 );
+$o2->billing_phone = '+14155550123';
+try {
+	myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $o2 );
+	$thrown = null;
+} catch ( Exception $e ) {
+	$thrown = $e->error_code;
+}
+check( 'block race: first order stamped', '14155550123', $o1->meta['_myotp_verified_phone'] );
+check( 'block race: second order refused', 'myotp_pv_claimed', $thrown );
+// Phone changed between validation and processing: refused.
+myotp_test_configure();
+MyOTP_PV_Session::set_verified( '14155550123', null );
+$o3                = new MyOTP_Fake_Order( 303 );
+$o3->billing_phone = '+14155559999';
+try {
+	myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $o3 );
+	$thrown = null;
+} catch ( Exception $e ) {
+	$thrown = $e->error_code;
+}
+check( 'block: phone changed before processing refused', 'myotp_pv_mismatch', $thrown );
 // Guests only: a logged-in shopper is not gated on block checkout either.
 myotp_test_configure();
 $GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_guests_only'] = 1;

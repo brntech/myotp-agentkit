@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: MyOTP Phone Verification 1.1.0\n"
 "Report-Msgid-Bugs-To: https://github.com/brntech/myotp-agentkit/issues\n"
-"POT-Creation-Date: 2026-09-29 16:45+0000\n"
+"POT-Creation-Date: 2026-09-29 16:47+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -318,6 +318,15 @@ msgid "We couldn't check the code right now. Please try again in a minute or con
 msgstr ""
 
 msgid "We couldn't send a code right now. Please try again in a minute or contact the shop."
+msgstr ""
+
+msgid "We'll send a code by Telegram to confirm this number."
+msgstr ""
+
+msgid "We'll send a code by WhatsApp to confirm this number."
+msgstr ""
+
+msgid "We'll text a code to confirm this number."
 msgstr ""
 
 msgid "When you verify a phone number on this site, the number is sent to MyOTP.App (api.myotp.app) so a one-time code can be delivered by SMS, WhatsApp or Telegram and checked. MyOTP.App processes the number under its own privacy policy and terms: https://myotp.app/privacy-policy/ and https://myotp.app/term-condition/."

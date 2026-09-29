@@ -31,6 +31,13 @@
 	vertical-align: middle;
 }
 
+.myotp-pv-hint {
+	display: inline-block;
+	margin-left: 0.5em;
+	font-size: 0.9em;
+	vertical-align: middle;
+}
+
 .myotp-pv-status {
 	min-height: 1.4em;
 	margin: 0;

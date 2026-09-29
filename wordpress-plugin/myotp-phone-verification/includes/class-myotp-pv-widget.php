@@ -95,6 +95,22 @@ class MyOTP_PV_Widget {
 	}
 
 	/**
+	 * The line next to Send code, naming the configured channel.
+	 *
+	 * @return string
+	 */
+	public static function hint() {
+		$o = myotp_pv_get_options();
+		if ( 'whatsapp' === $o['channel'] ) {
+			return __( 'We\'ll send a code by WhatsApp to confirm this number.', 'myotp-phone-verification' );
+		}
+		if ( 'telegram' === $o['channel'] ) {
+			return __( 'We\'ll send a code by Telegram to confirm this number.', 'myotp-phone-verification' );
+		}
+		return __( 'We\'ll text a code to confirm this number.', 'myotp-phone-verification' );
+	}
+
+	/**
 	 * Build the widget markup.
 	 *
 	 * Keys: phone_selector (CSS selector of an external phone input; empty
@@ -143,8 +159,10 @@ class MyOTP_PV_Widget {
 				<button type="button" class="button myotp-pv-send" <?php disabled( $verified ); ?>>
 					<?php esc_html_e( 'Send code', 'myotp-phone-verification' ); ?>
 				</button>
+				<span class="myotp-pv-hint"><?php echo esc_html( self::hint() ); ?></span>
 			</p>
-			<p class="myotp-pv-row myotp-pv-code-row" <?php echo $verified ? 'hidden' : ''; ?>>
+			<?php // The code row stays hidden until a code was sent; the script reveals it. ?>
+			<p class="myotp-pv-row myotp-pv-code-row" hidden>
 				<label for="<?php echo esc_attr( $id ); ?>-code"><?php esc_html_e( 'Verification code', 'myotp-phone-verification' ); ?></label>
 				<input type="text" class="myotp-pv-code" id="<?php echo esc_attr( $id ); ?>-code"
 					inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" />

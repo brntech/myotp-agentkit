@@ -1396,6 +1396,18 @@ ob_start();
 MyOTP_PV_Settings::render();
 check( 'phone field: no note when WooCommerce already requires it', false, false !== strpos( ob_get_clean(), 'this plugin shows the field as required at checkout' ) );
 
+// Widget: one line says what Send code does; the code row appears only after a send (the script reveals it).
+myotp_test_configure();
+$w = MyOTP_PV_Widget::render( array( 'context' => 'checkout', 'phone_selector' => '#billing-phone' ) );
+check( 'widget: hint next to Send code (SMS)', true, false !== strpos( $w, '<span class="myotp-pv-hint">We\'ll text a code to confirm this number.</span>' ) );
+check( 'widget: code row hidden before any send', true, (bool) preg_match( '/<p class="myotp-pv-row myotp-pv-code-row" hidden>/', $w ) );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['channel'] = 'whatsapp';
+check( 'widget: hint names WhatsApp', true, false !== strpos( MyOTP_PV_Widget::render( array() ), 'We\'ll send a code by WhatsApp to confirm this number.' ) );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['channel'] = 'telegram';
+check( 'widget: hint names Telegram', true, false !== strpos( MyOTP_PV_Widget::render( array() ), 'by Telegram' ) );
+$w = MyOTP_PV_Widget::render( array( 'verified' => '14155550123' ) );
+check( 'widget: verified widget keeps the code row hidden', true, (bool) preg_match( '/myotp-pv-code-row" hidden>/', $w ) );
+
 // Privacy text, header, .pot.
 myotp_test_configure();
 myotp_test_do_action( 'admin_init' );

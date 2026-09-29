@@ -438,6 +438,7 @@ class MyOTP_PV_Order_Verify {
 			</p>
 			<p class="myotp-pv-row myotp-pv-actions">
 				<button type="button" class="button myotp-pv-send"><?php esc_html_e( 'Send code', 'myotp-phone-verification' ); ?></button>
+				<span class="myotp-pv-hint"><?php echo esc_html( MyOTP_PV_Widget::hint() ); ?></span>
 			</p>
 			<p class="myotp-pv-row myotp-pv-code-row" hidden>
 				<label for="<?php echo esc_attr( $box ); ?>-code"><?php esc_html_e( 'Verification code', 'myotp-phone-verification' ); ?></label>

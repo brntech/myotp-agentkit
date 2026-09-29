@@ -22,7 +22,19 @@
 		if (wrapper && wrapper.parentNode && !wrapper.classList.contains('is-editing')) {
 			return wrapper;
 		}
-		return input.closest('.wc-block-components-address-form__phone') || input.parentNode;
+		return rowEnd(input.closest('.wc-block-components-address-form__phone') || input.parentNode);
+	}
+
+	// The address form lays fields out two to a row. The widget is a full-width
+	// row, so it goes after the last field that shares the phone field's row.
+	function rowEnd(field) {
+		var end = field;
+		var sib = field.nextElementSibling;
+		while (sib && sib !== root && sib.offsetTop === field.offsetTop) {
+			end = sib;
+			sib = sib.nextElementSibling;
+		}
+		return end;
 	}
 
 	function ensure() {
@@ -72,8 +84,9 @@
 
 	// React owns the checkout tree and re-renders it: put the widget back when it
 	// goes, and move it when the address switches between card and form (a class change).
+	// A resize can change which fields share the phone field's row.
 	var timer = null;
-	new MutationObserver(function () {
+	function later() {
 		if (timer) {
 			return;
 		}
@@ -81,6 +94,8 @@
 			timer = null;
 			ensure();
 		}, 100);
-	}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+	}
+	new MutationObserver(later).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+	window.addEventListener('resize', later);
 	ensure();
 })();

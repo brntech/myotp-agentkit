@@ -3,6 +3,13 @@
 	clear: both;
 }
 
+/* Block checkout: the widget is a full-width row of the address form. */
+.wc-block-components-address-form > .myotp-pv {
+	flex: 0 0 100%;
+	width: 100%;
+	box-sizing: border-box;
+}
+
 .myotp-pv-row {
 	margin: 0 0 0.5em;
 }

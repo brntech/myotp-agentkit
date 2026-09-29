@@ -125,8 +125,9 @@ class MyOTP_PV_WooCommerce {
 	 * @throws Exception Route exception carrying the message shown to the shopper.
 	 */
 	public static function validate_block( $order, $request = null ) {
-		self::$claimed      = '';
-		self::$pay_existing = is_object( $request ) && method_exists( $request, 'get_route' ) && 1 === preg_match( '#/checkout/\d+/?$#', (string) $request->get_route() );
+		self::$claimed                  = '';
+		MyOTP_PV_Session::$key_override = '';
+		self::$pay_existing             = is_object( $request ) && method_exists( $request, 'get_route' ) && 1 === preg_match( '#/checkout/\d+/?$#', (string) $request->get_route() );
 		if ( self::$pay_existing ) {
 			return;
 		}
@@ -136,7 +137,9 @@ class MyOTP_PV_WooCommerce {
 		if ( ! self::required() ) {
 			return;
 		}
-		$phone = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
+		// Pin the visitor key so order processing finds the same proof even if the account is created in between.
+		MyOTP_PV_Session::$key_override = MyOTP_PV_Session::visitor_key();
+		$phone                          = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
 		if ( '' === myotp_pv_normalize_phone( $phone ) ) {
 			$failure = array( 'myotp_pv_no_phone', __( 'Enter your phone number and verify it before placing the order. Use the Send code button under the phone field.', 'myotp-phone-verification' ) );
 		} else {
@@ -159,15 +162,20 @@ class MyOTP_PV_WooCommerce {
 	 */
 	public static function consume_block( $order ) {
 		self::$claimed = '';
-		if ( self::$pay_existing || ! self::required() ) {
+		// Only an order that was gated at validation (which pinned the key) is consumed here.
+		if ( self::$pay_existing || '' === MyOTP_PV_Session::$key_override ) {
 			return;
 		}
-		$phone   = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
-		$failure = '' === myotp_pv_normalize_phone( $phone ) ? array( 'myotp_pv_no_phone', __( 'Enter your phone number and verify it before placing the order. Use the Send code button under the phone field.', 'myotp-phone-verification' ) ) : self::check( $phone );
-		if ( null !== $failure ) {
-			self::refuse( $failure );
+		try {
+			$phone   = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
+			$failure = '' === myotp_pv_normalize_phone( $phone ) ? array( 'myotp_pv_no_phone', __( 'Enter your phone number and verify it before placing the order. Use the Send code button under the phone field.', 'myotp-phone-verification' ) ) : self::check( $phone );
+			if ( null !== $failure ) {
+				self::refuse( $failure );
+			}
+			self::consume( $order );
+		} finally {
+			MyOTP_PV_Session::$key_override = '';
 		}
-		self::consume( $order );
 	}
 
 	/**
@@ -250,7 +258,7 @@ class MyOTP_PV_WooCommerce {
 	 * @param WC_Order $order The created order.
 	 */
 	public static function consume( $order ) {
-		if ( ! self::required() || ! is_object( $order ) || '' === self::$claimed ) {
+		if ( ( ! self::required() && '' === MyOTP_PV_Session::$key_override ) || ! is_object( $order ) || '' === self::$claimed ) {
 			return;
 		}
 		$phone         = self::$claimed;

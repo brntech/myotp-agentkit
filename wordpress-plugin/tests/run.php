@@ -856,6 +856,7 @@ $o1                = new MyOTP_Fake_Order( 301 );
 $o1->billing_phone = '+14155550123';
 myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $o1 );
 MyOTP_PV_Session::$request_id = 'rid-blk-B2';
+MyOTP_PV_Session::$key_override = MyOTP_PV_Session::visitor_key(); // request B validated before A consumed
 $o2                = new MyOTP_Fake_Order( 302 );
 $o2->billing_phone = '+14155550123';
 try {
@@ -869,6 +870,7 @@ check( 'block race: second order refused', 'myotp_pv_claimed', $thrown );
 // Phone changed between validation and processing: refused.
 myotp_test_configure();
 MyOTP_PV_Session::set_verified( '14155550123', null );
+check( 'block: validation passes with the verified phone', null, myotp_test_block_validate( '+14155550123' ) );
 $o3                = new MyOTP_Fake_Order( 303 );
 $o3->billing_phone = '+14155559999';
 try {
@@ -878,6 +880,17 @@ try {
 	$thrown = $e->error_code;
 }
 check( 'block: phone changed before processing refused', 'myotp_pv_mismatch', $thrown );
+// Account created between validation and processing changes the visitor key: the proof must still be found.
+myotp_test_configure();
+MyOTP_PV_Session::set_verified( '14155550123', null );
+check( 'block key drift: validation passes as a guest', null, myotp_test_block_validate( '+14155550123' ) );
+$GLOBALS['myotp_test']['logged_in'] = true; // process_customer created and logged in the account
+$o_key                = new MyOTP_Fake_Order( 501 );
+$o_key->billing_phone = '+14155550123';
+myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $o_key );
+$GLOBALS['myotp_test']['logged_in'] = false;
+check( 'block key drift: order stamped', '14155550123', $o_key->meta['_myotp_verified_phone'] ?? null );
+check( 'block key drift: pin released after processing', '', MyOTP_PV_Session::$key_override );
 // Pay-for-order route: not gated at validation nor at processing.
 myotp_test_configure();
 check( 'block: pay-existing-order route not gated', null, myotp_test_block_validate( '+14155550123', 'POST', '/wc/store/v1/checkout/57' ) );

@@ -37,11 +37,24 @@ class MyOTP_PV_Session {
 	public static $request_id = '';
 
 	/**
+	 * Visitor key pinned for the rest of this request. The block checkout
+	 * can create the account between validation and order processing, which
+	 * changes the WooCommerce customer id; the proof stays under the key it
+	 * was verified with.
+	 *
+	 * @var string
+	 */
+	public static $key_override = '';
+
+	/**
 	 * Stable visitor id: WC customer id, user id, or a random cookie.
 	 *
 	 * @return string
 	 */
 	public static function visitor_key() {
+		if ( '' !== self::$key_override ) {
+			return self::$key_override;
+		}
 		if ( function_exists( 'WC' ) && is_object( WC()->session ) && method_exists( WC()->session, 'get_customer_id' ) ) {
 			$id = (string) WC()->session->get_customer_id();
 			if ( '' !== $id ) {

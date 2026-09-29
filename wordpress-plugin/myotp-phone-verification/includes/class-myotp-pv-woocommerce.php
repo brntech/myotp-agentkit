@@ -272,7 +272,7 @@ class MyOTP_PV_WooCommerce {
 		MyOTP_PV_Session::$key_override = MyOTP_PV_Session::visitor_key();
 		$phone                          = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
 		if ( '' === myotp_pv_normalize_phone( $phone ) ) {
-			$failure = array( 'myotp_pv_no_phone', __( 'Enter your phone number and verify it before placing the order. Use the Send code button under the phone field.', 'myotp-phone-verification' ) );
+			$failure = array( 'myotp_pv_no_phone', __( 'Add a phone number to your address, then verify it with the Send code button before placing the order.', 'myotp-phone-verification' ) );
 		} else {
 			$failure = self::check( $phone, false );
 		}
@@ -304,7 +304,7 @@ class MyOTP_PV_WooCommerce {
 		}
 		try {
 			$phone   = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
-			$failure = '' === myotp_pv_normalize_phone( $phone ) ? array( 'myotp_pv_no_phone', __( 'Enter your phone number and verify it before placing the order. Use the Send code button under the phone field.', 'myotp-phone-verification' ) ) : self::check( $phone );
+			$failure = '' === myotp_pv_normalize_phone( $phone ) ? array( 'myotp_pv_no_phone', __( 'Add a phone number to your address, then verify it with the Send code button before placing the order.', 'myotp-phone-verification' ) ) : self::check( $phone );
 			if ( null !== $failure ) {
 				self::refuse( $failure );
 			}
@@ -343,7 +343,7 @@ class MyOTP_PV_WooCommerce {
 			if ( MyOTP_PV_Session::verified_is_used() ) {
 				return array( 'myotp_pv_claimed', __( 'This phone verification was already used by another checkout. Verify your number again.', 'myotp-phone-verification' ) );
 			}
-			return array( 'myotp_pv_unverified', __( 'Verify your billing phone number before placing the order. Use the Send code button under the billing details.', 'myotp-phone-verification' ) );
+			return array( 'myotp_pv_unverified', __( 'Verify your phone number before placing the order. Use the Send code button under your address.', 'myotp-phone-verification' ) );
 		}
 		if ( $billing !== $verified ) {
 			return array( 'myotp_pv_mismatch', __( 'The billing phone number does not match the number you verified. Verify the new number or change it back.', 'myotp-phone-verification' ) );

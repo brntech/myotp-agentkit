@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: MyOTP Phone Verification 1.1.0\n"
 "Report-Msgid-Bugs-To: https://github.com/brntech/myotp-agentkit/issues\n"
-"POT-Creation-Date: 2026-09-29 16:35+0000\n"
+"POT-Creation-Date: 2026-09-29 16:41+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -35,6 +35,9 @@ msgid "A key is saved. Leave the stars in place to keep it, or paste a new key. 
 msgstr ""
 
 msgid "API key"
+msgstr ""
+
+msgid "Add a phone number to your address, then verify it with the Send code button before placing the order."
 msgstr ""
 
 msgid "Add a verified phone field to wp-login.php?action=register"
@@ -92,9 +95,6 @@ msgid "Enter the code you received."
 msgstr ""
 
 msgid "Enter the number with the country code, digits only, for example 14155550123."
-msgstr ""
-
-msgid "Enter your phone number and verify it before placing the order. Use the Send code button under the phone field."
 msgstr ""
 
 msgid "Express wallet buttons (Apple Pay, Google Pay, Link, Amazon Pay from WooPayments or WooCommerce Stripe Payment Gateway) place the order without the checkout form, so the shopper never sees the code box."
@@ -283,10 +283,10 @@ msgstr ""
 msgid "Verify"
 msgstr ""
 
-msgid "Verify your billing phone number before placing the order. Use the Send code button under the billing details."
+msgid "Verify your phone number"
 msgstr ""
 
-msgid "Verify your phone number"
+msgid "Verify your phone number before placing the order. Use the Send code button under your address."
 msgstr ""
 
 msgid "Verify your phone number before registering."

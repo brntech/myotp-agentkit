@@ -12,12 +12,25 @@
 		return document.getElementById('billing-phone') || document.getElementById('shipping-phone');
 	}
 
+	// Where the widget goes. A returning shopper sees the saved address as a
+	// card with an Edit link while the form (phone field included) stays in the
+	// page, hidden: then the widget goes right after the card, still bound to
+	// the hidden phone field, which holds the saved number. While the form is
+	// open it goes right after the phone field.
+	function placement(input) {
+		var wrapper = input.closest('.wc-block-components-address-address-wrapper');
+		if (wrapper && wrapper.parentNode && !wrapper.classList.contains('is-editing')) {
+			return wrapper;
+		}
+		return input.closest('.wc-block-components-address-form__phone') || input.parentNode;
+	}
+
 	function ensure() {
 		var input = phoneField();
 		if (!input) {
 			return;
 		}
-		var anchor = input.closest('.wc-block-components-address-form__phone') || input.parentNode;
+		var anchor = placement(input);
 		if (!anchor || !anchor.parentNode) {
 			return;
 		}
@@ -57,7 +70,8 @@
 		}
 	});
 
-	// React owns the checkout tree and re-renders it: put the widget back when it goes.
+	// React owns the checkout tree and re-renders it: put the widget back when it
+	// goes, and move it when the address switches between card and form (a class change).
 	var timer = null;
 	new MutationObserver(function () {
 		if (timer) {
@@ -67,6 +81,6 @@
 			timer = null;
 			ensure();
 		}, 100);
-	}).observe(document.body, { childList: true, subtree: true });
+	}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 	ensure();
 })();

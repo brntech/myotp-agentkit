@@ -257,6 +257,8 @@ function myotp_test_reset() {
 	$GLOBALS['myotp_test']['delete_meta_fail'] = false;
 	$GLOBALS['myotp_test']['orders']      = array();
 	$GLOBALS['myotp_test']['wc_log']      = array();
+	$GLOBALS['myotp_test']['is_admin']    = false;
+	$GLOBALS['myotp_test']['doing_ajax']  = false;
 	$GLOBALS['myotp_test']['settings_errors'] = array();
 	$GLOBALS['myotp_test']['can_edit_orders'] = false;
 	$_GET                                 = array();
@@ -388,6 +390,8 @@ function current_user_can( $cap ) {
 	}
 	return $GLOBALS['myotp_test']['can_manage'];
 }
+function is_admin() { return ! empty( $GLOBALS['myotp_test']['is_admin'] ); }
+function wp_doing_ajax() { return ! empty( $GLOBALS['myotp_test']['doing_ajax'] ); }
 function admin_url( $path = '' ) { return 'http://example.test/wp-admin/' . $path; }
 function add_settings_error( $setting, $code, $message, $type = 'error' ) { $GLOBALS['myotp_test']['settings_errors'][ $code ] = $message; }
 /** WooCommerce logger fake: records every line. */

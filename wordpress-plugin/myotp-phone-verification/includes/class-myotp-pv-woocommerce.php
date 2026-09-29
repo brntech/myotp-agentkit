@@ -89,6 +89,39 @@ class MyOTP_PV_WooCommerce {
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'validate_block' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_order_processed', array( __CLASS__, 'consume_block' ) );
 		add_action( 'wp_footer', array( __CLASS__, 'block_widget' ) );
+		// The phone field is required while the gate is on (WooCommerce's default is optional).
+		add_filter( 'option_woocommerce_checkout_phone_field', array( __CLASS__, 'phone_field_visibility' ) );
+		add_filter( 'woocommerce_billing_fields', array( __CLASS__, 'require_billing_phone' ), 20 );
+	}
+
+	/**
+	 * WooCommerce's checkout phone setting (optional, required or hidden)
+	 * as the checkout reads it: "required" while this visitor must verify,
+	 * so both the block and the classic checkout show and require the
+	 * field. Only the value read at checkout changes; the stored option is
+	 * never rewritten, and admin screens see the merchant's own value.
+	 *
+	 * @param mixed $value Stored value.
+	 * @return mixed
+	 */
+	public static function phone_field_visibility( $value ) {
+		if ( 'required' === $value || ( is_admin() && ! wp_doing_ajax() ) || ! self::required() ) {
+			return $value;
+		}
+		return 'required';
+	}
+
+	/**
+	 * Classic checkout: the billing phone is required while the gate is on.
+	 *
+	 * @param mixed $fields Billing fields.
+	 * @return mixed
+	 */
+	public static function require_billing_phone( $fields ) {
+		if ( is_array( $fields ) && isset( $fields['billing_phone'] ) && is_array( $fields['billing_phone'] ) && self::required() ) {
+			$fields['billing_phone']['required'] = true;
+		}
+		return $fields;
 	}
 
 	/**

@@ -83,6 +83,10 @@ Not with another payment method. A wallet order is recognised only when the chos
 
 The plain limit: those markers come from the shopper's browser. Someone who edits the request by hand can send a wallet marker while paying with an ordinary card through WooPayments or Stripe, and the order is then treated as a wallet order (placed without a code, or held until verified, depending on the setting). They still had to pay through that gateway, with the gateway's own fraud checks. If you need every order verified with no exception, choose "Ask for the code after payment" or "Block".
 
+= Why is the phone field required at checkout now? =
+
+A number that is not there cannot be verified. While verification is on (and, with "Only for guests", for guests), the plugin shows WooCommerce's checkout phone field as required on both the block and the classic checkout, even when WooCommerce's own setting says optional. Your WooCommerce setting is not changed; Settings > MyOTP says when it is being overridden.
+
 = Can logged-in customers skip verification? =
 
 Yes. Tick "Only for guests" under WooCommerce checkout in Settings > MyOTP.
@@ -120,6 +124,7 @@ In the `myotp_pv_options` option, on the server only. It is shown masked on the 
 = 1.1.0 =
 * WooCommerce block checkout support (Store API validation and a Send code widget under the phone field).
 * New setting "Apple Pay / Google Pay and other express wallet orders": allow without a code (default), ask for the code after payment (the paid order is held until the shopper verifies on the order confirmation page), or block. Wallet orders are recognised from WooPayments and WooCommerce Stripe Payment Gateway only when the wallet gateway is the chosen payment method.
+* The checkout phone field is shown as required while verification is on (WooCommerce's own setting is left as it is).
 * Shoppers never see the verification service's raw error text; the detail goes to the WooCommerce log and an admin notice, without phone numbers. The Brand setting accepts only 3 to 16 letters or digits and says so when a value is refused.
 
 = 1.0.0 =

@@ -322,6 +322,8 @@ foreach ( array(
 	'wp_ajax_nopriv_myotp_pv_order_verify',
 	'wp_footer',
 	'admin_notices',
+	'option_woocommerce_checkout_phone_field',
+	'woocommerce_billing_fields',
 	'registration_errors',
 	'register_new_user',
 	'wp_enqueue_scripts',
@@ -1359,6 +1361,40 @@ $o = myotp_test_held_order( 890 );
 $o->payment_complete();
 myotp_test_http( 402, array( 'error' => array( 'http_code' => 402, 'message' => 'Insufficient balance' ) ) );
 check( 'order send: provider failure is the friendly line', 'We couldn\'t send a code right now. Please try again in a minute or contact the shop.', myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '890', 'key' => 'wc_order_k890' ) )->data['message'] );
+
+// Phone field required at checkout while the gate is on; the stored WooCommerce option is never rewritten.
+myotp_test_configure();
+check( 'phone field: optional read as required at checkout', 'required', apply_filters( 'option_woocommerce_checkout_phone_field', 'optional' ) );
+check( 'phone field: hidden read as required at checkout (a hidden field could never be verified)', 'required', apply_filters( 'option_woocommerce_checkout_phone_field', 'hidden' ) );
+check( 'phone field: required stays required', 'required', apply_filters( 'option_woocommerce_checkout_phone_field', 'required' ) );
+$GLOBALS['myotp_test']['options']['woocommerce_checkout_phone_field'] = 'optional';
+check( 'phone field: stored option untouched', 'optional', get_option( 'woocommerce_checkout_phone_field' ) );
+$GLOBALS['myotp_test']['is_admin'] = true;
+check( 'phone field: admin screens see the merchant\'s own value', 'optional', apply_filters( 'option_woocommerce_checkout_phone_field', 'optional' ) );
+$GLOBALS['myotp_test']['doing_ajax'] = true;
+check( 'phone field: checkout AJAX (admin-ajax) still required', 'required', apply_filters( 'option_woocommerce_checkout_phone_field', 'optional' ) );
+$GLOBALS['myotp_test']['is_admin']   = false;
+$GLOBALS['myotp_test']['doing_ajax'] = false;
+$bf = apply_filters( 'woocommerce_billing_fields', array( 'billing_phone' => array( 'required' => false, 'label' => 'Phone' ), 'billing_company' => array( 'required' => false ) ) );
+check( 'phone field: classic billing phone required', true, $bf['billing_phone']['required'] );
+check( 'phone field: other classic fields untouched', false, $bf['billing_company']['required'] );
+check( 'phone field: classic without a phone field untouched', array( 'billing_email' => array() ), apply_filters( 'woocommerce_billing_fields', array( 'billing_email' => array() ) ) );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_guests_only'] = 1;
+$GLOBALS['myotp_test']['logged_in'] = true;
+check( 'phone field: guests only, logged-in customer keeps the merchant setting', 'optional', apply_filters( 'option_woocommerce_checkout_phone_field', 'optional' ) );
+check( 'phone field: guests only, logged-in classic field untouched', false, apply_filters( 'woocommerce_billing_fields', array( 'billing_phone' => array( 'required' => false ) ) )['billing_phone']['required'] );
+$GLOBALS['myotp_test']['logged_in'] = false;
+// The settings page tells the merchant when their WooCommerce setting is overridden at checkout.
+myotp_test_configure();
+$GLOBALS['myotp_test']['can_manage']                                  = true;
+$GLOBALS['myotp_test']['options']['woocommerce_checkout_phone_field'] = 'optional';
+ob_start();
+MyOTP_PV_Settings::render();
+check( 'phone field: settings page says the optional field is shown as required', true, false !== strpos( ob_get_clean(), 'this plugin shows the field as required at checkout' ) );
+$GLOBALS['myotp_test']['options']['woocommerce_checkout_phone_field'] = 'required';
+ob_start();
+MyOTP_PV_Settings::render();
+check( 'phone field: no note when WooCommerce already requires it', false, false !== strpos( ob_get_clean(), 'this plugin shows the field as required at checkout' ) );
 
 // Privacy text, header, .pot.
 myotp_test_configure();

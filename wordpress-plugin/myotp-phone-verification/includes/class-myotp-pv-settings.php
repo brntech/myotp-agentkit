@@ -247,6 +247,9 @@ class MyOTP_PV_Settings {
 									<p class="description"><?php esc_html_e( 'WooCommerce is not active.', 'myotp-phone-verification' ); ?></p>
 								<?php else : ?>
 									<p class="description"><?php esc_html_e( 'Works with the classic (shortcode) checkout and the block checkout. Keep the phone field visible in the checkout block.', 'myotp-phone-verification' ); ?></p>
+									<?php if ( ! empty( $o['wc_enabled'] ) && 'required' !== get_option( 'woocommerce_checkout_phone_field', 'required' ) ) : ?>
+										<p class="description"><strong><?php esc_html_e( 'WooCommerce\'s own setting has the checkout phone field as optional or hidden. While verification is required, this plugin shows the field as required at checkout. Your WooCommerce setting is not changed.', 'myotp-phone-verification' ); ?></strong></p>
+									<?php endif; ?>
 								<?php endif; ?>
 							</fieldset>
 						</td>

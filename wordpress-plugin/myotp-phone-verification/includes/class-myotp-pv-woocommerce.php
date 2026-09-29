@@ -351,7 +351,8 @@ class MyOTP_PV_WooCommerce {
 	 * Refuse the order the way the Store API expects.
 	 *
 	 * @param array $failure Array( error code, message ).
-	 * @throws Exception Always.
+	 * @throws \Automattic\WooCommerce\StoreApi\Exceptions\RouteException When the Store API is loaded (always, on its routes).
+	 * @throws \RuntimeException Otherwise.
 	 */
 	private static function refuse( $failure ) {
 		if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {

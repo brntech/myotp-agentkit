@@ -606,7 +606,7 @@ function myotp_pv_generate_payload( $phone, array $options, $force ) {
 		'channel'      => isset( $options['channel'] ) ? (string) $options['channel'] : 'sms',
 		'force_send'   => (bool) $force,
 	);
-	$length = isset( $options['otp_length'] ) ? (int) $options['otp_length'] : 6;
+	$length  = isset( $options['otp_length'] ) ? (int) $options['otp_length'] : 6;
 	if ( 6 !== $length ) {
 		$payload['otp_length'] = $length;
 	}

@@ -133,7 +133,8 @@ class MyOTP_PV_Order_Verify {
 		if ( ! is_object( $order ) ) {
 			$order = self::order( $order_id );
 		}
-		if ( ! self::is_awaiting( $order ) || current_user_can( 'edit_shop_orders' ) ) {
+		// edit_shop_orders is WooCommerce's shop manager capability.
+		if ( ! self::is_awaiting( $order ) || current_user_can( 'edit_shop_orders' ) ) { // phpcs:ignore WordPress.WP.Capabilities.Unknown
 			return;
 		}
 		$order->update_meta_data( self::RESTORE, $to );

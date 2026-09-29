@@ -4,7 +4,7 @@ Tags: otp, sms verification, phone verification, woocommerce, whatsapp
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,7 +31,7 @@ How it stays safe:
 * A verification is valid for 30 minutes and is claimed by exactly one checkout or one registration at validation time, then consumed when the order or account exists. If checkout fails after validation (a declined payment, for example) the visitor verifies again.
 * Phone numbers are reduced to digits before they are sent. Leading zeros are kept.
 
-Not in this version: the WooCommerce block checkout. The classic shortcode checkout is supported.
+Both the classic (shortcode) checkout and the block checkout are supported. On the block checkout the plugin adds its widget under the phone field with a small script (no block to add in the editor) and validates when the order is placed. The block checkout's phone field must be shown: with the field hidden there is no number to verify and the order is refused.
 
 = External service =
 
@@ -62,7 +62,7 @@ Country code first, digits only, no plus sign. 14155550123, not +1 (415) 555-012
 
 = Does it work with the WooCommerce block checkout? =
 
-No. This version hooks the classic checkout (the `[woocommerce_checkout]` shortcode page). Block checkout support is planned.
+Yes, from 1.1.0. The Send code button appears under the phone field and the order is refused until that number is verified, same as the classic `[woocommerce_checkout]` page. Keep the phone field visible in the checkout block; with it hidden there is nothing to verify.
 
 = Can logged-in customers skip verification? =
 
@@ -94,10 +94,16 @@ In the `myotp_pv_options` option, on the server only. It is shown masked on the 
 
 == Changelog ==
 
+= 1.1.0 =
+* WooCommerce block checkout support (Store API validation and a Send code widget under the phone field).
+
 = 1.0.0 =
 * First release. WooCommerce classic checkout, registration form, `[myotp_verify]` shortcode, settings page with test send.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Adds WooCommerce block checkout support.
 
 = 1.0.0 =
 First release.

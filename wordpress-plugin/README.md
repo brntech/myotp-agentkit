@@ -4,7 +4,7 @@ A WordPress plugin that verifies phone numbers with a one-time code over SMS, Wh
 
 ## What it does
 
-- **WooCommerce checkout.** A Send code button under the billing phone. The order is blocked with a notice until the billing number is verified. Optionally only for guests. Classic (shortcode) checkout only in this version.
+- **WooCommerce checkout.** A Send code button under the billing phone. The order is blocked with a notice until the billing number is verified. Optionally only for guests. Works on the classic (shortcode) checkout and on the block checkout (Store API); the block checkout's phone field must be shown.
 - **WordPress registration.** A phone field on `wp-login.php?action=register` with the same flow. The verified number is saved as user meta `myotp_verified_phone`.
 - **Shortcode.** `[myotp_verify]` renders the widget anywhere. On success it fires `myotp:verified` on `document` with `event.detail.phone`.
 - **Settings page.** Settings > MyOTP: API key (masked), channel, code length (4 to 8), validity in seconds, optional brand, and a Send test code button.

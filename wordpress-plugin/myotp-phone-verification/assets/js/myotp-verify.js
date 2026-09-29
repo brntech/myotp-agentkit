@@ -182,6 +182,8 @@
 	}
 	// WooCommerce re-renders checkout fragments; rebind after each update.
 	document.addEventListener('updated_checkout', bindAll);
+	// Widgets injected later (block checkout) ask for a bind with this event.
+	document.addEventListener('myotp:bind', bindAll);
 	if (window.jQuery) {
 		window.jQuery(document.body).on('updated_checkout', bindAll);
 	}

@@ -49,7 +49,7 @@ $esc = function ( string $s ): string {
 $pot  = "# Copyright (C) 2026 MyOTP.App\n";
 $pot .= "# This file is distributed under the GPL-2.0-or-later.\n";
 $pot .= "msgid \"\"\nmsgstr \"\"\n";
-$pot .= "\"Project-Id-Version: MyOTP Phone Verification 1.0.0\\n\"\n";
+$pot .= "\"Project-Id-Version: MyOTP Phone Verification 1.1.0\\n\"\n";
 $pot .= "\"Report-Msgid-Bugs-To: https://github.com/brntech/myotp-agentkit/issues\\n\"\n";
 $pot .= "\"POT-Creation-Date: " . gmdate( 'Y-m-d H:i' ) . "+0000\\n\"\n";
 $pot .= "\"MIME-Version: 1.0\\n\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n\"Content-Transfer-Encoding: 8bit\\n\"\n";

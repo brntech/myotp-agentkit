@@ -310,6 +310,9 @@ foreach ( array(
 	'edit_user_profile',
 	'woocommerce_after_checkout_validation',
 	'woocommerce_checkout_order_created',
+	'woocommerce_store_api_checkout_update_order_from_request',
+	'woocommerce_store_api_checkout_order_processed',
+	'wp_footer',
 	'registration_errors',
 	'register_new_user',
 	'wp_enqueue_scripts',
@@ -799,6 +802,65 @@ foreach ( MyOTP_PV_Store::$instance->deletes as $d ) {
 	}
 }
 check( 'guards: no unguarded delete on pending or verified rows', array(), $unguarded );
+
+// Block checkout (Store API): same gate, thrown as a RouteException, POST only.
+function myotp_test_block_validate( string $phone, string $method = 'POST' ): ?Exception {
+	$order                = new MyOTP_Fake_Order( 201 );
+	$order->billing_phone = $phone;
+	try {
+		myotp_test_do_action( 'woocommerce_store_api_checkout_update_order_from_request', $order, new MyOTP_Fake_Request( $method ) );
+	} catch ( Exception $e ) {
+		return $e;
+	}
+	return null;
+}
+myotp_test_configure();
+$e = myotp_test_block_validate( '+14155550123' );
+check( 'block: unverified refused with a route exception', 'myotp_pv_unverified', $e instanceof MyOTP_Fake_RouteException ? $e->error_code : null );
+check( 'block: refusal is HTTP 400', 400, $e->status );
+$e = myotp_test_block_validate( '' );
+check( 'block: empty billing phone refused', 'myotp_pv_no_phone', $e->error_code );
+MyOTP_PV_Session::set_verified( '14155550123', null );
+$e = myotp_test_block_validate( '+1 415 555 0000' );
+check( 'block: different phone refused', 'myotp_pv_mismatch', $e->error_code );
+check( 'block: mismatch did not claim', 'verified', myotp_test_vrec()['state'] );
+check( 'block: draft update (PUT) is not validated', null, myotp_test_block_validate( '+1 415 555 0000', 'PUT' ) );
+check( 'block: draft update (PUT) did not claim', 'verified', myotp_test_vrec()['state'] );
+MyOTP_PV_Session::$request_id = 'rid-blk-A';
+check( 'block: matching phone passes', null, myotp_test_block_validate( '+1 (415) 555-0123' ) );
+check( 'block: proof claimed', 'claiming:14155550123:rid-blk-A', myotp_test_vrec()['state'] );
+MyOTP_PV_Session::$request_id = 'rid-blk-B';
+check( 'block: second checkout on the same proof refused', 'myotp_pv_claimed', myotp_test_block_validate( '+14155550123' )->error_code );
+MyOTP_PV_Session::$request_id = 'rid-blk-A';
+$wc_claimed->setValue( null, '14155550123' ); // the claim made by request A (each request is its own PHP process)
+$order_blk = new MyOTP_Fake_Order( 201 );
+myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $order_blk );
+check( 'block: order stamped', '14155550123', $order_blk->meta['_myotp_verified_phone'] );
+check( 'block: record consumed by order', 'consumed:order:201', myotp_test_vrec()['state'] );
+$order_blk2 = new MyOTP_Fake_Order( 202 );
+myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $order_blk2 );
+check( 'block: processing an order without a claim stamps nothing', false, isset( $order_blk2->meta['_myotp_verified_phone'] ) );
+// Guests only: a logged-in shopper is not gated on block checkout either.
+myotp_test_configure();
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_guests_only'] = 1;
+$GLOBALS['myotp_test']['logged_in'] = true;
+check( 'block: guests-only skips a logged-in shopper', null, myotp_test_block_validate( '+14155550123' ) );
+$GLOBALS['myotp_test']['logged_in'] = false;
+check( 'block: guests-only still gates a guest', 'myotp_pv_unverified', myotp_test_block_validate( '+14155550123' )->error_code );
+// Widget template only on a page holding the checkout block.
+myotp_test_configure();
+$GLOBALS['myotp_test']['enqueued'] = array();
+ob_start();
+myotp_test_do_action( 'wp_footer' );
+check( 'block widget: nothing on a page without the checkout block', '', ob_get_clean() );
+$GLOBALS['myotp_test']['has_block']['woocommerce/checkout'] = true;
+ob_start();
+myotp_test_do_action( 'wp_footer' );
+$footer = ob_get_clean();
+check( 'block widget: template emitted with the widget', true, false !== strpos( $footer, '<template id="myotp-pv-block-template">' ) && false !== strpos( $footer, 'myotp-pv-send' ) );
+check( 'block widget: bound to the block checkout phone field', true, false !== strpos( $footer, 'data-phone-selector="#billing-phone"' ) );
+check( 'block widget: injector script enqueued', true, in_array( 'myotp-pv-block', $GLOBALS['myotp_test']['enqueued'], true ) );
+$GLOBALS['myotp_test']['has_block'] = array();
 
 // Privacy text, header, .pot.
 myotp_test_configure();

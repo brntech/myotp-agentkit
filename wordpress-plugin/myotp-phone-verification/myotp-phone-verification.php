@@ -3,7 +3,7 @@
  * Plugin Name:       MyOTP Phone Verification
  * Plugin URI:        https://github.com/brntech/myotp-agentkit/tree/main/wordpress-plugin
  * Description:       Phone verification by SMS, WhatsApp or Telegram code for WooCommerce checkout, registration and the [myotp_verify] shortcode.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            MyOTP.App
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MYOTP_PV_VERSION', '1.0.0' );
+define( 'MYOTP_PV_VERSION', '1.1.0' );
 define( 'MYOTP_PV_FILE', __FILE__ );
 define( 'MYOTP_PV_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MYOTP_PV_URL', plugin_dir_url( __FILE__ ) );

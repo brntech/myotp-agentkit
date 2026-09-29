@@ -115,8 +115,34 @@ function WC() {
 	return $wc;
 }
 
+/** Real Store API exception shape: code, message, HTTP status. */
+class MyOTP_Fake_RouteException extends Exception {
+	public $error_code;
+	public $status;
+	public function __construct( $error_code, $message, $status = 400 ) {
+		parent::__construct( $message );
+		$this->error_code = $error_code;
+		$this->status     = $status;
+	}
+}
+class_alias( 'MyOTP_Fake_RouteException', 'Automattic\WooCommerce\StoreApi\Exceptions\RouteException' );
+
+class MyOTP_Fake_Request {
+	public $method;
+	public function __construct( $method ) {
+		$this->method = $method;
+	}
+	public function get_method() {
+		return $this->method;
+	}
+}
+
 class MyOTP_Fake_Order {
 	public $id;
+	public $billing_phone = '';
+	public function get_billing_phone() {
+		return $this->billing_phone;
+	}
 	public $meta  = array();
 	public $notes = array();
 	public $saved = 0;
@@ -303,6 +329,11 @@ function submit_button( $t = null ) { echo '<input type="submit" />'; }
 function selected( $a, $b = true, $echo = true ) { $r = ( (string) $a === (string) $b ) ? ' selected="selected"' : ''; if ( $echo ) { echo $r; } return $r; }
 function checked( $a, $b = true, $echo = true ) { $r = ( (string) $a === (string) $b ) ? ' checked="checked"' : ''; if ( $echo ) { echo $r; } return $r; }
 function disabled( $a, $b = true, $echo = true ) { $r = ( (string) $a === (string) $b ) ? ' disabled="disabled"' : ''; if ( $echo ) { echo $r; } return $r; }
+function has_block( $name ) { return ! empty( $GLOBALS['myotp_test']['has_block'][ $name ] ); }
+function wp_enqueue_script( $h, $src = '', $deps = array() ) { $GLOBALS['myotp_test']['enqueued'][] = $h; }
+function wp_enqueue_style( $h ) { $GLOBALS['myotp_test']['enqueued'][] = $h; }
+function wp_script_is( $h, $list = 'enqueued' ) { return true; }
+function wp_unique_id( $p = '' ) { return $p . '1'; }
 function is_user_logged_in() { return $GLOBALS['myotp_test']['logged_in']; }
 function get_current_user_id() { return $GLOBALS['myotp_test']['logged_in'] ? 7 : 0; }
 function wp_generate_password( $len, $special ) { return bin2hex( random_bytes( (int) ( $len / 2 ) ) ); }

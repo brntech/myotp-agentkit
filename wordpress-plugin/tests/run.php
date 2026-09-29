@@ -1412,6 +1412,13 @@ check( 'widget: hint names Telegram', true, false !== strpos( MyOTP_PV_Widget::r
 $w = MyOTP_PV_Widget::render( array( 'verified' => '14155550123' ) );
 check( 'widget: verified widget keeps the code row hidden', true, (bool) preg_match( '/myotp-pv-code-row" hidden>/', $w ) );
 
+// Sizing: Send code is a primary button; tap targets >= 44px; block checkout fields are 50px with a 4px radius.
+myotp_test_configure();
+check( 'widget: Send code styled as the primary button', true, false !== strpos( MyOTP_PV_Widget::render( array() ), 'class="button alt wp-element-button myotp-pv-send"' ) );
+$css = file_get_contents( $src_dir . '/assets/css/myotp-verify.css' );
+check( 'css: 44px minimum tap targets', true, (bool) preg_match( '/\.myotp-pv \.myotp-pv-send,\s*\.myotp-pv \.myotp-pv-verify,\s*\.myotp-pv \.myotp-pv-code \{\s*min-height: 44px;/', $css ) );
+check( 'css: block checkout height 50px and radius 4px', true, (bool) preg_match( '/\.wc-block-checkout \.myotp-pv \.myotp-pv-code \{\s*height: 50px;\s*border-radius: 4px;/', $css ) );
+
 // Privacy text, header, .pot.
 myotp_test_configure();
 myotp_test_do_action( 'admin_init' );

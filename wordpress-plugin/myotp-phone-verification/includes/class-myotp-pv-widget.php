@@ -156,7 +156,7 @@ class MyOTP_PV_Widget {
 				</p>
 			<?php endif; ?>
 			<p class="myotp-pv-row myotp-pv-actions">
-				<button type="button" class="button myotp-pv-send" <?php disabled( $verified ); ?>>
+				<button type="button" class="button alt wp-element-button myotp-pv-send" <?php disabled( $verified ); ?>>
 					<?php esc_html_e( 'Send code', 'myotp-phone-verification' ); ?>
 				</button>
 				<span class="myotp-pv-hint"><?php echo esc_html( self::hint() ); ?></span>

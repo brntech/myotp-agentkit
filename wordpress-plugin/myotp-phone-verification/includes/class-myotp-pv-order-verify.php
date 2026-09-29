@@ -437,7 +437,7 @@ class MyOTP_PV_Order_Verify {
 				<input type="tel" class="myotp-pv-phone" id="<?php echo esc_attr( $box ); ?>-phone" value="<?php echo esc_attr( $phone ); ?>" readonly="readonly" />
 			</p>
 			<p class="myotp-pv-row myotp-pv-actions">
-				<button type="button" class="button myotp-pv-send"><?php esc_html_e( 'Send code', 'myotp-phone-verification' ); ?></button>
+				<button type="button" class="button alt wp-element-button myotp-pv-send"><?php esc_html_e( 'Send code', 'myotp-phone-verification' ); ?></button>
 				<span class="myotp-pv-hint"><?php echo esc_html( MyOTP_PV_Widget::hint() ); ?></span>
 			</p>
 			<p class="myotp-pv-row myotp-pv-code-row" hidden>

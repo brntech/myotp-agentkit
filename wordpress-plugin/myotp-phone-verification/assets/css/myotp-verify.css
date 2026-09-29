@@ -59,6 +59,45 @@
 	color: #b3261e;
 }
 
+/* Tap targets at least 44px everywhere. */
+.myotp-pv .myotp-pv-send,
+.myotp-pv .myotp-pv-verify,
+.myotp-pv .myotp-pv-code {
+	min-height: 44px;
+	box-sizing: border-box;
+}
+
+.myotp-pv .myotp-pv-send,
+.myotp-pv .myotp-pv-verify {
+	min-width: 44px;
+}
+
+/* Block checkout: the same 50px height, 4px radius and border as its own fields. */
+.wc-block-checkout .myotp-pv .myotp-pv-send,
+.wc-block-checkout .myotp-pv .myotp-pv-verify,
+.wc-block-checkout .myotp-pv .myotp-pv-code {
+	height: 50px;
+	border-radius: 4px;
+	padding-top: 0;
+	padding-bottom: 0;
+	line-height: 1.2;
+}
+
+.wc-block-checkout .myotp-pv .myotp-pv-send,
+.wc-block-checkout .myotp-pv .myotp-pv-verify {
+	padding-left: 1.25em;
+	padding-right: 1.25em;
+}
+
+.wc-block-checkout .myotp-pv .myotp-pv-code {
+	padding-left: 12px;
+	padding-right: 12px;
+	border: 1px solid color-mix(in srgb, currentColor 80%, transparent);
+	background-color: #fff;
+	color: #2b2d2f;
+	font-size: 16px;
+}
+
 .myotp-pv[data-verified="1"] .myotp-pv-actions {
 	display: none;
 }

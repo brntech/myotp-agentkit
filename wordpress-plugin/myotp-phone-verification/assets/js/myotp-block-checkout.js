@@ -95,7 +95,7 @@
 				input.focus();
 			}
 			setStatus(message);
-		}, 150);
+		}, 350); // WooCommerce focuses the form's first field 300 ms after it opens; focus the phone after that.
 		return true;
 	}
 

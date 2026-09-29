@@ -374,7 +374,7 @@ class MyOTP_PV_WooCommerce {
 
 		if ( '' === $verified ) {
 			if ( MyOTP_PV_Session::verified_is_used() ) {
-				return array( 'myotp_pv_claimed', __( 'This phone verification was already used by another checkout. Verify your number again.', 'myotp-phone-verification' ) );
+				return array( 'myotp_pv_claimed', __( 'Please verify your phone number again for this order.', 'myotp-phone-verification' ) );
 			}
 			return array( 'myotp_pv_unverified', __( 'Verify your phone number before placing the order. Use the Send code button under your address.', 'myotp-phone-verification' ) );
 		}
@@ -386,7 +386,7 @@ class MyOTP_PV_WooCommerce {
 		}
 		$claimed = MyOTP_PV_Session::claim_verified( $billing );
 		if ( $claimed !== $billing ) {
-			return array( 'myotp_pv_claimed', __( 'This phone verification was already used by another checkout. Verify your number again.', 'myotp-phone-verification' ) );
+			return array( 'myotp_pv_claimed', __( 'Please verify your phone number again for this order.', 'myotp-phone-verification' ) );
 		}
 		self::$claimed = $claimed;
 		return null;

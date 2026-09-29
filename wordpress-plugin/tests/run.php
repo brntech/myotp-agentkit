@@ -743,7 +743,9 @@ MyOTP_PV_Session::$request_id = 'rid-A';
 check( 'checkout A: matching billing phone passes', array(), myotp_test_checkout_validate( '+1 (415) 555-0123' )->get_error_codes() );
 check( 'checkout A: proof claimed', 'claiming:14155550123:rid-A', myotp_test_vrec()['state'] );
 MyOTP_PV_Session::$request_id = 'rid-B';
-check( 'checkout B: refused at validation', array( 'myotp_pv_claimed' ), myotp_test_checkout_validate( '+14155550123' )->get_error_codes() );
+$errs_b = myotp_test_checkout_validate( '+14155550123' );
+check( 'checkout B: refused at validation', array( 'myotp_pv_claimed' ), $errs_b->get_error_codes() );
+check( 'checkout B: reuse refusal text', 'Please verify your phone number again for this order.', $errs_b->errors['myotp_pv_claimed'] );
 MyOTP_PV_Session::$request_id = 'rid-A';
 $wc_claimed->setValue( null, '14155550123' );
 $order_a = new MyOTP_Fake_Order( 101 );
@@ -849,7 +851,9 @@ myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $order_b
 check( 'block: order stamped', '14155550123', $order_blk->meta['_myotp_verified_phone'] );
 check( 'block: record consumed by order', 'consumed:order:201', myotp_test_vrec()['state'] );
 // A second order on the consumed proof is refused at validation and at processing.
-check( 'block: consumed proof refused at validation', 'myotp_pv_claimed', myotp_test_block_validate( '+14155550123' )->error_code );
+$e = myotp_test_block_validate( '+14155550123' );
+check( 'block: consumed proof refused at validation', 'myotp_pv_claimed', $e->error_code );
+check( 'block: reuse refusal reads as a plain request to verify again', 'Please verify your phone number again for this order.', $e->getMessage() );
 $order_x                = new MyOTP_Fake_Order( 203 );
 $order_x->billing_phone = '+14155550123';
 try {

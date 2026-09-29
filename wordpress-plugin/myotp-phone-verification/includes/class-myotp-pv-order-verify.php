@@ -228,7 +228,8 @@ class MyOTP_PV_Order_Verify {
 			} elseif ( (int) $result['http'] >= 500 || 409 === (int) $result['http'] ) {
 				MyOTP_PV_Session::release_site_slot( $limit['taken'] );
 			}
-			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
+			MyOTP_PV_Api::report( __( 'Sending a code failed', 'myotp-phone-verification' ), $result );
+			wp_send_json_error( array( 'message' => MyOTP_PV_Api::shopper_send_error() ), 200 );
 		}
 
 		$ttl  = MyOTP_PV_Session::pending_ttl();
@@ -296,13 +297,12 @@ class MyOTP_PV_Order_Verify {
 		$result = MyOTP_PV_Api::verify( $phone, $otp, $message_id );
 		if ( ! $result['ok'] ) {
 			myotp_pv_release_attempt( $store, $pkey, $message_id );
-			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
+			MyOTP_PV_Api::report( __( 'Checking a code failed', 'myotp-phone-verification' ), $result );
+			wp_send_json_error( array( 'message' => MyOTP_PV_Api::shopper_check_error() ), 200 );
 		}
 		$status = isset( $result['body']['status'] ) ? (string) $result['body']['status'] : '';
 		if ( 'success' !== $status ) {
-			$text = isset( $result['body']['message'] ) && is_string( $result['body']['message'] )
-				? $result['body']['message']
-				: __( 'That code is not correct.', 'myotp-phone-verification' );
+			$text = MyOTP_PV_Ajax::status_text( $status, $result );
 			if ( 'expired' === $status ) {
 				$store->delete( $pkey, $reserve['raw'] );
 			} elseif ( 'failed' === $status ) {

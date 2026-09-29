@@ -122,7 +122,8 @@ class MyOTP_PV_Ajax {
 			} elseif ( (int) $result['http'] >= 500 || 409 === (int) $result['http'] ) {
 				MyOTP_PV_Session::release_site_slot( $limit['taken'] );
 			}
-			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
+			MyOTP_PV_Api::report( __( 'Sending a code failed', 'myotp-phone-verification' ), $result );
+			wp_send_json_error( array( 'message' => MyOTP_PV_Api::shopper_send_error() ), 200 );
 		}
 
 		// The code went out. Retire the old verified record (verified or consumed) with
@@ -196,14 +197,13 @@ class MyOTP_PV_Ajax {
 		if ( ! $result['ok'] ) {
 			// Transport failure or any non-2xx: not a wrong code, count nothing.
 			MyOTP_PV_Session::release_attempt( $message_id );
-			wp_send_json_error( array( 'message' => $result['message'] ), 200 );
+			MyOTP_PV_Api::report( __( 'Checking a code failed', 'myotp-phone-verification' ), $result );
+			wp_send_json_error( array( 'message' => MyOTP_PV_Api::shopper_check_error() ), 200 );
 		}
 
 		$status = isset( $result['body']['status'] ) ? (string) $result['body']['status'] : '';
 		if ( 'success' !== $status ) {
-			$text = isset( $result['body']['message'] ) && is_string( $result['body']['message'] )
-				? $result['body']['message']
-				: __( 'That code is not correct.', 'myotp-phone-verification' );
+			$text = self::status_text( $status, $result );
 			if ( 'expired' === $status ) {
 				// Challenge is dead; drop it without counting.
 				MyOTP_PV_Session::clear_pending( $pending_raw );
@@ -242,6 +242,26 @@ class MyOTP_PV_Ajax {
 				'phone'   => $pending['phone'],
 			)
 		);
+	}
+
+	/**
+	 * Shopper text for a verify answer that is not "success". Our own words
+	 * only; an answer we do not know is reported to the shop.
+	 *
+	 * @param string $status Provider status.
+	 * @param array  $result Provider result.
+	 * @return string
+	 */
+	public static function status_text( $status, array $result ) {
+		if ( 'failed' === $status ) {
+			return __( 'That code is not correct.', 'myotp-phone-verification' );
+		}
+		if ( 'expired' === $status ) {
+			return __( 'That code has expired. Send a new code.', 'myotp-phone-verification' );
+		}
+		$result['message'] = isset( $result['body']['message'] ) && is_string( $result['body']['message'] ) ? $result['body']['message'] : $status;
+		MyOTP_PV_Api::report( __( 'Checking a code gave an unexpected answer', 'myotp-phone-verification' ), $result );
+		return MyOTP_PV_Api::shopper_check_error();
 	}
 
 	/**

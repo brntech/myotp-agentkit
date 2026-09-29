@@ -97,6 +97,10 @@ Listen for the event:
 
 The plugin reads REMOTE_ADDR only, because forwarding headers can be forged by the client. Behind a proxy that address may be the proxy itself, so every visitor shares one per-IP bucket and the site-wide hourly ceiling is the real backstop. If your host guarantees a trusted header, return the real address from the `myotp_pv_client_ip` filter.
 
+= A shopper says the code never arrives. Where do I look? =
+
+Shoppers only ever see a short message asking them to try again or contact the shop; the verification service's own error text is not shown to them. The detail goes to WooCommerce > Status > Logs (source `myotp-phone-verification`) and to a notice in the WordPress admin for a day, with phone numbers removed. A common cause is the Brand setting: it must be 3 to 16 letters or digits, with no spaces.
+
 = Does each test send cost credits? =
 
 Yes. A test send is a real send.
@@ -116,6 +120,7 @@ In the `myotp_pv_options` option, on the server only. It is shown masked on the 
 = 1.1.0 =
 * WooCommerce block checkout support (Store API validation and a Send code widget under the phone field).
 * New setting "Apple Pay / Google Pay and other express wallet orders": allow without a code (default), ask for the code after payment (the paid order is held until the shopper verifies on the order confirmation page), or block. Wallet orders are recognised from WooPayments and WooCommerce Stripe Payment Gateway only when the wallet gateway is the chosen payment method.
+* Shoppers never see the verification service's raw error text; the detail goes to the WooCommerce log and an admin notice, without phone numbers. The Brand setting accepts only 3 to 16 letters or digits and says so when a value is refused.
 
 = 1.0.0 =
 * First release. WooCommerce classic checkout, registration form, `[myotp_verify]` shortcode, settings page with test send.

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: MyOTP Phone Verification 1.1.0\n"
 "Report-Msgid-Bugs-To: https://github.com/brntech/myotp-agentkit/issues\n"
-"POT-Creation-Date: 2026-09-29 16:41+0000\n"
+"POT-Creation-Date: 2026-09-29 16:44+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -16,7 +16,7 @@ msgstr ""
 "X-Generator: bin/make-pot.php\n"
 "X-Domain: myotp-phone-verification\n"
 
-msgid "3 to 16 letters, digits or dots, shown in the message. Leave empty to use your account default."
+msgid "3 to 16 letters or digits (no spaces), shown in the message. Leave empty to use your account default."
 msgstr ""
 
 msgid "4 to 8 digits. A length other than 6 needs a MyOTP plan with custom code length."
@@ -70,6 +70,15 @@ msgstr ""
 msgid "Channel"
 msgstr ""
 
+msgid "Check the settings"
+msgstr ""
+
+msgid "Checking a code failed"
+msgstr ""
+
+msgid "Checking a code gave an unexpected answer"
+msgstr ""
+
 msgid "Checking..."
 msgstr ""
 
@@ -111,6 +120,10 @@ msgid "MyOTP"
 msgstr ""
 
 msgid "MyOTP Phone Verification"
+msgstr ""
+
+#. translators: %s: error detail from the verification service
+msgid "MyOTP Phone Verification: a shopper could not get or check a code. Last error: %s"
 msgstr ""
 
 msgid "MyOTP: billing phone verified by the shopper after the express wallet payment."
@@ -190,6 +203,9 @@ msgstr ""
 msgid "Send test code"
 msgstr ""
 
+msgid "Sending a code failed"
+msgstr ""
+
 msgid "Sending..."
 msgstr ""
 
@@ -212,6 +228,9 @@ msgstr ""
 msgid "Suggested text for sites using MyOTP Phone Verification."
 msgstr ""
 
+msgid "That code has expired. Send a new code."
+msgstr ""
+
 msgid "That code is not correct."
 msgstr ""
 
@@ -219,6 +238,9 @@ msgid "The API key was not saved. Keys are 32 characters: letters, digits, dash 
 msgstr ""
 
 msgid "The billing phone number does not match the number you verified. Verify the new number or change it back."
+msgstr ""
+
+msgid "The brand was not saved. Use 3 to 16 letters or digits, with no spaces or other characters."
 msgstr ""
 
 msgid "The number changed after the code was sent. Send a new code."
@@ -290,6 +312,12 @@ msgid "Verify your phone number before placing the order. Use the Send code butt
 msgstr ""
 
 msgid "Verify your phone number before registering."
+msgstr ""
+
+msgid "We couldn't check the code right now. Please try again in a minute or contact the shop."
+msgstr ""
+
+msgid "We couldn't send a code right now. Please try again in a minute or contact the shop."
 msgstr ""
 
 msgid "When you verify a phone number on this site, the number is sent to MyOTP.App (api.myotp.app) so a one-time code can be delivered by SMS, WhatsApp or Telegram and checked. MyOTP.App processes the number under its own privacy policy and terms: https://myotp.app/privacy-policy/ and https://myotp.app/term-condition/."

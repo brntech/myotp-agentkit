@@ -14,6 +14,55 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class MyOTP_PV_Api {
 
+	const ERROR_TRANSIENT = 'myotp_pv_api_error';
+
+	/**
+	 * What a shopper sees when a code could not be sent. The provider's own
+	 * text never reaches the shopper; report() keeps it for the shop.
+	 *
+	 * @return string
+	 */
+	public static function shopper_send_error() {
+		return __( 'We couldn\'t send a code right now. Please try again in a minute or contact the shop.', 'myotp-phone-verification' );
+	}
+
+	/**
+	 * What a shopper sees when a code could not be checked.
+	 *
+	 * @return string
+	 */
+	public static function shopper_check_error() {
+		return __( 'We couldn\'t check the code right now. Please try again in a minute or contact the shop.', 'myotp-phone-verification' );
+	}
+
+	/**
+	 * Keep a failed call's detail for the shop owner: the WooCommerce log
+	 * (source myotp-phone-verification) when available, and a notice in the
+	 * admin for a day. Phone numbers are scrubbed out of the detail.
+	 *
+	 * @param string $what   What failed, e.g. "Sending a code failed".
+	 * @param array  $result Result from post().
+	 */
+	public static function report( $what, array $result ) {
+		$http   = isset( $result['http'] ) ? (int) $result['http'] : 0;
+		$detail = myotp_pv_scrub_detail( isset( $result['message'] ) ? $result['message'] : '' );
+		$line   = myotp_pv_scrub_detail( $what . ( $http > 0 ? ' (HTTP ' . $http . ')' : '' ) . ( '' !== $detail ? ': ' . $detail : '' ) );
+		if ( function_exists( 'wc_get_logger' ) ) {
+			$logger = wc_get_logger();
+			if ( is_object( $logger ) && method_exists( $logger, 'warning' ) ) {
+				$logger->warning( $line, array( 'source' => 'myotp-phone-verification' ) );
+			}
+		}
+		set_transient(
+			self::ERROR_TRANSIENT,
+			array(
+				'at'     => time(),
+				'detail' => $line,
+			),
+			DAY_IN_SECONDS
+		);
+	}
+
 	/**
 	 * POST JSON to the API. Returns array( ok, http, body, message, transport ).
 	 * transport is true when the request never got an HTTP answer.

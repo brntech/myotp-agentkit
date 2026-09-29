@@ -321,6 +321,7 @@ foreach ( array(
 	'wp_ajax_myotp_pv_order_verify',
 	'wp_ajax_nopriv_myotp_pv_order_verify',
 	'wp_footer',
+	'admin_notices',
 	'registration_errors',
 	'register_new_user',
 	'wp_enqueue_scripts',
@@ -421,7 +422,9 @@ myotp_test_http( 200, array( 'status' => 'accepted' ) );
 check( 'send: 200 without message_id is an error', false, myotp_test_send( '14155550123' )->success );
 myotp_test_configure();
 myotp_test_http( 402, array( 'error' => array( 'http_code' => 402, 'message' => 'Insufficient balance' ) ) );
-check( 'send: 402 surfaced', 'Insufficient balance', myotp_test_send( '14155550123' )->data['message'] );
+check( 'send: 402 shows the shopper our own line, not the provider text', 'We couldn\'t send a code right now. Please try again in a minute or contact the shop.', myotp_test_send( '14155550123' )->data['message'] );
+check( 'send: 402 detail kept for the shop in an admin notice', 'Sending a code failed (HTTP 402): Insufficient balance', get_transient( 'myotp_pv_api_error' )['detail'] ?? null );
+check( 'send: 402 detail in the WooCommerce log', array( 'warning', 'Sending a code failed (HTTP 402): Insufficient balance', array( 'source' => 'myotp-phone-verification' ) ), $GLOBALS['myotp_test']['wc_log'][0] ?? null );
 check( 'send: 4xx keeps the site slot', 1, myotp_test_counter( 'send_site' ) );
 myotp_test_configure();
 myotp_test_http( 503, array( 'error' => array( 'http_code' => 503, 'message' => 'Down' ) ) );
@@ -478,7 +481,7 @@ myotp_test_send( '14155550123' );
 myotp_test_wrong( 4 );
 myotp_test_http( 200, array( 'status' => 'failed', 'message' => 'Invalid OTP' ) );
 $r = myotp_test_verify( '000000' );
-check( 'cooldown: fifth wrong answer surfaced', 'Invalid OTP', $r->data['message'] );
+check( 'cooldown: fifth wrong answer in our words', 'That code is not correct.', $r->data['message'] );
 check( 'cooldown: remaining zero', 0, $r->data['remaining'] );
 check( 'cooldown: challenge dropped', null, myotp_test_pending() );
 check( 'cooldown: record is per visitor and phone', true, null !== MyOTP_PV_Store::$instance->get( 'cool:c_' . str_repeat( 'a', 32 ) . ':14155550123' ) );
@@ -539,7 +542,7 @@ for ( $i = 0; $i < 20; $i++ ) {
 }
 check( 'count: a provider outage never exhausts a challenge', 1, myotp_test_pending()['failed'] );
 myotp_test_http( 200, array( 'status' => 'expired', 'message' => 'OTP expired' ) );
-check( 'count: expired surfaced', 'OTP expired', myotp_test_verify( '111111' )->data['message'] );
+check( 'count: expired in our words', 'That code has expired. Send a new code.', myotp_test_verify( '111111' )->data['message'] );
 check( 'count: expired dropped the challenge', null, myotp_test_pending() );
 check( 'count: expired started no cooldown', 0, MyOTP_PV_Session::cooldown_remaining( '14155550123' ) );
 
@@ -1302,6 +1305,60 @@ $o                = new MyOTP_Fake_Order( 880 );
 $o->billing_phone = '';
 MyOTP_PV_Order_Verify::mark( $o, 'google_pay' );
 check( 'after: unusable phone gets a note for the shop', true, myotp_test_has_note( $o, 'cannot receive a code' ) );
+
+// Provider text never reaches shoppers; the shop gets the detail without phone numbers.
+myotp_test_configure();
+myotp_test_http( 400, array( 'error' => array( 'http_code' => 400, 'message' => 'brand must be an alphanumeric string of 3-16 characters' ) ) );
+$r = myotp_test_send( '14155550123' );
+check( 'api error: shopper sees the friendly line', 'We couldn\'t send a code right now. Please try again in a minute or contact the shop.', $r->data['message'] );
+check( 'api error: raw validation text not shown to the shopper', false, false !== strpos( json_encode( $r->data ), 'alphanumeric' ) );
+check( 'api error: merchant detail has the provider text', 'Sending a code failed (HTTP 400): brand must be an alphanumeric string of 3-16 characters', get_transient( 'myotp_pv_api_error' )['detail'] );
+myotp_test_http( 400, array( 'error' => array( 'http_code' => 400, 'message' => 'Invalid phone number +1 (415) 555-0123 for route 14155550123' ) ) );
+myotp_test_send( '14155550100' );
+check( 'api error: phone numbers scrubbed from the merchant detail', 'Sending a code failed (HTTP 400): Invalid phone number [number] for route [number]', get_transient( 'myotp_pv_api_error' )['detail'] );
+check( 'api error: phone numbers scrubbed from the log', false, false !== strpos( json_encode( $GLOBALS['myotp_test']['wc_log'] ), '5550123' ) );
+check( 'scrub: short numbers in text survive', 'brand must be 3-16 characters', myotp_pv_scrub_detail( "brand must be\n 3-16 characters" ) );
+$GLOBALS['myotp_test']['options']['myotp_pv_options']['api_key'] = '';
+check( 'api error: no key configured is the friendly line too', 'We couldn\'t send a code right now. Please try again in a minute or contact the shop.', myotp_test_send( '14155550123' )->data['message'] );
+check( 'api error: no key configured is reported to the shop', 'Sending a code failed: Phone verification is not configured on this site yet.', get_transient( 'myotp_pv_api_error' )['detail'] );
+myotp_test_configure();
+myotp_test_http( 200, array( 'message_id' => 'msg-u' ) );
+myotp_test_send( '14155550123' );
+myotp_test_http( 500, array( 'error' => array( 'http_code' => 500, 'message' => 'upstream timeout' ) ) );
+check( 'api error: verify 5xx is the friendly check line', 'We couldn\'t check the code right now. Please try again in a minute or contact the shop.', myotp_test_verify( '123456' )->data['message'] );
+myotp_test_http( 200, array( 'status' => 'weird', 'message' => 'Some provider text' ) );
+check( 'api error: unknown verify status is the friendly check line', 'We couldn\'t check the code right now. Please try again in a minute or contact the shop.', myotp_test_verify( '123456' )->data['message'] );
+check( 'api error: unknown verify status reported', 'Checking a code gave an unexpected answer (HTTP 200): Some provider text', get_transient( 'myotp_pv_api_error' )['detail'] );
+// Admin notice for administrators only; cleared when the settings are saved.
+ob_start();
+myotp_test_do_action( 'admin_notices' );
+check( 'api notice: hidden from users without manage_options', '', ob_get_clean() );
+$GLOBALS['myotp_test']['can_manage'] = true;
+ob_start();
+myotp_test_do_action( 'admin_notices' );
+$notice = ob_get_clean();
+check( 'api notice: shown to an administrator with the detail', true, false !== strpos( $notice, 'Last error: Checking a code gave an unexpected answer (HTTP 200): Some provider text' ) && false !== strpos( $notice, 'options-general.php?page=myotp-phone-verification' ) );
+MyOTP_PV_Settings::sanitize( array( 'otp_length' => 6 ) );
+check( 'api notice: cleared when the settings are saved', false, get_transient( 'myotp_pv_api_error' ) );
+// Brand: letters and digits only, 3 to 16; refused values keep a valid stored brand and raise a notice.
+check( 'brand: letters and digits kept', 'Shop2', myotp_pv_sanitize_options( array( 'brand' => ' Shop2 ' ), array() )['brand'] );
+check( 'brand: spaces refused, current kept', 'Shop', myotp_pv_sanitize_options( array( 'brand' => 'My Shop' ), array( 'brand' => 'Shop' ) )['brand'] );
+check( 'brand: dots refused', '', myotp_pv_sanitize_options( array( 'brand' => 'Shop.co' ), array() )['brand'] );
+check( 'brand: too short refused', '', myotp_pv_sanitize_options( array( 'brand' => 'ab' ), array() )['brand'] );
+check( 'brand: an invalid stored brand is dropped on the next save', '', myotp_pv_sanitize_options( array( 'brand' => 'My Shop' ), array( 'brand' => 'Old Shop' ) )['brand'] );
+check( 'brand: empty clears', '', myotp_pv_sanitize_options( array( 'brand' => '' ), array( 'brand' => 'Shop' ) )['brand'] );
+check( 'brand: an invalid stored brand is never sent', false, array_key_exists( 'brand', myotp_pv_generate_payload( '14155550123', array_merge( myotp_pv_default_options(), array( 'brand' => 'My Shop' ) ), false ) ) );
+myotp_test_configure();
+MyOTP_PV_Settings::sanitize( array( 'brand' => 'My Shop' ) );
+check( 'brand: refused value raises a settings notice', true, isset( $GLOBALS['myotp_test']['settings_errors']['brand'] ) );
+myotp_test_configure();
+MyOTP_PV_Settings::sanitize( array( 'brand' => 'MyShop' ) );
+check( 'brand: valid value raises no notice', false, isset( $GLOBALS['myotp_test']['settings_errors']['brand'] ) );
+// Order page: same friendly lines.
+$o = myotp_test_held_order( 890 );
+$o->payment_complete();
+myotp_test_http( 402, array( 'error' => array( 'http_code' => 402, 'message' => 'Insufficient balance' ) ) );
+check( 'order send: provider failure is the friendly line', 'We couldn\'t send a code right now. Please try again in a minute or contact the shop.', myotp_test_order_ajax( 'myotp_pv_order_send', array( 'order_id' => '890', 'key' => 'wc_order_k890' ) )->data['message'] );
 
 // Privacy text, header, .pot.
 myotp_test_configure();

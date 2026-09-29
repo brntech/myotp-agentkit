@@ -256,6 +256,8 @@ function myotp_test_reset() {
 	$GLOBALS['myotp_test']['meta_fail']   = false;
 	$GLOBALS['myotp_test']['delete_meta_fail'] = false;
 	$GLOBALS['myotp_test']['orders']      = array();
+	$GLOBALS['myotp_test']['wc_log']      = array();
+	$GLOBALS['myotp_test']['settings_errors'] = array();
 	$GLOBALS['myotp_test']['can_edit_orders'] = false;
 	$_GET                                 = array();
 	MyOTP_PV_Store::$instance             = new MyOTP_Mem_Store();
@@ -385,6 +387,16 @@ function current_user_can( $cap ) {
 		return ! empty( $GLOBALS['myotp_test']['can_edit_orders'] );
 	}
 	return $GLOBALS['myotp_test']['can_manage'];
+}
+function admin_url( $path = '' ) { return 'http://example.test/wp-admin/' . $path; }
+function add_settings_error( $setting, $code, $message, $type = 'error' ) { $GLOBALS['myotp_test']['settings_errors'][ $code ] = $message; }
+/** WooCommerce logger fake: records every line. */
+function wc_get_logger() {
+	return new class() {
+		public function warning( $message, $context = array() ) {
+			$GLOBALS['myotp_test']['wc_log'][] = array( 'warning', $message, $context );
+		}
+	};
 }
 function wp_create_nonce( $action = -1 ) { return 'nonce-' . md5( (string) $action ); }
 function absint( $v ) { return abs( (int) $v ); }

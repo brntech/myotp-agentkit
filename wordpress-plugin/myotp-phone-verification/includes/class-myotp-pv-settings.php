@@ -23,6 +23,7 @@ class MyOTP_PV_Settings {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_action( 'admin_notices', array( __CLASS__, 'api_error_notice' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( MYOTP_PV_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -76,6 +77,15 @@ class MyOTP_PV_Settings {
 		$current = get_option( MYOTP_PV_OPTION, array() );
 		$clean   = myotp_pv_sanitize_options( $input, is_array( $current ) ? $current : array() );
 
+		if ( is_array( $input ) && isset( $input['brand'] ) && is_string( $input['brand'] ) ) {
+			$brand = trim( $input['brand'] );
+			if ( '' !== $brand && $brand !== $clean['brand'] ) {
+				add_settings_error( 'myotp_pv', 'brand', __( 'The brand was not saved. Use 3 to 16 letters or digits, with no spaces or other characters.', 'myotp-phone-verification' ) );
+			}
+		}
+		// Settings changed: the last send error may no longer apply.
+		delete_transient( MyOTP_PV_Api::ERROR_TRANSIENT );
+
 		if ( is_array( $input ) && isset( $input['api_key'] ) ) {
 			$submitted = trim( (string) $input['api_key'] );
 			if ( '' !== $submitted && MYOTP_PV_KEY_MASK !== $submitted && $submitted !== $clean['api_key'] ) {
@@ -83,6 +93,26 @@ class MyOTP_PV_Settings {
 			}
 		}
 		return $clean;
+	}
+
+	/**
+	 * Admin notice after a shopper could not get or check a code, with the
+	 * detail the provider gave (no phone numbers). Shown to administrators
+	 * for a day, or until the settings are saved.
+	 */
+	public static function api_error_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$error = get_transient( MyOTP_PV_Api::ERROR_TRANSIENT );
+		if ( ! is_array( $error ) || empty( $error['detail'] ) ) {
+			return;
+		}
+		$url = admin_url( 'options-general.php?page=' . self::PAGE );
+		echo '<div class="notice notice-warning"><p>';
+		/* translators: %s: error detail from the verification service */
+		echo esc_html( sprintf( __( 'MyOTP Phone Verification: a shopper could not get or check a code. Last error: %s', 'myotp-phone-verification' ), (string) $error['detail'] ) );
+		echo ' <a href="' . esc_url( $url ) . '">' . esc_html__( 'Check the settings', 'myotp-phone-verification' ) . '</a></p></div>';
 	}
 
 	/**
@@ -190,7 +220,7 @@ class MyOTP_PV_Settings {
 						<td>
 							<input type="text" id="myotp_pv_brand" class="regular-text" maxlength="16"
 								name="<?php echo esc_attr( $name ); ?>[brand]" value="<?php echo esc_attr( $o['brand'] ); ?>" />
-							<p class="description"><?php esc_html_e( '3 to 16 letters, digits or dots, shown in the message. Leave empty to use your account default.', 'myotp-phone-verification' ); ?></p>
+							<p class="description"><?php esc_html_e( '3 to 16 letters or digits (no spaces), shown in the message. Leave empty to use your account default.', 'myotp-phone-verification' ); ?></p>
 						</td>
 					</tr>
 					<tr>

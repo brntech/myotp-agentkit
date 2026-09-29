@@ -39,6 +39,31 @@ function myotp_pv_is_valid_phone( $digits ) {
 }
 
 /**
+ * True when the brand is what the API accepts: 3 to 16 letters or digits.
+ *
+ * @param mixed $brand Brand.
+ * @return bool
+ */
+function myotp_pv_is_valid_brand( $brand ) {
+	return is_string( $brand ) && 1 === preg_match( '/^[a-zA-Z0-9]{3,16}$/', $brand );
+}
+
+/**
+ * Error detail for the shop owner: one line, at most 300 characters, with
+ * anything that looks like a phone number replaced, so logs and notices
+ * never carry a shopper's number.
+ *
+ * @param mixed $text Detail text.
+ * @return string
+ */
+function myotp_pv_scrub_detail( $text ) {
+	$text = is_scalar( $text ) ? (string) $text : '';
+	$text = preg_replace( '/\+?\d[\d\s().\/-]{5,}\d/', '[number]', $text );
+	$text = trim( preg_replace( '/\s+/', ' ', (string) $text ) );
+	return strlen( $text ) > 300 ? substr( $text, 0, 297 ) . '...' : $text;
+}
+
+/**
  * True when the OTP matches ^[0-9]{3,8}$.
  *
  * @param string $otp Code as typed.
@@ -589,7 +614,8 @@ function myotp_pv_generate_payload( $phone, array $options, $force ) {
 	if ( 300 !== $validity ) {
 		$payload['otp_validity'] = $validity;
 	}
-	if ( isset( $options['brand'] ) && '' !== $options['brand'] ) {
+	// A stored brand the API would refuse (saved by an older version) is left out: the account default is used.
+	if ( isset( $options['brand'] ) && myotp_pv_is_valid_brand( $options['brand'] ) ) {
 		$payload['brand'] = (string) $options['brand'];
 	}
 	return $payload;
@@ -793,8 +819,13 @@ function myotp_pv_sanitize_options( $input, $current = array() ) {
 	}
 
 	if ( array_key_exists( 'brand', $input ) ) {
-		$brand        = trim( (string) $input['brand'] );
-		$out['brand'] = ( '' === $brand || preg_match( '/^[a-zA-Z0-9.]{3,16}$/', $brand ) ) ? $brand : $current['brand'];
+		$brand = is_string( $input['brand'] ) ? trim( $input['brand'] ) : '';
+		if ( '' === $brand || myotp_pv_is_valid_brand( $brand ) ) {
+			$out['brand'] = $brand;
+		} else {
+			// Refused: keep the stored brand only if it is itself valid.
+			$out['brand'] = myotp_pv_is_valid_brand( $current['brand'] ) ? $current['brand'] : '';
+		}
 	}
 
 	// Checkboxes are absent when unticked, so only reset them when a form was actually submitted.

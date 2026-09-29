@@ -413,7 +413,10 @@ function disabled( $a, $b = true, $echo = true ) { $r = ( (string) $a === (strin
 function has_block( $name ) { return ! empty( $GLOBALS['myotp_test']['has_block'][ $name ] ); }
 function wp_enqueue_script( $h, $src = '', $deps = array() ) { $GLOBALS['myotp_test']['enqueued'][] = $h; }
 function wp_enqueue_style( $h ) { $GLOBALS['myotp_test']['enqueued'][] = $h; }
-function wp_script_is( $h, $list = 'enqueued' ) { return true; }
+function wp_script_is( $h, $list = 'enqueued' ) { return empty( $GLOBALS['myotp_test']['scripts_unregistered'] ); }
+function wp_register_style( $h, $src = '', $deps = array(), $ver = false ) { $GLOBALS['myotp_test']['registered'][] = $h; }
+function wp_register_script( $h, $src = '', $deps = array(), $ver = false, $footer = false ) { $GLOBALS['myotp_test']['registered'][] = $h; }
+function wp_localize_script( $h, $name, $data ) { $GLOBALS['myotp_test']['localized'][ $name ] = $data; }
 function wp_unique_id( $p = '' ) { return $p . '1'; }
 function is_checkout() { return ! empty( $GLOBALS['myotp_test']['is_checkout'] ); }
 function is_user_logged_in() { return $GLOBALS['myotp_test']['logged_in']; }

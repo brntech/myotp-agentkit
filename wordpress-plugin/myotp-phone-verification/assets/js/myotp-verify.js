@@ -65,6 +65,31 @@
 			}
 		}
 
+		// After a send, "Send again" waits 30 seconds (display only; the server limits are unchanged).
+		var countdown = null;
+		function stopCountdown() {
+			if (countdown) {
+				clearInterval(countdown);
+				countdown = null;
+			}
+		}
+		function startCountdown() {
+			var left = 30;
+			stopCountdown();
+			lock(sendBtn, true);
+			sendBtn.textContent = myotpPv.i18n.sendAgainIn.replace('%d', left);
+			countdown = setInterval(function () {
+				left -= 1;
+				if (left > 0) {
+					sendBtn.textContent = myotpPv.i18n.sendAgainIn.replace('%d', left);
+					return;
+				}
+				stopCountdown();
+				sendBtn.textContent = myotpPv.i18n.sendAgain;
+				lock(sendBtn, root.getAttribute('data-verified') === '1');
+			}, 1000);
+		}
+
 		sendBtn.addEventListener('click', function () {
 			var input = phoneInput(root);
 			var phone = digits(input ? input.value : '');
@@ -88,7 +113,7 @@
 					sentTo = res.data.phone || phone;
 					root.setAttribute('data-verified', '0');
 					codeRow.hidden = false;
-					sendBtn.textContent = myotpPv.i18n.sendAgain;
+					startCountdown();
 					setStatus(root, res.data.message || myotpPv.i18n.sent, true);
 					codeInput.value = '';
 					codeInput.focus();
@@ -120,6 +145,7 @@
 				if (res && res.success) {
 					root.setAttribute('data-verified', '1');
 					codeRow.hidden = true;
+					stopCountdown();
 					lock(sendBtn, true);
 					if (input && !root.getAttribute('data-phone-selector') && !orderFields) {
 						input.value = res.data.phone || phone;
@@ -168,6 +194,7 @@
 			ext.addEventListener('input', function () {
 				if (root.getAttribute('data-verified') === '1') {
 					root.setAttribute('data-verified', '0');
+					stopCountdown();
 					lock(sendBtn, false);
 					sendBtn.textContent = myotpPv.i18n.send;
 					setStatus(root, '', true);

@@ -38,16 +38,18 @@ class MyOTP_PV_Widget {
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'myotp_pv_public' ),
 				'i18n'    => array(
-					'sending'   => __( 'Sending...', 'myotp-phone-verification' ),
-					'sent'      => __( 'Code sent. Enter it below.', 'myotp-phone-verification' ),
-					'checking'  => __( 'Checking...', 'myotp-phone-verification' ),
-					'verified'  => __( 'Phone number verified.', 'myotp-phone-verification' ),
-					'network'   => __( 'Network error. Try again.', 'myotp-phone-verification' ),
-					'needPhone' => __( 'Enter a phone number first.', 'myotp-phone-verification' ),
-					'needCode'  => __( 'Enter the code you received.', 'myotp-phone-verification' ),
-					'sendAgain' => __( 'Send again', 'myotp-phone-verification' ),
-					'send'      => __( 'Send code', 'myotp-phone-verification' ),
-					'verify'    => __( 'Verify', 'myotp-phone-verification' ),
+					'sending'     => __( 'Sending...', 'myotp-phone-verification' ),
+					'sent'        => __( 'Code sent. Enter it below.', 'myotp-phone-verification' ),
+					'checking'    => __( 'Checking...', 'myotp-phone-verification' ),
+					'verified'    => __( 'Phone number verified.', 'myotp-phone-verification' ),
+					'network'     => __( 'Network error. Try again.', 'myotp-phone-verification' ),
+					'needPhone'   => __( 'Enter a phone number first.', 'myotp-phone-verification' ),
+					'needCode'    => __( 'Enter the code you received.', 'myotp-phone-verification' ),
+					'sendAgain'   => __( 'Send again', 'myotp-phone-verification' ),
+					/* translators: %d: seconds until the code can be sent again */
+					'sendAgainIn' => __( 'Send again (%d)', 'myotp-phone-verification' ),
+					'send'        => __( 'Send code', 'myotp-phone-verification' ),
+					'verify'      => __( 'Verify', 'myotp-phone-verification' ),
 				),
 			)
 		);

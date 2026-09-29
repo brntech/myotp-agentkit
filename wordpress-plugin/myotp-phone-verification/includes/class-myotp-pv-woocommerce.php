@@ -41,6 +41,15 @@ class MyOTP_PV_WooCommerce {
 	private static $claimed = '';
 
 	/**
+	 * True when this request pays an existing order (Store API
+	 * /checkout/{id}); that order was not created at a checkout with the
+	 * widget, so it is not gated, as on the classic order-pay page.
+	 *
+	 * @var bool
+	 */
+	private static $pay_existing = false;
+
+	/**
 	 * Hook registration.
 	 */
 	public static function init() {
@@ -116,7 +125,11 @@ class MyOTP_PV_WooCommerce {
 	 * @throws Exception Route exception carrying the message shown to the shopper.
 	 */
 	public static function validate_block( $order, $request = null ) {
-		self::$claimed = '';
+		self::$claimed      = '';
+		self::$pay_existing = is_object( $request ) && method_exists( $request, 'get_route' ) && 1 === preg_match( '#/checkout/\d+/?$#', (string) $request->get_route() );
+		if ( self::$pay_existing ) {
+			return;
+		}
 		if ( is_object( $request ) && method_exists( $request, 'get_method' ) && 'POST' !== $request->get_method() ) {
 			return;
 		}
@@ -146,7 +159,7 @@ class MyOTP_PV_WooCommerce {
 	 */
 	public static function consume_block( $order ) {
 		self::$claimed = '';
-		if ( ! self::required() ) {
+		if ( self::$pay_existing || ! self::required() ) {
 			return;
 		}
 		$phone   = is_object( $order ) && method_exists( $order, 'get_billing_phone' ) ? (string) $order->get_billing_phone() : '';
@@ -165,9 +178,9 @@ class MyOTP_PV_WooCommerce {
 	 */
 	private static function refuse( $failure ) {
 		if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
-			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( $failure[0], $failure[1], 400 );
+			throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( esc_html( $failure[0] ), esc_html( $failure[1] ), 400 );
 		}
-		throw new \RuntimeException( $failure[1] );
+		throw new \RuntimeException( esc_html( $failure[1] ) );
 	}
 
 	/**
@@ -208,7 +221,13 @@ class MyOTP_PV_WooCommerce {
 	 * field and binds it.
 	 */
 	public static function block_widget() {
-		if ( ! self::required() || ! function_exists( 'has_block' ) || ! has_block( 'woocommerce/checkout' ) ) {
+		if ( ! self::required() ) {
+			return;
+		}
+		// is_checkout() also covers a checkout block that lives in a block template. The
+		// script does nothing when the page has no block-checkout phone field.
+		$is_block_page = function_exists( 'has_block' ) && has_block( 'woocommerce/checkout' );
+		if ( ! $is_block_page && ! ( function_exists( 'is_checkout' ) && is_checkout() ) ) {
 			return;
 		}
 		wp_enqueue_script( 'myotp-pv-block', MYOTP_PV_URL . 'assets/js/myotp-block-checkout.js', array( 'myotp-pv' ), MYOTP_PV_VERSION, true );

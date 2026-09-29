@@ -129,8 +129,13 @@ class_alias( 'MyOTP_Fake_RouteException', 'Automattic\WooCommerce\StoreApi\Excep
 
 class MyOTP_Fake_Request {
 	public $method;
-	public function __construct( $method ) {
+	public $route;
+	public function __construct( $method, $route = '/wc/store/v1/checkout' ) {
 		$this->method = $method;
+		$this->route  = $route;
+	}
+	public function get_route() {
+		return $this->route;
 	}
 	public function get_method() {
 		return $this->method;
@@ -334,6 +339,7 @@ function wp_enqueue_script( $h, $src = '', $deps = array() ) { $GLOBALS['myotp_t
 function wp_enqueue_style( $h ) { $GLOBALS['myotp_test']['enqueued'][] = $h; }
 function wp_script_is( $h, $list = 'enqueued' ) { return true; }
 function wp_unique_id( $p = '' ) { return $p . '1'; }
+function is_checkout() { return ! empty( $GLOBALS['myotp_test']['is_checkout'] ); }
 function is_user_logged_in() { return $GLOBALS['myotp_test']['logged_in']; }
 function get_current_user_id() { return $GLOBALS['myotp_test']['logged_in'] ? 7 : 0; }
 function wp_generate_password( $len, $special ) { return bin2hex( random_bytes( (int) ( $len / 2 ) ) ); }

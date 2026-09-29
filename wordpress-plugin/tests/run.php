@@ -804,11 +804,11 @@ foreach ( MyOTP_PV_Store::$instance->deletes as $d ) {
 check( 'guards: no unguarded delete on pending or verified rows', array(), $unguarded );
 
 // Block checkout (Store API): same gate, thrown as a RouteException, POST only.
-function myotp_test_block_validate( string $phone, string $method = 'POST' ): ?Exception {
+function myotp_test_block_validate( string $phone, string $method = 'POST', string $route = '/wc/store/v1/checkout' ): ?Exception {
 	$order                = new MyOTP_Fake_Order( 201 );
 	$order->billing_phone = $phone;
 	try {
-		myotp_test_do_action( 'woocommerce_store_api_checkout_update_order_from_request', $order, new MyOTP_Fake_Request( $method ) );
+		myotp_test_do_action( 'woocommerce_store_api_checkout_update_order_from_request', $order, new MyOTP_Fake_Request( $method, $route ) );
 	} catch ( Exception $e ) {
 		return $e;
 	}
@@ -878,6 +878,14 @@ try {
 	$thrown = $e->error_code;
 }
 check( 'block: phone changed before processing refused', 'myotp_pv_mismatch', $thrown );
+// Pay-for-order route: not gated at validation nor at processing.
+myotp_test_configure();
+check( 'block: pay-existing-order route not gated', null, myotp_test_block_validate( '+14155550123', 'POST', '/wc/store/v1/checkout/57' ) );
+$o_pay                = new MyOTP_Fake_Order( 401 );
+$o_pay->billing_phone = '+14155550123';
+myotp_test_do_action( 'woocommerce_store_api_checkout_order_processed', $o_pay );
+check( 'block: pay-existing-order not stamped or refused', false, isset( $o_pay->meta['_myotp_verified_phone'] ) );
+check( 'block: normal checkout route gated again on the next request', 'myotp_pv_unverified', myotp_test_block_validate( '+14155550123' )->error_code );
 // Guests only: a logged-in shopper is not gated on block checkout either.
 myotp_test_configure();
 $GLOBALS['myotp_test']['options']['myotp_pv_options']['wc_guests_only'] = 1;

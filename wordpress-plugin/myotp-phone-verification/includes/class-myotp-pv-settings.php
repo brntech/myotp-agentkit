@@ -216,7 +216,7 @@ class MyOTP_PV_Settings {
 								<?php if ( ! $has_wc ) : ?>
 									<p class="description"><?php esc_html_e( 'WooCommerce is not active.', 'myotp-phone-verification' ); ?></p>
 								<?php else : ?>
-									<p class="description"><?php esc_html_e( 'Works with the classic (shortcode) checkout. The block checkout is not supported in this version.', 'myotp-phone-verification' ); ?></p>
+									<p class="description"><?php esc_html_e( 'Works with the classic (shortcode) checkout and the block checkout. Keep the phone field visible in the checkout block. Express payment buttons (Apple Pay, Google Pay) that skip the checkout page are not supported for guests.', 'myotp-phone-verification' ); ?></p>
 								<?php endif; ?>
 							</fieldset>
 						</td>

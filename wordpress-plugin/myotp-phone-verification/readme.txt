@@ -31,7 +31,7 @@ How it stays safe:
 * A verification is valid for 30 minutes and is claimed by exactly one checkout or one registration at validation time, then consumed when the order or account exists. If checkout fails after validation (a declined payment, for example) the visitor verifies again.
 * Phone numbers are reduced to digits before they are sent. Leading zeros are kept.
 
-Both the classic (shortcode) checkout and the block checkout are supported. On the block checkout the plugin adds its widget under the phone field with a small script (no block to add in the editor) and validates when the order is placed. The block checkout's phone field must be shown: with the field hidden there is no number to verify and the order is refused.
+Both the classic (shortcode) checkout and the block checkout are supported. On the block checkout the plugin adds its widget under the phone field with a small script (no block to add in the editor) and validates when the order is placed. The block checkout's phone field must be shown: with the field hidden there is no number to verify and the order is refused. Express payment buttons (Apple Pay, Google Pay) placed on product or cart pages skip the checkout page, so they cannot show the widget and guests using them are refused while verification is required.
 
 = External service =
 

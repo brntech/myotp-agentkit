@@ -56,7 +56,7 @@ myotp-phone-verification/
   includes/class-myotp-pv-settings.php     Settings > MyOTP
   includes/class-myotp-pv-shortcode.php    [myotp_verify]
   includes/class-myotp-pv-registration.php wp-login.php?action=register
-  includes/class-myotp-pv-woocommerce.php  classic checkout
+  includes/class-myotp-pv-woocommerce.php  classic and block checkout
   assets/js, assets/css, languages/, readme.txt, uninstall.php
 tests/run.php                     plain PHP tests: pure helpers, then every hook and flow against tests/wp-stubs.php
 bin/make-pot.php                  regenerates languages/*.pot from the sources

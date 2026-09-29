@@ -442,6 +442,13 @@ class MyOTP_PV_WooCommerce {
 
 		$consumed = MyOTP_PV_Session::consume_claim( $phone, 'order:' . $order->get_id() );
 		if ( $consumed === $phone ) {
+			$order->add_order_note(
+				sprintf(
+					/* translators: %s: last four digits of the phone number */
+					__( 'MyOTP: phone ending %s verified by one-time code.', 'myotp-phone-verification' ),
+					substr( $phone, -4 )
+				)
+			);
 			return;
 		}
 		$order->add_order_note( __( 'MyOTP: the phone verification claimed at checkout could not be consumed for this order (it changed or expired in between). Billing phone is unverified.', 'myotp-phone-verification' ) );

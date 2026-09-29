@@ -338,7 +338,13 @@ class MyOTP_PV_Order_Verify {
 		$order->delete_meta_data( self::AWAITING );
 		$order->delete_meta_data( self::RESTORE );
 		$order->save();
-		$order->add_order_note( __( 'MyOTP: billing phone verified by the shopper after the express wallet payment.', 'myotp-phone-verification' ) );
+		$order->add_order_note(
+			sprintf(
+				/* translators: %s: last four digits of the phone number */
+				__( 'MyOTP: phone ending %s verified by one-time code after the express wallet payment.', 'myotp-phone-verification' ),
+				substr( $phone, -4 )
+			)
+		);
 		if ( '' === $restore || 'on-hold' === $restore || ! $order->has_status( 'on-hold' ) ) {
 			return;
 		}

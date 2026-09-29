@@ -125,6 +125,7 @@ In the `myotp_pv_options` option, on the server only. It is shown masked on the 
 * WooCommerce block checkout support (Store API validation and a Send code widget under the phone field).
 * New setting "Apple Pay / Google Pay and other express wallet orders": allow without a code (default), ask for the code after payment (the paid order is held until the shopper verifies on the order confirmation page), or block. Wallet orders are recognised from WooPayments and WooCommerce Stripe Payment Gateway only when the wallet gateway is the chosen payment method.
 * The code box shows one line saying a code will be sent, and the code field appears only after a code was sent.
+* A verified order gets an order note naming the last four digits of the verified phone.
 * The checkout phone field is shown as required while verification is on (WooCommerce's own setting is left as it is).
 * Shoppers never see the verification service's raw error text; the detail goes to the WooCommerce log and an admin notice, without phone numbers. The Brand setting accepts only 3 to 16 letters or digits and says so when a value is refused.
 

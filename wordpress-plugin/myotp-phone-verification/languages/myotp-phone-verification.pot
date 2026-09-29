@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: MyOTP Phone Verification 1.1.0\n"
 "Report-Msgid-Bugs-To: https://github.com/brntech/myotp-agentkit/issues\n"
-"POT-Creation-Date: 2026-09-29 16:51+0000\n"
+"POT-Creation-Date: 2026-09-29 16:52+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -126,9 +126,6 @@ msgstr ""
 msgid "MyOTP Phone Verification: a shopper could not get or check a code. Last error: %s"
 msgstr ""
 
-msgid "MyOTP: billing phone verified by the shopper after the express wallet payment."
-msgstr ""
-
 #. translators: %s: wallet name, e.g. Apple Pay
 msgid "MyOTP: express wallet payment (%s) placed without phone verification."
 msgstr ""
@@ -141,6 +138,14 @@ msgid "MyOTP: held until the shopper verifies the billing phone."
 msgstr ""
 
 msgid "MyOTP: payment received. The order is on hold until the shopper verifies the billing phone."
+msgstr ""
+
+#. translators: %s: last four digits of the phone number
+msgid "MyOTP: phone ending %s verified by one-time code after the express wallet payment."
+msgstr ""
+
+#. translators: %s: last four digits of the phone number
+msgid "MyOTP: phone ending %s verified by one-time code."
 msgstr ""
 
 msgid "MyOTP: released after phone verification."

@@ -205,6 +205,9 @@ URL and send `X-API-Key: <your-key>` on authenticated tool requests.
 | `PORT` | `3000` | HTTP listen port. |
 | `HOST` | `0.0.0.0` | HTTP bind address. |
 | `MCP_PATH` | `/mcp` | HTTP route for MCP traffic. |
+| `MCP_SESSION_IDLE_MS` | `1800000` | HTTP mode: close a session after this long with no requests. The client gets 404 and re-initializes. |
+| `MCP_SESSION_BUSY_MS` | `3600000` | HTTP mode: close a session whose open request (such as an SSE stream) started longer ago than this. |
+| `MCP_MAX_SESSIONS` | `1000` | HTTP mode: most sessions held at once; a new session closes the least recently used one, idle sessions first. |
 
 ## Example tool calls
 

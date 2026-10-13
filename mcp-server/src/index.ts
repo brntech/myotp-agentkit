@@ -7,12 +7,14 @@
  *   - --http (or MYOTP_MCP_TRANSPORT=http): streamable HTTP (for hosting at mcp.myotp.app)
  */
 
-import { randomUUID } from "node:crypto";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import express, { type Request, type Response } from "express";
-import { createServer, resolveApiKeyFromHeaders, resolveApiKeyFromQuery } from "./server.js";
+import {
+  createHttpApp,
+  DEFAULT_MAX_SESSIONS,
+  DEFAULT_SESSION_BUSY_MS,
+  DEFAULT_SESSION_IDLE_MS,
+} from "./http.js";
+import { createServer } from "./server.js";
 
 interface CliConfig {
   transport: "stdio" | "http";
@@ -60,77 +62,23 @@ async function runStdio(): Promise<void> {
   process.stderr.write(`[myotp-mcp] running on stdio (base url: ${process.env.MYOTP_BASE_URL ?? "https://api.myotp.app"})\n`);
 }
 
+function positiveEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 async function runHttp(config: CliConfig): Promise<void> {
-  const app = express();
-  app.use(express.json({ limit: "1mb" }));
+  const idleMs = positiveEnv("MCP_SESSION_IDLE_MS", DEFAULT_SESSION_IDLE_MS);
+  const busyMs = positiveEnv("MCP_SESSION_BUSY_MS", DEFAULT_SESSION_BUSY_MS);
+  const maxSessions = positiveEnv("MCP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS);
+  const http = createHttpApp({ path: config.path, idleMs, busyMs, maxSessions });
 
-  // Per the MCP spec, each session has its own transport instance. We key them
-  // by Mcp-Session-Id (issued on initialize) so subsequent requests reuse the
-  // same transport and preserve protocol state.
-  const transports = new Map<string, StreamableHTTPServerTransport>();
+  const sweepTimer = setInterval(() => {
+    void http.sweep();
+  }, Math.min(idleMs, 60_000));
+  sweepTimer.unref();
 
-  app.get("/healthz", (_req: Request, res: Response) => {
-    res.json({ ok: true, server: "myotp-mcp" });
-  });
-
-  // Each request must carry its own key so one hosted server can serve many
-  // tenants; we deliberately do NOT fall back to MYOTP_API_KEY in HTTP mode.
-  // See resolveApiKeyFromHeaders for why Authorization: Bearer is also accepted.
-  const resolveApiKey = (extra: {
-    headers?: Record<string, string | string[] | undefined>;
-    url?: string;
-  }): string => resolveApiKeyFromHeaders(extra.headers) || resolveApiKeyFromQuery(extra.url);
-
-  const handleMcpRequest = async (req: Request, res: Response): Promise<void> => {
-    const sessionId = req.header("mcp-session-id") ?? undefined;
-
-    // Gateways that pass config in the URL: lift the key into the header the
-    // tools read, unless a header already carries one.
-    if (!resolveApiKeyFromHeaders(req.headers)) {
-      const fromQuery = resolveApiKeyFromQuery(req.originalUrl ?? req.url);
-      if (fromQuery) req.headers["x-api-key"] = fromQuery;
-    }
-
-    let transport: StreamableHTTPServerTransport | undefined = sessionId
-      ? transports.get(sessionId)
-      : undefined;
-
-    if (!transport) {
-      // New session — only allowed if the body is an MCP `initialize` request.
-      if (req.method === "POST" && !isInitializeRequest(req.body)) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message: "Bad Request: no Mcp-Session-Id and request is not an initialize call.",
-          },
-          id: null,
-        });
-        return;
-      }
-
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (sid: string) => {
-          if (transport) transports.set(sid, transport);
-        },
-      });
-      transport.onclose = () => {
-        if (transport?.sessionId) transports.delete(transport.sessionId);
-      };
-
-      const server = createServer({ resolveApiKey });
-      await server.connect(transport);
-    }
-
-    await transport.handleRequest(req, res, req.body);
-  };
-
-  app.post(config.path, handleMcpRequest);
-  app.get(config.path, handleMcpRequest);
-  app.delete(config.path, handleMcpRequest);
-
-  app.listen(config.port, config.host, () => {
+  http.app.listen(config.port, config.host, () => {
     process.stderr.write(
       `[myotp-mcp] HTTP listening on http://${config.host}:${config.port}${config.path}\n`
     );

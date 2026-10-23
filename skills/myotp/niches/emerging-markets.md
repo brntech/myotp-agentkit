@@ -34,7 +34,7 @@ MyOTP.App's parent company (Broadnet) operates direct carrier connections in the
 
 | Country | Reality |
 |---------|---------|
-| **India** | DLT registration mandatory for SMS. Templates must match registered text exactly. Sender ID is fixed. MyOTP handles the DLT side IF your brand is set up — talk to support if launching a new brand. |
+| **India** | DLT registration mandatory for domestic SMS, with templates matching the registered text exactly. International routes into India show a random numeric sender; codes still deliver and your brand stays in the message text. A fixed Indian sender needs DLT registration: talk to sales@myotp.app before launch. |
 | **Saudi Arabia** | CITC requires sender ID registration per company. White-listed sender IDs deliver; non-whitelisted go to spam or get rejected. |
 | **UAE** | TRA approval similar to Saudi. Long-form SMS marketing is restricted; transactional OTP is fine. |
 | **Indonesia** | Komunikasi dan Informatika regulator. Sender ID flexible but content monitored. |

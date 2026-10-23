@@ -27,7 +27,7 @@ It's not a perfect filter (SIM farms exist) but it raises the cost curve enough 
 - **Multi-channel** — SMS for universal coverage, WhatsApp where it's the dominant messenger (LATAM, India, SEA marketplaces), Telegram for tech-savvy buyer/seller communities
 - **Direct carrier delivery** so the OTP doesn't get filtered as spam (a real risk on shared SMS aggregators that have been abused by previous customers)
 - **Sensible per-message pricing** — important when you're verifying every listing, not just every signup
-- **Brand control** — sender shows as "AcmeMarket" not a random short code, which builds buyer trust
+- **Your brand in every code** — the message reads "AcmeMarket: Your verification code is …", so buyers know who sent it
 
 ## Common patterns
 

@@ -11,7 +11,11 @@ info:
     Delivery webhooks: register a callback URL against an API key in your
     dashboard and MyOTP will POST to it when a message reaches a terminal state,
     so you do not have to poll /check_otp_status. Events are otp.delivered,
-    otp.sent, otp.read and otp.failed, on all three channels. The body is the
+    otp.sent, otp.read and otp.failed, on all three channels. For SMS,
+    otp.delivered means the carrier accepted the message; the handset outcome
+    comes later as otp.carrier_receipt (dlr_status DELIVRD, UNDELIV, EXPIRED,
+    REJECTD or DELETED, and dlr_at), sent only to a webhook that lists that
+    event explicitly, on plans with delivery reports. The body is the
     DeliveryEvent schema below. Every request is signed with Standard Webhooks
     v1 (standardwebhooks.com), so you can verify it with any off-the-shelf
     library: the signed content is "{webhook-id}.{webhook-timestamp}.{body}",
@@ -227,7 +231,10 @@ paths:
                       - invalid
                       - expired
                       - not found
-                    description: Present when status is failed. An expired code answers status failed with reason expired.
+                    description: >-
+                      Present when status is failed. An expired code answers status failed with reason expired.
+                      A code accepts five wrong attempts: the fifth answers invalid and deletes the code, and
+                      later attempts fail until a new code is sent.
                   message:
                     type: string
                     description: Message describing the status of the OTP verification
@@ -1093,10 +1100,12 @@ components:
       properties:
         event:
           type: string
-          enum: [otp.delivered, otp.sent, otp.read, otp.failed]
+          enum: [otp.delivered, otp.sent, otp.read, otp.failed, otp.carrier_receipt]
           description: >
             All failures collapse to otp.failed; the specific cause is in `reason`,
             so subscribing to otp.failed keeps working as new failure codes appear.
+            otp.carrier_receipt (SMS only, opt-in) carries the carrier's final
+            handset report in dlr_status and dlr_at.
         message_id:
           type: string
           description: The message_id returned by /generate_otp.
@@ -1116,6 +1125,15 @@ components:
         reason:
           type: string
           description: Present only on otp.failed, e.g. NoBalance, SMPP, mWebAPI.
+        dlr_status:
+          type: string
+          enum: [DELIVRD, UNDELIV, EXPIRED, REJECTD, DELETED]
+          description: Present only on otp.carrier_receipt; the carrier's final report for this SMS.
+        dlr_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Present only on otp.carrier_receipt; when the carrier reported it.
       required: [event, message_id, status, occurred_at]
       example:
         event: otp.delivered

@@ -44,7 +44,7 @@ Other gateways can be added with the `myotp_pv_express_wallet_gateways` filter (
 
 = External service =
 
-This plugin sends the phone number a visitor enters to the MyOTP.App API at https://api.myotp.app to deliver a one-time code and to check the code the visitor types. No other data is sent. MyOTP.App privacy policy: https://myotp.app/privacy-policy/. Terms: https://myotp.app/term-condition/.
+This plugin sends the phone number a visitor enters to the MyOTP.App API at https://api.myotp.app to deliver a one-time code and to check the code the visitor types. No other data is sent. MyOTP.App privacy policy: https://myotp.app/privacy-policy/. Terms: https://www.broadnet.me/legal/terms-of-service.
 
 = Data stored on your site =
 

@@ -341,7 +341,7 @@ msgstr ""
 msgid "We'll text a code to confirm this number."
 msgstr ""
 
-msgid "When you verify a phone number on this site, the number is sent to MyOTP.App (api.myotp.app) so a one-time code can be delivered by SMS, WhatsApp or Telegram and checked. MyOTP.App processes the number under its own privacy policy and terms: https://myotp.app/privacy-policy/ and https://myotp.app/term-condition/."
+msgid "When you verify a phone number on this site, the number is sent to MyOTP.App (api.myotp.app) so a one-time code can be delivered by SMS, WhatsApp or Telegram and checked. MyOTP.App processes the number under its own privacy policy and terms: https://myotp.app/privacy-policy/ and https://www.broadnet.me/legal/terms-of-service."
 msgstr ""
 
 msgid "Why this exists: it bounds what an attacker with many addresses and many numbers can make the site spend. Counted in a fixed one-hour window that starts at the first send, so up to twice this number can go out across a window boundary. On top of the per-visitor, per-IP and per-number limits. Behind a reverse proxy the per-IP limit may see only the proxy address, so this is the real backstop. Filter: myotp_pv_site_hourly_cap."

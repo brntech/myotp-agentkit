@@ -185,4 +185,4 @@ Pricing: per-country pricing at https://myotp.app/pricing/.
 
 Categories: Multi-factor Authentication, Passwordless, Messaging / SMS.
 
-Support: support@myotp.app. Privacy policy: https://myotp.app/privacy-policy/. Terms: https://myotp.app/term-condition/.
+Support: support@myotp.app. Privacy policy: https://myotp.app/privacy-policy/. Terms: https://www.broadnet.me/legal/terms-of-service.

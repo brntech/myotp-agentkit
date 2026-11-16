@@ -11,6 +11,7 @@ Auth0 generates and checks the code. The Action hands it to MyOTP, which deliver
 | `integration/configuration.json` | `MYOTP_API_KEY` secret, `MYOTP_CHANNEL` setting. |
 | `integration/installation_guide.md` | The install steps shown on the Marketplace listing. |
 | `media/` | Logo (256x256) and three column images (460x260). |
+| `description.md` | Listing copy: short description, gallery tile text, description. MFA only. |
 
 For the newer Custom Phone Provider (passwordless SMS and MFA from one Action), see the [parent folder](../).
 

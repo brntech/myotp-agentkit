@@ -155,7 +155,10 @@ exports.onExecuteCustomPhoneProvider = async (event, api) => {
 
 The full file in `action/` adds input validation, phone masking in logs, a bounded body read, the legacy trigger and clearer error messages. Prefer it.
 
-## Marketplace listing copy
+## Listing copy for the Custom Phone Provider
+
+This copy describes the Action in `action/`. The Auth0 Marketplace package in `marketplace/` is the Send Phone Message
+integration, which covers MFA only; its listing copy is `marketplace/description.md`.
 
 Integration name: MyOTP.App
 
